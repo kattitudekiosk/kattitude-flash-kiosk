@@ -66,6 +66,12 @@
   let swipeStart         = null;  // { x, y }
   let lastPinchDist      = 0;
   let multiTouchDetected = false; // a 2nd+ finger joined this gesture — see onTouchStart
+  let trackedTouchId     = null;  // Touch.identifier of the finger driving the gesture —
+                                   // touches[0] is NOT guaranteed to stay the same physical
+                                   // contact across events (spec leaves array order
+                                   // implementation-defined), so a ghost/phantom contact on
+                                   // a noisy panel could silently swap into index 0 mid-
+                                   // gesture and corrupt swipe tracking. Always resolve by id.
 
   let badgeTimer = null;
 
@@ -102,6 +108,13 @@
   function isFS() {
     return !!(document.fullscreenElement || document.webkitFullscreenElement);
   }
+
+  // Diagnostic only — if this logs false, the Fullscreen API is blocked
+  // outright for this page (e.g. no `allowfullscreen` on an embedding
+  // iframe, or a Permissions-Policy disabling it), and no amount of
+  // retrying requestFullscreen() from here will ever succeed; that would
+  // need fixing in the kiosk browser/shell config, not this script.
+  console.log('[fullscreen] document.fullscreenEnabled =', document.fullscreenEnabled);
 
   // Best-effort fullscreen attempt — used on page load and on visibility
   // regain, in addition to the splash tap (see enterGallery). Browsers
@@ -216,16 +229,37 @@
   // Capture phase so this always sees a touch first, before any component
   // (nav buttons, dots, the stage's own drag/swipe handling) can act on it —
   // stopping propagation here fully consumes the "wake up" tap so it can't
-  // simultaneously trigger navigation or zoom underneath.
+  // simultaneously trigger navigation or zoom underneath. preventDefault()
+  // is unconditional (not just during screensaver) as a blanket "this app
+  // owns all touch input" declaration — belt-and-suspenders against the
+  // browser's native gesture handling (page pinch-zoom, edge-swipe
+  // back/forward navigation, overscroll) ever claiming a gesture instead of
+  // the page, independent of touch-action CSS or the per-element JS below.
   document.addEventListener('touchstart', e => {
+    e.preventDefault();
     if (screensaverActive) {
-      e.preventDefault();
       e.stopPropagation();
       exitScreensaver();
       return;
     }
     if (galleryEntered) resetIdleTimer();
+    // Every touch is a valid user gesture — keep retrying fullscreen on
+    // each one until it sticks, in case an earlier attempt (page load,
+    // the very first splash tap) was rejected by this particular browser.
+    tryEnterFullscreen();
   }, { capture: true, passive: false });
+
+  // Same reasoning for touchmove: Chrome can mark a touchmove non-cancelable
+  // if preventDefault() wasn't called on an earlier move in the same
+  // gesture, so every touchmove is unconditionally prevented here, at the
+  // earliest possible point (document, capture phase) — not just
+  // multi-touch ones.
+  document.addEventListener('touchmove', e => e.preventDefault(), { capture: true, passive: false });
+
+  // WebKit-only pinch gesture events (Chrome never fires these, so this is
+  // a no-op there, but it's a real vector on Safari-based kiosk browsers).
+  document.addEventListener('gesturestart',  e => e.preventDefault());
+  document.addEventListener('gesturechange', e => e.preventDefault());
 
   document.addEventListener('pointerdown', e => {
     if (e.pointerType === 'touch') return; // touch handled above
@@ -368,7 +402,7 @@
 
       // Reset zoom/pan state
       scale = 1; tx = 0; ty = 0;
-      isDragging = false; dragStart = null; swipeStart = null; lastPinchDist = 0; multiTouchDetected = false;
+      isDragging = false; dragStart = null; swipeStart = null; lastPinchDist = 0; multiTouchDetected = false; trackedTouchId = null;
       current = idx;
       updateUI();
 
@@ -447,24 +481,33 @@
   function isZoomed() { return scale > MIN_SCALE + 0.01; }
 
   /* ── Touch handlers (kiosk primary) ──────────────────────────────────────
-   * Pinch-to-zoom is not supported here by design — only the FIRST touch
-   * point of a gesture is ever tracked. Any extra/phantom touch points
-   * (ghost contacts are common on large capacitive panels) are simply
-   * ignored rather than being read as a second pinch finger, so they can
-   * never hijack a swipe into a zoom. multiTouchDetected additionally
-   * remembers that a 2nd finger joined at all, so a real two-finger pinch
-   * attempt whose anchor finger barely moves can't be misread as a
-   * stationary tap-to-zoom once everything lifts (see onTouchEnd) — that
-   * would make pinch zoom by accident, which must stay disabled.
+   * Pinch-to-zoom is not supported here by design — only the finger that
+   * STARTED the gesture is ever tracked, resolved by Touch.identifier (not
+   * array position — the order of the `touches`/`changedTouches` lists is
+   * implementation-defined, so a ghost/phantom contact, common on large
+   * capacitive panels, could otherwise silently take over index 0 mid-
+   * gesture and corrupt swipe tracking). Extra touch points are ignored for
+   * driving the gesture, but multiTouchDetected remembers one joined at all,
+   * so a real two-finger pinch attempt whose anchor finger barely moves
+   * can't be misread as a stationary tap-to-zoom once everything lifts
+   * (see onTouchEnd) — that would make pinch zoom by accident.
    *
-   * A gesture is classified at touchend by how far it travelled from
-   * touchstart:
+   * The gesture resolves as soon as the TRACKED finger lifts — regardless
+   * of whether some other (ghost) touch is still reported down — classified
+   * by how far it travelled from touchstart:
    *   - <= TAP_MOVE_TOLERANCE and single-finger throughout -> tap -> toggle zoom
    *   - a real horizontal swipe (and not currently zoomed) -> navigate
    *   - anything else (e.g. a pan while zoomed, already applied live in
    *     onTouchMove, a multi-finger gesture, or a failed/ambiguous swipe
    *     attempt) -> no-op
    */
+  function findTouch(touchList, id) {
+    for (let i = 0; i < touchList.length; i++) {
+      if (touchList[i].identifier === id) return touchList[i];
+    }
+    return null;
+  }
+
   function onTouchStart(e) {
     e.preventDefault();
     const t = e.touches;
@@ -475,21 +518,21 @@
       return;
     }
 
-    isDragging = false;
+    isDragging     = false;
     multiTouchDetected = t.length >= 2;
-    dragStart  = { x: t[0].clientX, y: t[0].clientY, tx, ty };
-    swipeStart = { x: t[0].clientX, y: t[0].clientY };
+    trackedTouchId = t[0].identifier;
+    dragStart      = { x: t[0].clientX, y: t[0].clientY, tx, ty };
+    swipeStart     = { x: t[0].clientX, y: t[0].clientY };
   }
 
   function onTouchMove(e) {
     e.preventDefault();
-    const t = e.touches;
-    if (t.length === 0 || !dragStart) return;
+    if (!dragStart || trackedTouchId === null) return;
+    const touch = findTouch(e.touches, trackedTouchId);
+    if (!touch) return; // tracked finger not in this event (only a ghost/other touch moved)
 
-    // Always track touches[0] — the finger the gesture started with —
-    // regardless of how many other fingers may also be on the glass.
-    const dx = t[0].clientX - dragStart.x;
-    const dy = t[0].clientY - dragStart.y;
+    const dx = touch.clientX - dragStart.x;
+    const dy = touch.clientY - dragStart.y;
     if (!isDragging && Math.hypot(dx, dy) > TAP_MOVE_TOLERANCE) isDragging = true;
     if (isDragging && isZoomed()) {
       tx = dragStart.tx + dx;
@@ -502,26 +545,28 @@
 
   function onTouchEnd(e) {
     e.preventDefault();
-    const t       = e.touches;
-    const changed = e.changedTouches;
+    if (!dragStart || trackedTouchId === null) return;
 
-    if (t.length === 0) {
-      if (swipeStart && changed.length > 0) {
-        const dx = changed[0].clientX - swipeStart.x;
-        const dy = changed[0].clientY - swipeStart.y;
-        const moveDist = Math.hypot(dx, dy);
+    const ended = findTouch(e.changedTouches, trackedTouchId);
+    if (!ended) return; // some other (ghost) touch ended; our tracked finger is still down
 
-        if (moveDist <= TAP_MOVE_TOLERANCE && !multiTouchDetected) {
-          handleTapZoom(changed[0].clientX, changed[0].clientY);
-        } else if (!isZoomed() && Math.abs(dx) > SWIPE_THRESHOLD && Math.abs(dx) > Math.abs(dy) * SWIPE_ANGLE_RATIO) {
-          dx < 0 ? navigate(current + 1, 'left') : navigate(current - 1, 'right');
-        }
+    if (swipeStart) {
+      const dx = ended.clientX - swipeStart.x;
+      const dy = ended.clientY - swipeStart.y;
+      const moveDist = Math.hypot(dx, dy);
+
+      if (moveDist <= TAP_MOVE_TOLERANCE && !multiTouchDetected) {
+        handleTapZoom(ended.clientX, ended.clientY);
+      } else if (!isZoomed() && Math.abs(dx) > SWIPE_THRESHOLD && Math.abs(dx) > Math.abs(dy) * SWIPE_ANGLE_RATIO) {
+        dx < 0 ? navigate(current + 1, 'left') : navigate(current - 1, 'right');
       }
-      isDragging         = false;
-      dragStart          = null;
-      swipeStart         = null;
-      multiTouchDetected = false;
     }
+
+    isDragging         = false;
+    dragStart          = null;
+    swipeStart         = null;
+    multiTouchDetected = false;
+    trackedTouchId     = null;
   }
 
   /* ── Pointer handlers (mouse / desktop fallback — touch guarded) ─────────── */
