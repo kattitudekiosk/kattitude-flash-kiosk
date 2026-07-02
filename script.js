@@ -53,7 +53,7 @@
   // sheets (burn-in prevention). Any tap during the screensaver wakes the
   // kiosk back to the logo/splash page rather than just pausing on a sheet.
   const IDLE_TIMEOUT_MS         = 120000; // 2 minutes
-  const SCREENSAVER_INTERVAL_MS = 6000;   // ms per sheet while cycling (6s)
+  const SCREENSAVER_INTERVAL_MS = 8000;   // ms per sheet while cycling (8s)
 
   let isDragging    = false;
   let dragStart     = null;  // { x, y, tx, ty }
