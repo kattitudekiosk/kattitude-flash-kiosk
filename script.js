@@ -92,9 +92,38 @@
     el.addEventListener('click', fn);
   }
 
+  /* ── QR code (links to the online gallery) ────────────────────────────── */
+  function renderQrCode() {
+    const badge = document.getElementById('qrBadge');
+    if (!badge || typeof qrcode !== 'function') return;
+
+    const qr = qrcode(0, 'M');
+    qr.addData('https://flash-gallery.vercel.app');
+    qr.make();
+
+    const count   = qr.getModuleCount();
+    const svgNS   = 'http://www.w3.org/2000/svg';
+    const svg     = document.createElementNS(svgNS, 'svg');
+    svg.setAttribute('viewBox', `0 0 ${count} ${count}`);
+    svg.setAttribute('shape-rendering', 'crispEdges');
+
+    let d = '';
+    for (let r = 0; r < count; r++) {
+      for (let c = 0; c < count; c++) {
+        if (qr.isDark(r, c)) d += `M${c},${r}h1v1h-1z`;
+      }
+    }
+    const path = document.createElementNS(svgNS, 'path');
+    path.setAttribute('d', d);
+    path.setAttribute('fill', '#1a1a1a');
+    svg.appendChild(path);
+    badge.appendChild(svg);
+  }
+
   /* ── Init ──────────────────────────────────────────────────────────────── */
   function init() {
     buildDots();
+    renderQrCode();
     loadSheet(0, 'none');
     bindEventListeners();
   }
