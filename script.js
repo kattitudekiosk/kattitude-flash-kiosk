@@ -20,6 +20,7 @@
   const btnPrev    = document.getElementById('btnPrev');
   const btnNext    = document.getElementById('btnNext');
   const dotsEl     = document.getElementById('dots');
+  const footerHint = document.querySelector('.footer-hint');
 
   const zoomBadge = document.createElement('div');
   zoomBadge.id    = 'zoomBadge';
@@ -39,10 +40,16 @@
   // Pinch-to-zoom is intentionally disabled on this kiosk (see onTouchStart) —
   // a stray second touch point (common on large capacitive panels) was being
   // misread as a pinch gesture mid-swipe, zooming instead of navigating.
-  // Zoom is still reachable via double-tap. Swipe threshold raised so small
-  // jitter during a real swipe can't be misread either.
+  // Swipe threshold raised so small jitter during a real swipe can't be
+  // misread either.
   const SWIPE_THRESHOLD   = 90;   // px of horizontal travel required to trigger nav
   const SWIPE_ANGLE_RATIO = 1.5;  // horizontal travel must dominate vertical by this much
+
+  // Double-tap-to-zoom only makes sense on a small phone screen (via the QR
+  // code) where there's no other way to get closer to tattoo detail. On the
+  // 1080px-wide kiosk the sheets already render full-size, so it's disabled
+  // there entirely — see handleDoubleTap().
+  const ZOOM_ENABLED = window.innerWidth < 900;
 
   // Sheet slide-out/slide-in transition duration — slowed down from the
   // original 280ms so the flip between flash sheets feels smoother on the
@@ -74,9 +81,18 @@
 
   /* ── Fullscreen ─────────────────────────────────────────────────────────── */
   function requestFS() {
-    const el = document.documentElement;
-    const fn = el.requestFullscreen || el.webkitRequestFullscreen;
-    if (fn) return Promise.resolve(fn.call(el)).catch(() => {});
+    // Some browsers (seen on kiosk hardware) throw SYNCHRONOUSLY here —
+    // e.g. re-requesting while already fullscreen — rather than rejecting
+    // a promise. Must never let that escape, or it aborts whatever caller
+    // invoked this (see enterGallery, which now sequences its critical
+    // splash-dismiss step before this call regardless).
+    try {
+      const el = document.documentElement;
+      const fn = el.requestFullscreen || el.webkitRequestFullscreen;
+      if (fn) return Promise.resolve(fn.call(el)).catch(() => {});
+    } catch (err) {
+      console.log('[fullscreen] request failed (non-fatal):', err && err.message ? err.message : err);
+    }
     return Promise.resolve();
   }
 
@@ -92,6 +108,32 @@
   document.addEventListener('fullscreenchange',       () => document.body.classList.toggle('in-fullscreen', isFS()));
   document.addEventListener('webkitfullscreenchange', () => document.body.classList.toggle('in-fullscreen', isFS()));
 
+  /* ── Wake Lock (kiosk display must never dim/sleep) ───────────────────────
+   * Requested on load and again when the splash is dismissed. Browsers
+   * release the lock automatically when the tab is backgrounded, so it's
+   * re-acquired on visibilitychange once the page is visible again.
+   * Unsupported browsers are handled gracefully — logged, not fatal.
+   */
+  let wakeLock = null;
+
+  async function requestWakeLock() {
+    if (!('wakeLock' in navigator)) {
+      console.log('[wake-lock] Not supported in this browser — screen may dim/sleep per OS settings.');
+      return;
+    }
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+      console.log('[wake-lock] Acquired.');
+      wakeLock.addEventListener('release', () => console.log('[wake-lock] Released.'));
+    } catch (err) {
+      console.log('[wake-lock] Request failed:', err && err.message ? err.message : err);
+    }
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') requestWakeLock();
+  });
+
   /* ── Splash ─────────────────────────────────────────────────────────────── */
   let galleryEntered = false;
 
@@ -99,9 +141,18 @@
     if (galleryEntered) return;
     galleryEntered = true;
     if (e && e.cancelable) e.preventDefault();
-    requestFS();
+
+    // Dismiss the splash and arm the idle timer FIRST and unconditionally.
+    // Fullscreen/wake-lock are best-effort enhancements — if either throws
+    // (seen on kiosk hardware re-requesting fullscreen), it must never be
+    // able to leave the kiosk stuck showing the splash with no way to
+    // dismiss it (galleryEntered would already be true, so every future
+    // tap would silently no-op at the guard above).
     splash.classList.add('hidden');
     resetIdleTimer();
+
+    requestFS();
+    requestWakeLock();
   }
 
   splash.addEventListener('touchstart', enterGallery, { passive: false });
@@ -135,10 +186,16 @@
     clearInterval(screensaverTimer);
     clearTimeout(idleTimer);
     document.body.classList.remove('screensaver');
-
     galleryEntered = false;
-    if (current === 0) resetZoom(); else loadSheet(0, 'none');
+
+    // Splash must always reappear — do this before the best-effort sheet
+    // reset so a failure there can never leave the kiosk stuck.
     splash.classList.remove('hidden');
+    try {
+      if (current === 0) resetZoom(); else loadSheet(0, 'none');
+    } catch (err) {
+      console.log('[screensaver] reset-to-sheet-1 failed (non-fatal):', err && err.message ? err.message : err);
+    }
   }
 
   // Capture phase so this always sees a touch first, before any component
@@ -210,6 +267,8 @@
     renderQrCode();
     loadSheet(0, 'none');
     bindEventListeners();
+    requestWakeLock();
+    if (footerHint && !ZOOM_ENABLED) footerHint.textContent = 'Swipe to browse';
   }
 
   /* ── Dots ──────────────────────────────────────────────────────────────── */
@@ -529,6 +588,7 @@
 
   /* ── Double-tap zoom ────────────────────────────────────────────────────── */
   function handleDoubleTap(cx, cy) {
+    if (!ZOOM_ENABLED) return; // disabled on the kiosk — see ZOOM_ENABLED above
     const rect = stage.getBoundingClientRect();
     if (isZoomed()) {
       // Animate back to resting state
