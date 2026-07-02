@@ -20,7 +20,6 @@
   const btnPrev    = document.getElementById('btnPrev');
   const btnNext    = document.getElementById('btnNext');
   const dotsEl     = document.getElementById('dots');
-  const footerHint = document.querySelector('.footer-hint');
 
   const zoomBadge = document.createElement('div');
   zoomBadge.id    = 'zoomBadge';
@@ -37,19 +36,19 @@
   const MIN_SCALE = 1;
   const MAX_SCALE = 6;
 
-  // Pinch-to-zoom is intentionally disabled on this kiosk (see onTouchStart) —
-  // a stray second touch point (common on large capacitive panels) was being
+  // Pinch-to-zoom is intentionally disabled (see onTouchStart) — a stray
+  // second touch point (common on large capacitive panels) was being
   // misread as a pinch gesture mid-swipe, zooming instead of navigating.
   // Swipe threshold raised so small jitter during a real swipe can't be
   // misread either.
   const SWIPE_THRESHOLD   = 90;   // px of horizontal travel required to trigger nav
   const SWIPE_ANGLE_RATIO = 1.5;  // horizontal travel must dominate vertical by this much
 
-  // Double-tap-to-zoom only makes sense on a small phone screen (via the QR
-  // code) where there's no other way to get closer to tattoo detail. On the
-  // 1080px-wide kiosk the sheets already render full-size, so it's disabled
-  // there entirely — see handleDoubleTap().
-  const ZOOM_ENABLED = window.innerWidth < 900;
+  // A touch that moves less than this counts as a stationary TAP rather
+  // than a swipe/drag — used to trigger tap-to-zoom (tap once to zoom in
+  // centered on that point, tap again anywhere to zoom back out). Works
+  // identically on the kiosk and on mobile; only pinch is disabled.
+  const TAP_MOVE_TOLERANCE = 10;
 
   // Sheet slide-out/slide-in transition duration — slowed down from the
   // original 280ms so the flip between flash sheets feels smoother on the
@@ -62,13 +61,12 @@
   const IDLE_TIMEOUT_MS         = 120000; // 2 minutes
   const SCREENSAVER_INTERVAL_MS = 8000;   // ms per sheet while cycling (8s)
 
-  let isDragging    = false;
-  let dragStart     = null;  // { x, y, tx, ty }
-  let swipeStart    = null;  // { x, y }
-  let lastPinchDist = 0;
+  let isDragging         = false;
+  let dragStart          = null;  // { x, y, tx, ty }
+  let swipeStart         = null;  // { x, y }
+  let lastPinchDist      = 0;
+  let multiTouchDetected = false; // a 2nd+ finger joined this gesture — see onTouchStart
 
-  let lastTap    = 0;
-  let lastTapPos = null;
   let badgeTimer = null;
 
   // Mouse/desktop only
@@ -268,7 +266,6 @@
     loadSheet(0, 'none');
     bindEventListeners();
     requestWakeLock();
-    if (footerHint && !ZOOM_ENABLED) footerHint.textContent = 'Swipe to browse';
   }
 
   /* ── Dots ──────────────────────────────────────────────────────────────── */
@@ -353,7 +350,7 @@
 
       // Reset zoom/pan state
       scale = 1; tx = 0; ty = 0;
-      isDragging = false; dragStart = null; swipeStart = null; lastPinchDist = 0;
+      isDragging = false; dragStart = null; swipeStart = null; lastPinchDist = 0; multiTouchDetected = false;
       current = idx;
       updateUI();
 
@@ -436,30 +433,34 @@
    * point of a gesture is ever tracked. Any extra/phantom touch points
    * (ghost contacts are common on large capacitive panels) are simply
    * ignored rather than being read as a second pinch finger, so they can
-   * never hijack a swipe into a zoom. Zoom is still available via
-   * double-tap.
+   * never hijack a swipe into a zoom. multiTouchDetected additionally
+   * remembers that a 2nd finger joined at all, so a real two-finger pinch
+   * attempt whose anchor finger barely moves can't be misread as a
+   * stationary tap-to-zoom once everything lifts (see onTouchEnd) — that
+   * would make pinch zoom by accident, which must stay disabled.
+   *
+   * A gesture is classified at touchend by how far it travelled from
+   * touchstart:
+   *   - <= TAP_MOVE_TOLERANCE and single-finger throughout -> tap -> toggle zoom
+   *   - a real horizontal swipe (and not currently zoomed) -> navigate
+   *   - anything else (e.g. a pan while zoomed, already applied live in
+   *     onTouchMove, a multi-finger gesture, or a failed/ambiguous swipe
+   *     attempt) -> no-op
    */
   function onTouchStart(e) {
     e.preventDefault();
     const t = e.touches;
-    if (t.length === 0 || dragStart) return; // gesture already tracking a touch — ignore extra fingers
+    if (t.length === 0) return;
+
+    if (dragStart) {
+      if (t.length >= 2) multiTouchDetected = true; // extra finger joined — ignore it, but remember
+      return;
+    }
 
     isDragging = false;
+    multiTouchDetected = t.length >= 2;
     dragStart  = { x: t[0].clientX, y: t[0].clientY, tx, ty };
     swipeStart = { x: t[0].clientX, y: t[0].clientY };
-
-    // Double-tap detection
-    const now = Date.now();
-    if (now - lastTap < 280 && lastTapPos) {
-      const dx = t[0].clientX - lastTapPos.x;
-      const dy = t[0].clientY - lastTapPos.y;
-      if (Math.hypot(dx, dy) < 44) {
-        handleDoubleTap(t[0].clientX, t[0].clientY);
-        lastTap = 0; lastTapPos = null; return;
-      }
-    }
-    lastTap    = now;
-    lastTapPos = { x: t[0].clientX, y: t[0].clientY };
   }
 
   function onTouchMove(e) {
@@ -471,7 +472,7 @@
     // regardless of how many other fingers may also be on the glass.
     const dx = t[0].clientX - dragStart.x;
     const dy = t[0].clientY - dragStart.y;
-    if (!isDragging && Math.hypot(dx, dy) > 6) isDragging = true;
+    if (!isDragging && Math.hypot(dx, dy) > TAP_MOVE_TOLERANCE) isDragging = true;
     if (isDragging && isZoomed()) {
       tx = dragStart.tx + dx;
       ty = dragStart.ty + dy;
@@ -487,16 +488,21 @@
     const changed = e.changedTouches;
 
     if (t.length === 0) {
-      if (swipeStart && !isZoomed() && changed.length > 0) {
+      if (swipeStart && changed.length > 0) {
         const dx = changed[0].clientX - swipeStart.x;
         const dy = changed[0].clientY - swipeStart.y;
-        if (Math.abs(dx) > SWIPE_THRESHOLD && Math.abs(dx) > Math.abs(dy) * SWIPE_ANGLE_RATIO) {
+        const moveDist = Math.hypot(dx, dy);
+
+        if (moveDist <= TAP_MOVE_TOLERANCE && !multiTouchDetected) {
+          handleTapZoom(changed[0].clientX, changed[0].clientY);
+        } else if (!isZoomed() && Math.abs(dx) > SWIPE_THRESHOLD && Math.abs(dx) > Math.abs(dy) * SWIPE_ANGLE_RATIO) {
           dx < 0 ? navigate(current + 1, 'left') : navigate(current - 1, 'right');
         }
       }
-      isDragging = false;
-      dragStart  = null;
-      swipeStart = null;
+      isDragging         = false;
+      dragStart          = null;
+      swipeStart         = null;
+      multiTouchDetected = false;
     }
   }
 
@@ -511,18 +517,6 @@
       isDragging = false;
       dragStart  = { x: e.clientX, y: e.clientY, tx, ty };
       swipeStart = { x: e.clientX, y: e.clientY };
-
-      const now = Date.now();
-      if (now - lastTap < 280 && lastTapPos) {
-        const dx = e.clientX - lastTapPos.x;
-        const dy = e.clientY - lastTapPos.y;
-        if (Math.hypot(dx, dy) < 44) {
-          handleDoubleTap(e.clientX, e.clientY);
-          lastTap = 0; lastTapPos = null; return;
-        }
-      }
-      lastTap    = now;
-      lastTapPos = { x: e.clientX, y: e.clientY };
     }
     if (pointers.size === 2) {
       const pts = [...pointers.values()];
@@ -550,7 +544,7 @@
     if (pointers.size === 1 && dragStart) {
       const dx = e.clientX - dragStart.x;
       const dy = e.clientY - dragStart.y;
-      if (!isDragging && Math.hypot(dx, dy) > 6) { isDragging = true; stage.classList.add('dragging'); }
+      if (!isDragging && Math.hypot(dx, dy) > TAP_MOVE_TOLERANCE) { isDragging = true; stage.classList.add('dragging'); }
       if (isDragging && isZoomed()) {
         tx = dragStart.tx + dx;
         ty = dragStart.ty + dy;
@@ -570,10 +564,14 @@
     stage.classList.remove('dragging');
 
     if (pointers.size === 0 && wasSingle) {
-      if (swipeStart && !isZoomed()) {
+      if (swipeStart) {
         const dx = upX - swipeStart.x;
         const dy = upY - swipeStart.y;
-        if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.4) {
+        const moveDist = Math.hypot(dx, dy);
+
+        if (moveDist <= TAP_MOVE_TOLERANCE) {
+          handleTapZoom(upX, upY);
+        } else if (!isZoomed() && Math.abs(dx) > SWIPE_THRESHOLD && Math.abs(dx) > Math.abs(dy) * SWIPE_ANGLE_RATIO) {
           dx < 0 ? navigate(current + 1, 'left') : navigate(current - 1, 'right');
         }
       }
@@ -586,9 +584,9 @@
     }
   }
 
-  /* ── Double-tap zoom ────────────────────────────────────────────────────── */
-  function handleDoubleTap(cx, cy) {
-    if (!ZOOM_ENABLED) return; // disabled on the kiosk — see ZOOM_ENABLED above
+  /* ── Tap-to-zoom: tap a point to zoom in centered there, tap again to
+   * zoom back out. Works on touch and mouse alike; pinch stays disabled. */
+  function handleTapZoom(cx, cy) {
     const rect = stage.getBoundingClientRect();
     if (isZoomed()) {
       // Animate back to resting state
