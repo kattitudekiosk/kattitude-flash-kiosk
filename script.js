@@ -36,6 +36,14 @@
   const MIN_SCALE = 1;
   const MAX_SCALE = 6;
 
+  // Pinch-to-zoom is intentionally disabled on this kiosk (see onTouchStart) —
+  // a stray second touch point (common on large capacitive panels) was being
+  // misread as a pinch gesture mid-swipe, zooming instead of navigating.
+  // Zoom is still reachable via double-tap. Swipe threshold raised so small
+  // jitter during a real swipe can't be misread either.
+  const SWIPE_THRESHOLD   = 90;   // px of horizontal travel required to trigger nav
+  const SWIPE_ANGLE_RATIO = 1.5;  // horizontal travel must dominate vertical by this much
+
   let isDragging    = false;
   let dragStart     = null;  // { x, y, tx, ty }
   let swipeStart    = null;  // { x, y }
@@ -283,66 +291,53 @@
 
   function isZoomed() { return scale > MIN_SCALE + 0.01; }
 
-  /* ── Touch handlers (kiosk primary) ────────────────────────────────────── */
+  /* ── Touch handlers (kiosk primary) ──────────────────────────────────────
+   * Pinch-to-zoom is not supported here by design — only the FIRST touch
+   * point of a gesture is ever tracked. Any extra/phantom touch points
+   * (ghost contacts are common on large capacitive panels) are simply
+   * ignored rather than being read as a second pinch finger, so they can
+   * never hijack a swipe into a zoom. Zoom is still available via
+   * double-tap.
+   */
   function onTouchStart(e) {
     e.preventDefault();
     const t = e.touches;
+    if (t.length === 0 || dragStart) return; // gesture already tracking a touch — ignore extra fingers
 
-    if (t.length === 1) {
-      isDragging = false;
-      dragStart  = { x: t[0].clientX, y: t[0].clientY, tx, ty };
-      swipeStart = { x: t[0].clientX, y: t[0].clientY };
+    isDragging = false;
+    dragStart  = { x: t[0].clientX, y: t[0].clientY, tx, ty };
+    swipeStart = { x: t[0].clientX, y: t[0].clientY };
 
-      // Double-tap detection
-      const now = Date.now();
-      if (now - lastTap < 280 && lastTapPos) {
-        const dx = t[0].clientX - lastTapPos.x;
-        const dy = t[0].clientY - lastTapPos.y;
-        if (Math.hypot(dx, dy) < 44) {
-          handleDoubleTap(t[0].clientX, t[0].clientY);
-          lastTap = 0; lastTapPos = null; return;
-        }
+    // Double-tap detection
+    const now = Date.now();
+    if (now - lastTap < 280 && lastTapPos) {
+      const dx = t[0].clientX - lastTapPos.x;
+      const dy = t[0].clientY - lastTapPos.y;
+      if (Math.hypot(dx, dy) < 44) {
+        handleDoubleTap(t[0].clientX, t[0].clientY);
+        lastTap = 0; lastTapPos = null; return;
       }
-      lastTap    = now;
-      lastTapPos = { x: t[0].clientX, y: t[0].clientY };
     }
-
-    if (t.length >= 2) {
-      lastPinchDist = dist(
-        { x: t[0].clientX, y: t[0].clientY },
-        { x: t[1].clientX, y: t[1].clientY }
-      );
-      isDragging = false;
-      swipeStart = null;
-    }
+    lastTap    = now;
+    lastTapPos = { x: t[0].clientX, y: t[0].clientY };
   }
 
   function onTouchMove(e) {
     e.preventDefault();
     const t = e.touches;
+    if (t.length === 0 || !dragStart) return;
 
-    if (t.length >= 2) {
-      const p0   = { x: t[0].clientX, y: t[0].clientY };
-      const p1   = { x: t[1].clientX, y: t[1].clientY };
-      const d    = dist(p0, p1);
-      const m    = mid(p0, p1);
-      const rect = stage.getBoundingClientRect();
-      if (lastPinchDist > 0) zoomAt(scale * (d / lastPinchDist), m.x - rect.left, m.y - rect.top);
-      lastPinchDist = d;
-      return;
-    }
-
-    if (t.length === 1 && dragStart) {
-      const dx = t[0].clientX - dragStart.x;
-      const dy = t[0].clientY - dragStart.y;
-      if (!isDragging && Math.hypot(dx, dy) > 6) isDragging = true;
-      if (isDragging && isZoomed()) {
-        tx = dragStart.tx + dx;
-        ty = dragStart.ty + dy;
-        clampPan();
-        stageInner.style.transition = 'none';
-        stageInner.style.transform  = `translate(${tx}px, ${ty}px) scale(${scale})`;
-      }
+    // Always track touches[0] — the finger the gesture started with —
+    // regardless of how many other fingers may also be on the glass.
+    const dx = t[0].clientX - dragStart.x;
+    const dy = t[0].clientY - dragStart.y;
+    if (!isDragging && Math.hypot(dx, dy) > 6) isDragging = true;
+    if (isDragging && isZoomed()) {
+      tx = dragStart.tx + dx;
+      ty = dragStart.ty + dy;
+      clampPan();
+      stageInner.style.transition = 'none';
+      stageInner.style.transform  = `translate(${tx}px, ${ty}px) scale(${scale})`;
     }
   }
 
@@ -355,18 +350,13 @@
       if (swipeStart && !isZoomed() && changed.length > 0) {
         const dx = changed[0].clientX - swipeStart.x;
         const dy = changed[0].clientY - swipeStart.y;
-        if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.4) {
+        if (Math.abs(dx) > SWIPE_THRESHOLD && Math.abs(dx) > Math.abs(dy) * SWIPE_ANGLE_RATIO) {
           dx < 0 ? navigate(current + 1, 'left') : navigate(current - 1, 'right');
         }
       }
-      isDragging    = false;
-      dragStart     = null;
-      swipeStart    = null;
-      lastPinchDist = 0;
-    } else if (t.length === 1) {
-      dragStart     = { x: t[0].clientX, y: t[0].clientY, tx, ty };
-      lastPinchDist = 0;
-      swipeStart    = null;
+      isDragging = false;
+      dragStart  = null;
+      swipeStart = null;
     }
   }
 

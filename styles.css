@@ -310,19 +310,19 @@ body.in-fullscreen .fs-exit-btn { display: flex; }
 /* ─── QR badge — subtle, fixed to the screen's bottom-left corner ───────── */
 .qr-badge {
   position: fixed;
-  left: 12px;
-  bottom: 8px;
+  left: 16px;
+  bottom: 16px;
   z-index: 40;
-  width: 46px;
-  height: 46px;
-  padding: 4px;
+  width: 138px;
+  height: 138px;
+  padding: 10px;
   background: #ffffff;
-  border: 1.5px solid var(--pink-dim);
-  border-radius: 6px;
+  border: 2px solid var(--pink-dim);
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.10);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
   pointer-events: none;
 }
 
