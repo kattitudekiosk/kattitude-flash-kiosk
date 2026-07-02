@@ -103,6 +103,18 @@
     return !!(document.fullscreenElement || document.webkitFullscreenElement);
   }
 
+  // Best-effort fullscreen attempt — used on page load and on visibility
+  // regain, in addition to the splash tap (see enterGallery). Browsers
+  // generally require a genuine user gesture for requestFullscreen() to
+  // succeed, so these early/background attempts will often be silently
+  // rejected outside a kiosk-mode browser — that's fine, requestFS()
+  // already swallows both sync throws and promise rejections. The splash
+  // tap remains the reliable path; this just grabs fullscreen immediately
+  // wherever the browser/kiosk setup allows it.
+  function tryEnterFullscreen() {
+    if (!isFS()) requestFS();
+  }
+
   document.addEventListener('fullscreenchange',       () => document.body.classList.toggle('in-fullscreen', isFS()));
   document.addEventListener('webkitfullscreenchange', () => document.body.classList.toggle('in-fullscreen', isFS()));
 
@@ -129,7 +141,10 @@
   }
 
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') requestWakeLock();
+    if (document.visibilityState === 'visible') {
+      requestWakeLock();
+      tryEnterFullscreen();
+    }
   });
 
   /* ── Splash ─────────────────────────────────────────────────────────────── */
@@ -149,7 +164,7 @@
     splash.classList.add('hidden');
     resetIdleTimer();
 
-    requestFS();
+    tryEnterFullscreen();
     requestWakeLock();
   }
 
@@ -185,6 +200,8 @@
     clearTimeout(idleTimer);
     document.body.classList.remove('screensaver');
     galleryEntered = false;
+    // Intentionally does NOT call exitFS() — fullscreen must stay active
+    // across the splash reset; Chrome UI should never reappear on the kiosk.
 
     // Splash must always reappear — do this before the best-effort sheet
     // reset so a failure there can never leave the kiosk stuck.
@@ -266,6 +283,7 @@
     loadSheet(0, 'none');
     bindEventListeners();
     requestWakeLock();
+    tryEnterFullscreen();
   }
 
   /* ── Dots ──────────────────────────────────────────────────────────────── */
