@@ -179,6 +179,14 @@ html, body {
 
 body.in-fullscreen .fs-exit-btn { display: flex; }
 
+/* ─── Screensaver mode — hide static chrome, full-bleed slideshow ───────── */
+body.screensaver #header,
+body.screensaver #footer,
+body.screensaver .qr-badge,
+body.screensaver .nav-btn {
+  display: none;
+}
+
 .sheet-label {
   font-family: 'Inter', sans-serif;
   font-weight: 600;

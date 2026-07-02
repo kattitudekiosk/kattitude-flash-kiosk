@@ -49,6 +49,12 @@
   // kiosk touchscreen instead of feeling abrupt.
   const SLIDE_MS = 450;
 
+  // Screensaver: after IDLE_TIMEOUT_MS with no touch, auto-cycle through the
+  // sheets (burn-in prevention). Any tap during the screensaver wakes the
+  // kiosk back to the logo/splash page rather than just pausing on a sheet.
+  const IDLE_TIMEOUT_MS         = 120000; // 2 minutes
+  const SCREENSAVER_INTERVAL_MS = 6000;   // ms per sheet while cycling (6s)
+
   let isDragging    = false;
   let dragStart     = null;  // { x, y, tx, ty }
   let swipeStart    = null;  // { x, y }
@@ -60,6 +66,11 @@
 
   // Mouse/desktop only
   let pointers = new Map();
+
+  // Screensaver / idle state
+  let idleTimer         = null;
+  let screensaverTimer  = null;
+  let screensaverActive = false;
 
   /* ── Fullscreen ─────────────────────────────────────────────────────────── */
   function requestFS() {
@@ -90,10 +101,70 @@
     if (e && e.cancelable) e.preventDefault();
     requestFS();
     splash.classList.add('hidden');
+    resetIdleTimer();
   }
 
   splash.addEventListener('touchstart', enterGallery, { passive: false });
   splash.addEventListener('pointerdown', e => { if (e.pointerType !== 'touch') enterGallery(e); });
+
+  /* ── Screensaver (burn-in prevention) ─────────────────────────────────────
+   * Idle countdown only runs while the gallery is being actively browsed
+   * (after the splash has been dismissed). When it elapses, sheets auto-
+   * cycle on a timer until the next touch, which sends the kiosk back to
+   * the logo/splash page rather than just freezing the slideshow.
+   */
+  function resetIdleTimer() {
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(startScreensaver, IDLE_TIMEOUT_MS);
+  }
+
+  function startScreensaver() {
+    if (screensaverActive || !galleryEntered) return;
+    screensaverActive = true;
+    document.body.classList.add('screensaver');
+    if (isZoomed()) resetZoom();
+
+    screensaverTimer = setInterval(() => {
+      navigate((current + 1) % sheets.length, 'left');
+    }, SCREENSAVER_INTERVAL_MS);
+  }
+
+  function exitScreensaver() {
+    if (!screensaverActive) return;
+    screensaverActive = false;
+    clearInterval(screensaverTimer);
+    clearTimeout(idleTimer);
+    document.body.classList.remove('screensaver');
+
+    galleryEntered = false;
+    if (current === 0) resetZoom(); else loadSheet(0, 'none');
+    splash.classList.remove('hidden');
+  }
+
+  // Capture phase so this always sees a touch first, before any component
+  // (nav buttons, dots, the stage's own drag/swipe handling) can act on it —
+  // stopping propagation here fully consumes the "wake up" tap so it can't
+  // simultaneously trigger navigation or zoom underneath.
+  document.addEventListener('touchstart', e => {
+    if (screensaverActive) {
+      e.preventDefault();
+      e.stopPropagation();
+      exitScreensaver();
+      return;
+    }
+    if (galleryEntered) resetIdleTimer();
+  }, { capture: true, passive: false });
+
+  document.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'touch') return; // touch handled above
+    if (screensaverActive) {
+      e.preventDefault();
+      e.stopPropagation();
+      exitScreensaver();
+      return;
+    }
+    if (galleryEntered) resetIdleTimer();
+  }, { capture: true });
 
   /* ── Utility: dual touch+click binding for buttons ──────────────────────── */
   function addTap(el, fn) {
@@ -159,7 +230,8 @@
   }
 
   /* ── Navigation ────────────────────────────────────────────────────────── */
-  let navigating = false;
+  let navigating     = false;
+  let loadGeneration = 0; // bumped on every loadSheet() call to cancel stale in-flight transitions
 
   function navigate(idx, dir) {
     if (idx < 0 || idx >= sheets.length || idx === current || navigating) return;
@@ -168,10 +240,12 @@
 
   function loadSheet(idx, direction) {
     const sheet = sheets[idx];
+    const myGen = ++loadGeneration; // any earlier in-flight loadSheet's callbacks become no-ops
 
     if (direction === 'none') {
       img.src = sheet.file;
       current = idx;
+      navigating = false;
       resetZoom();
       updateUI();
       return;
@@ -187,6 +261,7 @@
     let started       = false;
 
     function trySlideIn() {
+      if (myGen !== loadGeneration) return; // superseded by a newer load
       if (!slideOutDone || !preloadReady || started) return;
       started = true;
       doSlideIn();
@@ -232,6 +307,7 @@
       stageInner.style.transform  = 'translate(0px, 0px) scale(1)';
 
       function onDone() {
+        if (myGen !== loadGeneration) return; // a newer load (e.g. a hard reset) already took over
         stageInner.style.transition = 'none';
         navigating = false;
       }
