@@ -44,6 +44,11 @@
   const SWIPE_THRESHOLD   = 90;   // px of horizontal travel required to trigger nav
   const SWIPE_ANGLE_RATIO = 1.5;  // horizontal travel must dominate vertical by this much
 
+  // Sheet slide-out/slide-in transition duration — slowed down from the
+  // original 280ms so the flip between flash sheets feels smoother on the
+  // kiosk touchscreen instead of feeling abrupt.
+  const SLIDE_MS = 450;
+
   let isDragging    = false;
   let dragStart     = null;  // { x, y, tx, ty }
   let swipeStart    = null;  // { x, y }
@@ -190,10 +195,10 @@
     // Slide current sheet out
     const sw   = stage.clientWidth;
     const outX = direction === 'left' ? -(sw + 40) : (sw + 40);
-    stageInner.style.transition = 'transform 0.28s ease-in';
+    stageInner.style.transition = `transform ${SLIDE_MS}ms ease-in`;
     stageInner.style.transform  = `translate(${outX}px, 0px) scale(${scale})`;
 
-    setTimeout(() => { slideOutDone = true; trySlideIn(); }, 310);
+    setTimeout(() => { slideOutDone = true; trySlideIn(); }, SLIDE_MS + 30);
 
     if (!preloadReady) {
       preload.addEventListener('load',  () => { preloadReady = true; trySlideIn(); }, { once: true });
@@ -223,7 +228,7 @@
 
       // Animate to resting position
       stageInner.style.visibility = 'visible';
-      stageInner.style.transition = 'transform 0.28s ease-out';
+      stageInner.style.transition = `transform ${SLIDE_MS}ms ease-out`;
       stageInner.style.transform  = 'translate(0px, 0px) scale(1)';
 
       function onDone() {
@@ -231,7 +236,7 @@
         navigating = false;
       }
       stageInner.addEventListener('transitionend', onDone, { once: true });
-      setTimeout(onDone, 400);
+      setTimeout(onDone, SLIDE_MS + 120);
     }
   }
 

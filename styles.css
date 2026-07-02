@@ -333,8 +333,8 @@ body.in-fullscreen .fs-exit-btn { display: flex; }
 }
 
 /* ─── Sheet-flip transitions ─────────────────────────────────────────────── */
-.stage-inner.slide-out-left  { transition: transform 0.28s ease-in;  transform: translate(calc(-100% - 40px), 0) !important; }
-.stage-inner.slide-out-right { transition: transform 0.28s ease-in;  transform: translate(calc( 100% + 40px), 0) !important; }
+.stage-inner.slide-out-left  { transition: transform 0.45s ease-in;  transform: translate(calc(-100% - 40px), 0) !important; }
+.stage-inner.slide-out-right { transition: transform 0.45s ease-in;  transform: translate(calc( 100% + 40px), 0) !important; }
 .stage-inner.slide-in-right  { transition: none;                     transform: translate(calc( 100% + 40px), 0) !important; }
 .stage-inner.slide-in-left   { transition: none;                     transform: translate(calc(-100% - 40px), 0) !important; }
-.stage-inner.slide-center    { transition: transform 0.28s ease-out; transform: translate(0, 0) !important; }
+.stage-inner.slide-center    { transition: transform 0.45s ease-out; transform: translate(0, 0) !important; }
