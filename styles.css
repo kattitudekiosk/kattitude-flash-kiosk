@@ -82,7 +82,7 @@ html, body {
   font-family: 'Inter', sans-serif;
   font-weight: 300;
   font-size: clamp(11px, 2.2vw, 16px);
-  color: var(--text-dim);
+  color: var(--text);
   letter-spacing: 0.3em;
   text-transform: uppercase;
   padding: 14px 44px;
