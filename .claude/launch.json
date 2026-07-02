@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "flash-gallery",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [".claude/static-server.cjs"],
+      "port": 4453,
+      "autoPort": true
+    }
+  ]
+}

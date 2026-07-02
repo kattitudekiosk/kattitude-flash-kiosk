@@ -1,0 +1,327 @@
+/* ─── Kiosk: no cursor (touchscreen only) ───────────────────────────────── */
+* { cursor: none !important; }
+
+/* ─── Variables ─────────────────────────────────────────────────────────── */
+:root {
+  --bg:        #ffffff;
+  --surface:   #f7f7f7;
+  --pink:      #E91E8C;
+  --gold:      #B8860B;
+  --text:      #1a1a1a;
+  --text-dim:  rgba(26,26,26,0.4);
+  --pink-dim:  rgba(233,30,140,0.35);
+}
+
+/* ─── Reset & base ──────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+  user-select: none;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─── Splash screen (stays dark — dramatic entry) ───────────────────────── */
+#splash {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: #0a0a0a;          /* hardcoded — splash is always dark */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  touch-action: none;
+  transition: opacity 0.55s ease;
+}
+
+#splash.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.splash-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+  text-align: center;
+  padding: 40px;
+}
+
+.splash-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(72px, 18vw, 200px);
+  color: var(--pink);
+  letter-spacing: 0.07em;
+  line-height: 1;
+  animation: title-breathe 4s ease-in-out infinite;
+}
+
+@keyframes title-breathe {
+  0%, 100% { text-shadow: 0 0 40px rgba(233,30,140,0.2); }
+  50%       { text-shadow: 0 0 80px rgba(233,30,140,0.55), 0 0 120px rgba(233,30,140,0.2); }
+}
+
+.splash-sub {
+  font-family: 'Inter', sans-serif;
+  font-weight: 300;
+  font-size: clamp(13px, 3.2vw, 28px);
+  color: var(--gold);
+  letter-spacing: 0.65em;
+  text-indent: 0.65em;
+  text-transform: uppercase;
+  margin-top: -18px;
+}
+
+.splash-divider {
+  width: 100px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--pink), transparent);
+  opacity: 0.6;
+}
+
+.splash-enter {
+  font-family: 'Inter', sans-serif;
+  font-weight: 300;
+  font-size: clamp(11px, 2.2vw, 16px);
+  color: rgba(245,245,245,0.45);
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  border: 1px solid var(--pink-dim);
+  padding: 14px 44px;
+  animation: enter-pulse 2.8s ease-in-out infinite;
+}
+
+@keyframes enter-pulse {
+  0%, 100% { opacity: 1;    border-color: var(--pink-dim); }
+  50%       { opacity: 0.5; border-color: rgba(233,30,140,0.1); }
+}
+
+/* ─── Layout skeleton: header / viewer / footer ─────────────────────────── */
+#header {
+  position: relative;
+  z-index: 10;
+  flex: 0 0 auto;
+  padding: 12px 20px 10px;
+  background: var(--surface);
+  border-bottom: 2px solid var(--pink);
+}
+
+#viewer {
+  position: relative;
+  z-index: 5;
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+#footer {
+  position: relative;
+  z-index: 10;
+  flex: 0 0 auto;
+  padding: 10px 20px 14px;
+  background: var(--surface);
+  border-top: 2px solid var(--pink);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+}
+
+/* ─── Header content ────────────────────────────────────────────────────── */
+.header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.header-side {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.header-side-left { justify-content: flex-start; }
+.header-side-right { justify-content: flex-end; }
+
+.header-logo {
+  flex: 0 0 auto;
+  height: clamp(34px, 5.5vw, 56px);
+  width: auto;
+  object-fit: contain;
+  display: block;
+}
+
+/* Fullscreen exit button — hidden until in-fullscreen */
+.fs-exit-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  background: transparent;
+  border: 1px solid rgba(26,26,26,0.2);
+  border-radius: 5px;
+  color: var(--text-dim);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.fs-exit-btn svg { width: 18px; height: 18px; }
+
+.fs-exit-btn:active {
+  color: var(--pink);
+  border-color: var(--pink);
+}
+
+body.in-fullscreen .fs-exit-btn { display: flex; }
+
+.sheet-label {
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: clamp(11px, 1.6vw, 16px);
+  color: var(--gold);
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+}
+
+/* ─── Stage (pan/zoom area) ─────────────────────────────────────────────── */
+.stage {
+  flex: 1 1 0;
+  min-width: 0;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  background: var(--bg);
+  touch-action: none;   /* prevent browser from claiming scroll/zoom gestures */
+}
+
+.stage.dragging { cursor: grabbing; }
+
+.stage-inner {
+  width: 100%;
+  height: 100%;
+  transform-origin: 0 0;
+  will-change: transform;
+  transition: none;
+}
+
+#sheetImg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+/* ─── Nav buttons — bare floating chevrons, no box ──────────────────────── */
+.nav-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 20;
+  width: 72px;
+  height: 160px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--pink);
+  cursor: pointer;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.12s, opacity 0.12s;
+}
+
+.nav-btn svg {
+  width: 48px;
+  height: 48px;
+  /* thin shadow so chevron stays visible over any image content */
+  filter: drop-shadow(0 1px 3px rgba(0,0,0,0.18));
+}
+
+.nav-btn:active {
+  transform: translateY(-50%) scale(0.82);
+  opacity: 0.65;
+}
+
+.nav-prev { left: 6px; }
+.nav-next { right: 6px; }
+
+.nav-btn.hidden { opacity: 0; pointer-events: none; touch-action: none; }
+
+/* ─── Dots — dark on white surface ─────────────────────────────────────── */
+.dots { display: flex; gap: 10px; align-items: center; }
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(26,26,26,0.12);
+  border: 1.5px solid rgba(26,26,26,0.28);
+  transition: background 0.2s, transform 0.2s, border-color 0.2s;
+  cursor: pointer;
+  padding: 0;
+}
+
+.dot.active {
+  background: var(--pink);
+  border-color: var(--pink);
+  transform: scale(1.35);
+}
+
+.footer-hint {
+  font-family: 'Inter', sans-serif;
+  font-weight: 300;
+  font-size: clamp(11px, 1.3vw, 14px);
+  color: var(--text-dim);
+  letter-spacing: 0.05em;
+  text-align: center;
+}
+
+/* ─── Zoom badge — dark pill floating over white stage ──────────────────── */
+#zoomBadge {
+  position: absolute;
+  bottom: 14px;
+  right: 18px;
+  z-index: 30;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  color: #f5f5f5;
+  background: rgba(20,20,20,0.82);
+  border: 1px solid var(--pink-dim);
+  border-radius: 4px;
+  padding: 3px 9px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+#zoomBadge.visible { opacity: 1; }
+
+/* ─── Sheet-flip transitions ─────────────────────────────────────────────── */
+.stage-inner.slide-out-left  { transition: transform 0.28s ease-in;  transform: translate(calc(-100% - 40px), 0) !important; }
+.stage-inner.slide-out-right { transition: transform 0.28s ease-in;  transform: translate(calc( 100% + 40px), 0) !important; }
+.stage-inner.slide-in-right  { transition: none;                     transform: translate(calc( 100% + 40px), 0) !important; }
+.stage-inner.slide-in-left   { transition: none;                     transform: translate(calc(-100% - 40px), 0) !important; }
+.stage-inner.slide-center    { transition: transform 0.28s ease-out; transform: translate(0, 0) !important; }

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Kattitude Tattoo — Flash Gallery</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- SPLASH SCREEN -->
+  <div id="splash" role="button" aria-label="Enter gallery">
+    <div class="splash-content">
+      <div class="splash-brand">
+        <div class="splash-title">KATTITUDE</div>
+        <div class="splash-sub">TATTOO</div>
+      </div>
+      <div class="splash-divider"></div>
+      <div class="splash-enter">TAP ANYWHERE TO ENTER</div>
+    </div>
+  </div>
+
+  <!-- HEADER -->
+  <header id="header">
+    <div class="header-inner">
+      <div class="header-side header-side-left">
+        <button id="fsExitBtn" class="fs-exit-btn" aria-label="Exit fullscreen">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="4 14 10 14 10 20"/>
+            <polyline points="20 10 14 10 14 4"/>
+            <line x1="10" y1="14" x2="3" y2="21"/>
+            <line x1="21" y1="3" x2="14" y2="10"/>
+          </svg>
+        </button>
+      </div>
+      <img class="header-logo" src="assets/brand/kattitude-logo.png" alt="Kattitude Tattoo Studio" />
+      <div class="header-side header-side-right">
+        <div class="sheet-label" id="sheetLabel">SHEET 1 / 4</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN VIEWER -->
+  <main id="viewer">
+    <button class="nav-btn nav-prev" id="btnPrev" aria-label="Previous sheet">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="15 18 9 12 15 6"/>
+      </svg>
+    </button>
+
+    <div class="stage" id="stage">
+      <div class="stage-inner" id="stageInner">
+        <img id="sheetImg" src="" alt="Flash Sheet" draggable="false" />
+      </div>
+    </div>
+
+    <button class="nav-btn nav-next" id="btnNext" aria-label="Next sheet">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="9 18 15 12 9 6"/>
+      </svg>
+    </button>
+  </main>
+
+  <!-- FOOTER -->
+  <footer id="footer">
+    <div class="dots" id="dots"></div>
+    <p class="footer-hint">Pinch or double-tap to zoom &bull; Swipe to browse</p>
+  </footer>
+
+  <script src="data.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
