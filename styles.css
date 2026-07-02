@@ -343,6 +343,16 @@ body.screensaver .nav-btn {
   display: block;
 }
 
+/* QR badge is only useful on the kiosk (1080px wide) so people can scan it
+   to browse on their own phone — pointless and visually obstructive on a
+   phone that's already looking at this same page, so hide it there. */
+@media (max-width: 768px) {
+  .qr-badge,
+  #qrBadge {
+    display: none !important;
+  }
+}
+
 /* ─── Sheet-flip transitions ─────────────────────────────────────────────── */
 .stage-inner.slide-out-left  { transition: transform 0.45s ease-in;  transform: translate(calc(-100% - 40px), 0) !important; }
 .stage-inner.slide-out-right { transition: transform 0.45s ease-in;  transform: translate(calc( 100% + 40px), 0) !important; }
