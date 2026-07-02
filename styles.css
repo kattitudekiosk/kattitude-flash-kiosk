@@ -96,14 +96,13 @@ html, body {
   color: rgba(245,245,245,0.45);
   letter-spacing: 0.3em;
   text-transform: uppercase;
-  border: 1px solid var(--pink-dim);
   padding: 14px 44px;
   animation: enter-pulse 2.8s ease-in-out infinite;
 }
 
 @keyframes enter-pulse {
-  0%, 100% { opacity: 1;    border-color: var(--pink-dim); }
-  50%       { opacity: 0.5; border-color: rgba(233,30,140,0.1); }
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.5; }
 }
 
 /* ─── Layout skeleton: header / viewer / footer ─────────────────────────── */
