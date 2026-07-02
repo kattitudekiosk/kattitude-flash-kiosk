@@ -29,15 +29,16 @@ html, body {
   flex-direction: column;
 }
 
-/* ─── Splash screen (stays dark — dramatic entry) ───────────────────────── */
+/* ─── Splash screen (white brand background, logo top-centered) ─────────── */
 #splash {
   position: fixed;
   inset: 0;
   z-index: 1000;
-  background: #0a0a0a;          /* hardcoded — splash is always dark */
+  background: var(--bg);
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   cursor: pointer;
   touch-action: none;
   transition: opacity 0.55s ease;
@@ -49,37 +50,25 @@ html, body {
 }
 
 .splash-content {
+  width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 28px;
   text-align: center;
   padding: 40px;
+  padding-top: 14vh;
 }
 
-.splash-title {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: clamp(72px, 18vw, 200px);
-  color: var(--pink);
-  letter-spacing: 0.07em;
-  line-height: 1;
-  animation: title-breathe 4s ease-in-out infinite;
+.splash-logo {
+  width: clamp(220px, 62vw, 480px);
+  height: auto;
+  animation: logo-breathe 4s ease-in-out infinite;
 }
 
-@keyframes title-breathe {
-  0%, 100% { text-shadow: 0 0 40px rgba(233,30,140,0.2); }
-  50%       { text-shadow: 0 0 80px rgba(233,30,140,0.55), 0 0 120px rgba(233,30,140,0.2); }
-}
-
-.splash-sub {
-  font-family: 'Inter', sans-serif;
-  font-weight: 300;
-  font-size: clamp(13px, 3.2vw, 28px);
-  color: var(--gold);
-  letter-spacing: 0.65em;
-  text-indent: 0.65em;
-  text-transform: uppercase;
-  margin-top: -18px;
+@keyframes logo-breathe {
+  0%, 100% { filter: drop-shadow(0 0 14px rgba(233,30,140,0.12)); }
+  50%       { filter: drop-shadow(0 0 26px rgba(233,30,140,0.30)); }
 }
 
 .splash-divider {
@@ -93,7 +82,7 @@ html, body {
   font-family: 'Inter', sans-serif;
   font-weight: 300;
   font-size: clamp(11px, 2.2vw, 16px);
-  color: rgba(245,245,245,0.45);
+  color: var(--text-dim);
   letter-spacing: 0.3em;
   text-transform: uppercase;
   padding: 14px 44px;
