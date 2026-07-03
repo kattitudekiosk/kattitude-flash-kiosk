@@ -18,6 +18,7 @@
 html, body {
   width: 100vw;
   height: 100vh;
+  height: 100dvh; /* actual visible viewport on mobile — vh can include space hidden behind a collapsed address bar */
   overflow: hidden;
   background: var(--bg);
   color: var(--text);
@@ -33,6 +34,9 @@ html, body {
 #splash {
   position: fixed;
   inset: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh; /* actual visible viewport on mobile — see html/body above */
   z-index: 1000;
   background: var(--bg);
   display: flex;
