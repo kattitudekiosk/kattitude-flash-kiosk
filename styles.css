@@ -38,7 +38,7 @@ html, body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: center;
   cursor: pointer;
   touch-action: none;
   transition: opacity 0.55s ease;
@@ -57,7 +57,6 @@ html, body {
   gap: 28px;
   text-align: center;
   padding: 40px;
-  padding-top: 14vh;
 }
 
 .splash-logo {
