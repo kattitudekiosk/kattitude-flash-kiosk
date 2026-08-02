@@ -1,0 +1,251 @@
+/* Kattitude Flash Dashboard — styles
+ *
+ * Mobile-first, ordinary responsive layout. This is a WORKING TOOL that
+ * artists use on a phone between clients, not the wall kiosk. The kiosk's
+ * fixed 1080x1920 canvas exists because that panel is a fixed physical
+ * object; applying it here would give a phone user 6px labels. Deliberately
+ * a different approach for a different job.
+ */
+
+:root {
+  --bg: #ffffff;
+  --surface: #f6f6f7;
+  --line: #e6e6e9;
+  --text: #17171a;
+  --muted: #6b6b74;
+  --pink: #E91E8C;
+  --pink-deep: #C2156F;
+  --ok: #0f7b4f;
+  --warn: #8a6d00;
+  --danger: #b3261e;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  color: var(--text);
+  background: var(--surface);
+  -webkit-text-size-adjust: 100%;
+}
+
+/* ── Chrome ─────────────────────────────────────────────────────────────── */
+#topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--text);
+  color: #fff;
+}
+
+.brand {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 22px;
+  letter-spacing: 0.08em;
+  line-height: 1;
+}
+
+.brand span {
+  display: block;
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+  margin-top: 3px;
+}
+
+.who { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+
+#tabs {
+  position: sticky;
+  top: 57px;
+  z-index: 19;
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+  padding: 0 8px;
+  scrollbar-width: none;
+}
+
+#tabs::-webkit-scrollbar { display: none; }
+
+.tab {
+  flex: 0 0 auto;
+  border: 0;
+  background: none;
+  padding: 14px 12px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+  /* 44px minimum target — this gets used one-handed on a phone. */
+  min-height: 48px;
+}
+
+.tab.is-active { color: var(--pink); border-bottom-color: var(--pink); }
+
+#app { padding: 12px; max-width: 900px; margin: 0 auto; }
+
+/* ── Cards ──────────────────────────────────────────────────────────────── */
+.card {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+h1 { font-size: 22px; margin: 0 0 8px; }
+h2 { font-size: 18px; margin: 0 0 8px; }
+h3 { font-size: 15px; margin: 0 0 8px; }
+
+.muted { color: var(--muted); }
+.small { font-size: 12px; }
+p.muted { line-height: 1.5; margin: 0 0 12px; }
+
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
+.field { display: block; margin-bottom: 10px; }
+.field span { display: block; margin-bottom: 4px; }
+
+/* ── Controls ───────────────────────────────────────────────────────────── */
+.input, input[type="text"], input[type="email"], input[type="number"], select {
+  width: 100%;
+  padding: 12px;
+  margin: 6px 0;
+  font: inherit;
+  font-size: 16px;              /* 16px stops iOS zooming the page on focus */
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  min-height: 48px;
+}
+
+.input.ord { width: 90px; min-width: 90px; }
+
+.btn {
+  padding: 12px 16px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  min-height: 48px;
+}
+
+.btn-primary { background: var(--pink); color: #fff; }
+.btn-primary:active { background: var(--pink-deep); }
+.btn-quiet { background: var(--bg); color: var(--text); border-color: var(--line); }
+.btn-danger { background: var(--bg); color: var(--danger); border-color: #f0c9c6; }
+.btn:disabled { opacity: 0.5; }
+
+.pill {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.pill.ok { color: var(--ok); border-color: #b9e3cd; background: #eef8f2; }
+.pill.draft { color: var(--muted); }
+.pill.warn { color: var(--warn); border-color: #ecdca6; background: #fbf6e6; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+
+.chip {
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 13px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  min-height: 40px;
+}
+
+.chip.is-on { background: var(--pink); border-color: var(--pink); color: #fff; }
+
+/* ── Sign in ────────────────────────────────────────────────────────────── */
+.signin-card { max-width: 420px; margin: 40px auto; }
+.msg { min-height: 20px; font-size: 13px; color: var(--pink); }
+
+/* ── Upload ─────────────────────────────────────────────────────────────── */
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 28px 16px;
+  border: 2px dashed var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  cursor: pointer;
+  text-align: center;
+}
+
+.dropzone.is-over { border-color: var(--pink); background: #fdf2f8; }
+.dropzone span { color: var(--muted); font-size: 13px; }
+
+.item { display: flex; gap: 12px; align-items: flex-start; }
+.item.is-bad { border-color: #f0c9c6; background: #fdf5f5; }
+.item-thumb {
+  width: 84px; height: 84px; flex: 0 0 auto;
+  object-fit: contain; background: var(--surface); border-radius: 6px;
+}
+.item-body { flex: 1 1 auto; min-width: 0; }
+
+.error { color: var(--danger); font-size: 13px; line-height: 1.45; margin-bottom: 6px; }
+
+/* ── Designs ────────────────────────────────────────────────────────────── */
+.dgrid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+
+@media (min-width: 640px) {
+  .dgrid { grid-template-columns: 1fr 1fr; }
+}
+
+.design { display: flex; gap: 12px; align-items: flex-start; }
+.design-thumb {
+  width: 96px; height: 96px; flex: 0 0 auto;
+  object-fit: cover; background: var(--surface); border-radius: 6px;
+}
+.design-title { font-weight: 600; margin-bottom: 2px; }
+.status { margin-top: 6px; }
+
+/* ── Toast ──────────────────────────────────────────────────────────────── */
+.toast {
+  position: fixed;
+  left: 12px; right: 12px; bottom: 12px;
+  z-index: 50;
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: var(--text);
+  color: #fff;
+  font-size: 14px;
+  line-height: 1.45;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.22);
+}
+
+.toast-error { background: var(--danger); }
+
+@media (min-width: 640px) {
+  .toast { left: auto; right: 20px; max-width: 460px; }
+}

@@ -1,0 +1,25 @@
+# Vercel falls back to .gitignore when this file is absent — and .gitignore
+# excludes assets/seed/ and seed/, which would strip every placeholder image
+# out of a preview deploy and leave a gallery of broken tiles. This file
+# overrides that: seed content SHIPS to previews on purpose.
+#
+# Remove this file (or drop the seed lines) once real content is in Supabase
+# and catalogSource is 'live'.
+
+# Dev tooling — never needed at runtime.
+tools/
+db/
+node_modules/
+.claude/
+
+# Docs and specs.
+IMPLEMENTATION.md
+flashgalleryprd.md
+
+# The 10000x10000 source file. Nothing loads it; it is 2.4MB of dead weight.
+assets/originals/
+
+.DS_Store
+.env
+.env.*
+.vercel

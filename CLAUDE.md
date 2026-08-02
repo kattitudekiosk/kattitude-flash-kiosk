@@ -1,0 +1,408 @@
+# KATTITUDE TATTOO — Agent Guide
+
+> **The single canonical rules file for all agents working on the Kattitude
+> flash gallery kiosk and dashboard.** Modeled on the THE LOST+UNFOUNDS agent
+> guide. Same discipline, different product and branding.
+>
+> Corrections applied 2 Aug 2026 are marked **[CORRECTED]** — the original
+> draft was written from session memory and several details did not survive
+> contact with the files.
+
+## What This Project Is
+
+A touchscreen flash gallery kiosk for Kattitude Tattoo Studio, plus a separate
+dashboard where artists upload and tag their own flash. Customers browse
+designs on a wall-mounted panel in the shop; artists manage content from their
+phones. Built and operated by one person with AI agents.
+
+## Hardware Reality — read this before any UI work
+
+| Property | Value |
+|---|---|
+| Machine | Mac mini, headless-ish, no mouse |
+| Display | Touchwo touchscreen, mounted **vertically**, 1080 x 1920 portrait |
+| Touch driver | **Touch Up** (open source) — USB HID touch into **mouse events** |
+| Browser | Safari, fullscreen |
+| Input available | Touch (as mouse), keyboard |
+
+The driver emits `mousedown`/`mousemove`/`mouseup`, NOT `touchstart`/
+`touchmove`/`touchend`. Every touch-gesture API you would reach for on mobile
+is unreliable on this hardware.
+
+## Architecture Overview
+
+| Layer | Location | Tech |
+|---|---|---|
+| Kiosk frontend | repo root | Vanilla HTML / CSS / JS — no framework, no build step |
+| Dashboard | `dashboard/` | Vanilla HTML / CSS / JS, Supabase JS client |
+| Database | Supabase `tovydesiocfgmasvzjvt` | PostgreSQL + RLS + Storage + Auth |
+| Deployment | Vercel | **Production builds from git.** See the warning below. |
+| Repo | `canyouseeus/kattitude-flash-kiosk` | private |
+
+### ⚠️ **[CORRECTED]** Production deploys from git — pushing to `main` ships to the wall
+
+The original draft said production used uploaded files with no git build hook.
+**The opposite is true.** Every production deployment carries `gitCommitRef:
+main`, a `gitCommitSha` and a commit message. Vercel is watching that branch.
+
+**A `git push` to `main` deploys the shop's kiosk.** Work on a branch. Never
+push `main` unless Joshua has said to promote, in those words.
+
+This also means git — not the deploy connector — is the only realistic route
+for a full deploy. See "Deploying" below.
+
+### Vercel projects — know which one you are touching
+
+| Project | Role |
+|---|---|
+| `flash-gallery` | **PRODUCTION — live on the shop wall.** Builds from `main`. |
+| `flash-gallery-preview` | preview; holds the image assets other previews borrow |
+| `flash-gallery-mobilefix` | preview; currently a `<base href>` overlay |
+| `kattitude-flash-dashboard` | dashboard app |
+| `kattitude-dash-assets` | dashboard CSS/config |
+
+Live URLs live in `LINKS.md`. Keep it current.
+
+## Where to Find Things
+
+| What you need | Where |
+|---|---|
+| Product spec | **[CORRECTED]** `flashgalleryprd.md`, **version 1.0**, on Joshua's Desktop — *not* in the repo. There is no `flash-gallery-prd-v2.md`. |
+| Decisions and defaults | `IMPLEMENTATION.md` |
+| Every live URL | `LINKS.md` |
+| Kiosk layout logic | `gallery.js`, `catalog.js` |
+| Kiosk shell, canvas scaling, sheet viewer | `script.js` |
+| Attract loop (video + flash reel) | `screensaver.js` |
+| Kiosk Supabase URL and publishable key | `config.js` |
+| **Dashboard** Supabase URL, key, image spec | `dashboard/config.js` |
+| Seed/placeholder content | `seed/`, `assets/seed/` (gitignored — never commit) |
+| Deploy helper | `tools/deploy-preview.sh` |
+
+## EVIDENCE RULE — every task, no exceptions
+
+Statements about your own process are reconstructions, not logs — they come out
+confident whether or not they're true. Produce artifacts instead.
+
+**Before writing code:**
+
+1. Name the files you will read, then read them.
+2. **Quote** the specific line from each that governs this task. A summary is
+   not a quote. If you can't quote it, you didn't read it.
+3. If a doc conflicts with this guide, say so out loud, state which you
+   followed and why. Never reconcile a conflict silently.
+
+**Before saying it's done:**
+
+4. Show the artifact — fetched page, decoded output, command output. Not a
+   description of one.
+5. Every check must be able to fail. A test that passes when its inputs are
+   missing is not a check. Verify the failure path before trusting the pass.
+6. Look at the whole output, not just the part you changed.
+
+**Layout work:** verify at **both** 1080 x 1920 and 390 x 844.
+
+**QR work:** verify **all four** states — artist page Follow panel, artist card
+QR, sheets-only artist viewer badge, and the Artists index (no stray badge).
+Fixing one QR state and breaking another has now happened three times.
+
+**Verify the rendered artwork, not your intent.** `tools/verify-qr.py`
+rasterises the real SVG and decodes it with OpenCV. It used to rebuild a matrix
+by re-parsing the path data, which only ever confirmed what we meant to draw.
+
+## BLOCKER DISCLOSURE RULE — highest priority for communication
+
+**The moment work stalls, say so. Do not wait until you have good news to pair
+it with.** Joshua is usually remote, watching from a phone, and can often clear
+a blocker in seconds.
+
+- Report a blocker in its own message, immediately, naming exactly what
+  completed and what did not.
+- Do not retry quietly more than once before reporting.
+- **The Vercel connector token expires mid-call.** Expect it in long sessions.
+  Only Joshua can reconnect it.
+- **Say when something is impossible rather than expensive.** Inlining the
+  image assets through the deploy connector is not "extra effort" — the bytes
+  pass through the agent's context window and a 3 MB payload exceeds it by
+  orders of magnitude. Saying "this will take a while" when the honest answer
+  is "this cannot work" wastes more of Joshua's time than the blocker did.
+
+## SEVEN CRITICAL INVARIANTS
+
+### 1. Arrow buttons are primary navigation — **[CORRECTED: the code violates this today]**
+
+The draft stated this as "No swipe. Ever." **That is a goal, not a description
+of the codebase.** The shipped code contains:
+
+- `SWIPE_THRESHOLD` / `SWIPE_ANGLE_RATIO` and full gesture tracking in
+  `script.js` (~line 47) and `gallery.js` (~line 21)
+- user-facing copy in `index.html`: `<p class="footer-hint">Tap to zoom •
+  Swipe to browse</p>`
+
+Arrow buttons **do** exist on every navigable surface (`#btnPrev`/`#btnNext` in
+the sheet viewer, `.g-detail-prev`/`.g-detail-next` in the detail view), so
+nothing is swipe-*dependent* — the invariant's real intent holds. But the
+kiosk is actively telling customers to swipe on hardware where swipe may not
+fire. **Fix the copy first; it is a one-line change and it is a live defect.**
+
+Also corrected: the draft specified "minimum 80 x 80 px targets, lower third of
+screen". The real buttons are **72 x 160 px, vertically centred** (`top: 50%`).
+Larger in area, different in placement. Decide which is right, then make the
+doc and the code agree.
+
+### 2. One layout everywhere — fixed canvas, scaled
+
+The entire app renders inside a fixed **1080 x 1920** canvas, CSS-scaled to the
+viewport. **No layout decision anywhere may read the real viewport** except the
+single scale function in `script.js`. No media queries affecting composition.
+No `vw`/`vh` inside the canvas.
+
+This has been violated twice by media queries that *looked* harmless:
+`.qr-badge { display: none }` under 768px hid the artist QR on phones while
+leaving it on the kiosk — so it was simultaneously fixed and broken, which is
+why it kept coming back. `tools/verify.js` now greps for viewport reads.
+
+### 3. Image spec is fixed and enforced
+
+Singles **2048 x 2048**. Sheets **2160 x 3840**. Derivatives at 512 x 512
+(cover) and 1024 x 1536 (contain), WebP. Off-size uploads are **rejected with
+the required dimensions in the error**. Never auto-crop an artist's work.
+
+### 4. Sheets-only artists bypass the grid
+
+An artist with only full sheets routes straight into the linear sheet viewer.
+It becomes the hybrid grid automatically once they have singles. This is the
+state the studio is in today — it must never regress.
+
+### 5. Production is sacred
+
+`flash-gallery.vercel.app` is live in a working business. **Never deploy to it
+without Joshua saying to promote.** Because production builds from `main`,
+this means never pushing `main`. After any deploy, re-fetch production and
+confirm it is unchanged.
+
+### 6. RLS on, service-role key never shipped
+
+The kiosk ships its publishable key in page source — secrecy is not a security
+control. **[CORRECTED]** RLS arrived in migration 2, not migration 1; the
+draft claimed "from the first migration". It is on now and must stay on.
+
+**RLS filters rows, not columns.** `artists_public_read` originally granted
+`anon` the whole row including `email`, `role` and `auth_user_id`. Column
+grants are the tool for that, and `anon` now holds SELECT only on the display
+columns. **When revoking from `anon`, never revoke from `authenticated`** — the
+dashboard resolves admin by reading its own `role`.
+
+A service-role key must never appear in any static file. Verify anonymous
+insert is refused before calling auth work done.
+
+### 7. Placeholder content is never presented as artist work
+
+Seed art carries real artist names. It renders with a loud pink banner and
+`seed/` stays gitignored. The placeholder attract reel
+(`assets/attract/placeholder-reel.mp4`) carries a burned-in stripe reading
+PLACEHOLDER REEL for the same reason. When sharing a preview containing either,
+say so up front.
+
+## DEPLOYING
+
+**[CORRECTED — this section was wrong in the draft.]**
+
+There are two routes and only one of them scales:
+
+**Git (the real route).** Push a branch; Vercel builds it with every asset.
+Nothing passes through the agent's context. This is how a full deploy happens.
+Never push `main` (invariant 5).
+
+**The deploy connector (text only).** Every byte must be inlined by the agent,
+so it is viable for HTML/CSS/JS and *never* for images or video. The kiosk's
+assets are ~3 MB; as base64 through a context window that is roughly a million
+tokens. Not slow — impossible.
+
+This is why `flash-gallery-mobilefix` is a `<base href>` overlay borrowing
+images from `flash-gallery-preview`. **The overlay has now caused two separate
+phantom bugs** — an `!important` rule and a media query that existed only in
+the frozen base — and cost more debugging time than it saved. Prefer the git
+route. Treat the overlay as a stopgap, and when using it, always check whether
+a bug lives in the repo or only in the deployed base.
+
+After creating any deployment you MUST:
+
+1. Confirm state is `READY` — not `BUILDING`, `QUEUED`, `ERROR`, `CANCELED`.
+2. **Fetch the deployed URL back.** For JS, fetch through the Vercel connector;
+   the generic fetcher returns `[binary data]`.
+3. Compare byte-exact against local for anything you inlined by hand.
+4. Exercise the thing that changed.
+5. Re-fetch production and confirm it is untouched.
+
+Never verify against production before your deploy is `READY`.
+
+## ALWAYS SHIP A LINK RULE
+
+Every deployment, build, or deliverable is reported **with its URL**, every
+time, without being asked. No exceptions.
+
+- Never say something is "deployed", "live", "updated" or "ready" without the
+  URL in the same message.
+- When a stable alias and a deployment-specific URL both exist, give the
+  **stable** one and say plainly if it is currently serving an older build.
+- If an earlier URL is now stale, say so explicitly — "use this one, not the
+  one from before".
+- Maintain **`LINKS.md`** at the repo root listing every live URL: kiosk
+  production, each preview project, the dashboard, the Supabase project, and
+  the GitHub repo. Update it whenever a URL changes. Joshua works from his
+  phone and cannot dig through history for a link.
+- A blocked or partial deploy still gets a status line — say which URL is
+  current and which is not yet updated.
+
+## DESIGN RULES
+
+| Token | Value | Use |
+|---|---|---|
+| Primary pink | `#E91E8C` | accents, banner |
+| Deep pink | `#C2156F` | card fills behind white text (5.78:1) |
+| Logo yellow | `#FDE446` | counts, category card (ink text only) |
+| Ink | `#1a1a1a` | text |
+| Paper | `#ffffff` / `#f7f7f7` | page ground |
+
+**Contrast is a requirement.** This is read from a metre away by someone
+standing up. White on primary pink is 4.18:1 — too thin for a large fill.
+State the ratio when you commit a colour. **[CORRECTED]** ink on logo yellow is
+**13.94:1**, not the 13.6:1 the draft claimed.
+
+**No borders.** Fill, spacing and shadow separate things — not outlines.
+
+**No rounded corners**, with one measured exception: **QR container tiles**,
+which are rounded because Joshua asked and because it cannot affect decoding.
+
+**Page titles are UPPERCASE.** Not body text, captions, buttons or errors.
+
+**The dashboard is exempt from the kiosk canvas** and from the no-borders and
+no-rounded-corners rules. It is a phone tool, not wall furniture. Never apply
+invariant 2 to `dashboard/`.
+
+## QR RULES
+
+Measured, not assumed. Sweeping radii against an independent decoder gave:
+
+| | decodes |
+|---|---|
+| Rounded modules, square finders | **21/21** |
+| Square modules, rounded finders | 2/21 |
+| Both rounded | 2/21 |
+
+**Rounded modules are free. Rounded finder patterns are fatal.** A decoder
+samples each module at its centre, so softening corners never moves the centre.
+The finders are not data — they are the targets a decoder hunts by scanning for
+a 1:1:3:1:1 run, and rounding breaks that ratio off-centre, so detection fails
+before decoding starts.
+
+- Error correction **H**. Ink near-black. Never tint the modules.
+- **Quiet zone of 4 modules on every side.** The SVG viewBox is the bare
+  matrix, so the CSS padding is the only quiet zone the code gets. Change a
+  badge's width and its padding must change with it.
+- Physical sizing on a 32" panel (~69 ppi): detail 2.04 mm/module, artist card
+  1.42 mm, sheet corner 1.08 mm.
+
+## GRID LAYOUT RULE — **[CORRECTED]**
+
+The draft quoted PRD numbers rather than the code. Actual geometry at 1080:
+
+- 3 columns, **14 px outer padding, 12 px gutter, 342 px square cells**
+  (not 25/16/333)
+- Single design: 1 col x 1 row
+- **A sheet's row span is derived, not fixed at 2x3.** `moduleSpan()` computes
+  it from each sheet's real aspect (clamped 1–4) because the studio's four
+  sheets are 0.77–1.00, nothing like the 9:16 the PRD assumed. A fixed 2x3
+  block cropped the wide ones badly.
+- Consecutive sheet modules alternate sides so sheets don't stripe down one
+  edge. `arrangeHybrid()` spreads them; `grid-auto-flow: dense` packs them.
+- **Sheets letterbox — they do not "never letterbox".** The draft had this
+  backwards. `.g-tile-sheet:not(.g-tile-module)` uses `object-fit: contain`
+  deliberately, because cropping a sheet to a square hides most of what makes
+  it a sheet.
+
+Sparse states: singles-only renders a plain grid; sheets-only follows
+invariant 4.
+
+## ATTRACT LOOP
+
+One reel of video clips and flash stills **woven together** — not two modes
+that alternate. Configured in `config.js` under `screensaver`.
+
+- Default ratio: one clip, then 4 stills, repeat.
+- Stills hold 8 s, matching the existing cadence. Clips run their natural
+  duration, capped so a stalled clip cannot own the screen.
+- Two stacked layers crossfade; the outgoing frame is never torn down before
+  the incoming one paints. That teardown is what causes a black flash, and on a
+  wall panel a black flash reads as a fault.
+- **Video is stored on the Mac mini's own disk.** Clips download once into
+  Cache Storage and play from an in-memory blob thereafter. A looping `<video>`
+  pointed at a URL may re-request its media; on an idle kiosk that is the
+  difference between ~2.7 GB/month and ~540 GB/month of egress, silently.
+  `Screensaver.netFetches()` exists so a test can assert it never climbs.
+- **Zero clips = today's sheet slideshow, on the original code path.**
+  A clip that fails to load is marked dead for the session and skipped, never
+  retried in a loop.
+
+## DATABASE RULE
+
+Schema changes go through the **Supabase MCP** (`apply_migration`), never
+hand-written SQL files and never SQL for Joshua to paste.
+
+1. `list_tables` before changing structure.
+2. Apply through MCP.
+3. **Query the result back** to verify it landed.
+4. Run `get_advisors` after DDL and fix what it flags.
+
+Business rules belong in the database where a client cannot bypass them — the
+"cannot publish without a category" gate is a Postgres trigger, not a UI check.
+
+**Triggers can silently cancel each other.** `claim_artist_row()` ran during
+signup, tripped `artists_guard`, and the guard reset the very column the claim
+had just set — because during signup there is no JWT, so `is_admin()` is false.
+No error, no claim, every artist stranded. When two triggers touch a table,
+check what the second does to the first's write.
+
+## BROWSER AND VERIFICATION LIMITS
+
+- The sandbox **cannot reach `*.vercel.app`** — verify deployments through the
+  Vercel connector's fetch. It can reach `supabase.co` and the npm/PyPI
+  registries.
+- There is **no browser** in the sandbox. The Chrome extension may or may not
+  be connected; check rather than assume. You can confirm markup, endpoints,
+  bytes and decoded output; you cannot confirm that a page paints. When the
+  last mile needs eyes, say so plainly.
+- **Terminal on the Mac is off the table.** Joshua is usually not at the shop.
+  Prefer paths that need no Terminal.
+- Git push from the sandbox fails — credentials are in the Mac's keychain, a
+  different filesystem.
+
+## CONTENT AND PEOPLE
+
+The roster is real people whose names appear on a wall in a shop.
+
+- Seniority (Studio Owner / Senior / Junior) is stored but **not displayed** by
+  default. Labelling someone "Junior" to a walk-in is the studio's call.
+- Instagram handles are data on the artist record, never hardcoded. Handle and
+  `instagram_url` move together — a mismatch sends customers to the wrong
+  profile.
+- **Sheet attribution is invented.** The four real sheets were assigned to Kat
+  and Alena so mixed galleries existed to look at. Nobody has said who drew
+  them. Correct before production.
+- Artist emails are personal data. They are not readable by the kiosk's
+  publishable key and must stay that way.
+- Pricing does not appear on the kiosk unless Joshua says so.
+
+## OPEN DECISIONS
+
+Tracked in `IMPLEMENTATION.md` with a chosen default so nothing blocks. None
+are settled:
+
+- Sheets-page QR destination — defaulted to the online gallery
+- Whether owner approval gates publishing — defaulted to off; the Review tab
+  and the `approved` column already exist, so switching it on needs no migration
+- Attribution of the four original flash sheets — provisional, see above
+- Whether kiosk-identical type is too small on phones — pending Joshua looking
+- Whether per-design videos belong in the grid, or the attract reel is the
+  whole video ask — **unanswered**; `screensaver_clips` is deliberately kept
+  separate from `designs` so this stays open

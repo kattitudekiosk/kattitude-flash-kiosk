@@ -26,7 +26,10 @@
   document.getElementById('viewer').appendChild(zoomBadge);
 
   /* ── State ─────────────────────────────────────────────────────────────── */
-  const sheets = GALLERY_DATA.sheets;
+  // `let`, not `const`: the gallery can swap in a filtered list (one artist's
+  // sheets, say) via SheetViewer.setSheets. Defaults to the full production
+  // list from data.js, so with no gallery present nothing changes.
+  let sheets = GALLERY_DATA.sheets;
   let current  = 0;
 
   // Resting state = scale 1, translate 0,0
@@ -82,6 +85,42 @@
   let idleTimer         = null;
   let screensaverTimer  = null;
   let screensaverActive = false;
+
+  /* ── Design canvas scaling ────────────────────────────────────────────────
+   * THE ONLY PLACE IN THE APP THAT READS THE REAL VIEWPORT.
+   *
+   * The whole UI is laid out at exactly 1080x1920 — the kiosk panel — and
+   * this scales that canvas to fit whatever screen it is on. A phone shows a
+   * literally identical composition, just smaller, because nothing inside can
+   * see the real viewport: every clientWidth reads 1080.
+   *
+   * Any other viewport-conditional layout decision anywhere would reintroduce
+   * the divergence this exists to prevent. tools/verify.js fails the build if
+   * one appears.
+   */
+  const DESIGN_W = 1080;
+  const DESIGN_H = 1920;
+
+  function applyCanvasScale() {
+    const canvas = document.getElementById('kioskCanvas');
+    if (!canvas) return;
+    const vw = window.innerWidth || document.documentElement.clientWidth || DESIGN_W;
+    const vh = window.innerHeight || document.documentElement.clientHeight || DESIGN_H;
+
+    // Contain, not cover: scaling past the shorter axis would crop the
+    // composition, and "identical to the kiosk" has to include the edges.
+    const scale = Math.min(vw / DESIGN_W, vh / DESIGN_H);
+    document.documentElement.style.setProperty('--app-scale', String(scale));
+
+    // The scaled canvas is 1920*scale tall; centre the leftover space so a
+    // phone does not show all the slack at the bottom.
+    const slack = Math.max(0, vh - DESIGN_H * scale);
+    canvas.style.top = Math.round(slack / 2) + 'px';
+  }
+
+  applyCanvasScale();
+  window.addEventListener('resize', applyCanvasScale);
+  window.addEventListener('orientationchange', () => setTimeout(applyCanvasScale, 100));
 
   /* ── Fullscreen ─────────────────────────────────────────────────────────── */
   function requestFS() {
@@ -177,6 +216,18 @@
     splash.classList.add('hidden');
     resetIdleTimer();
 
+    // Hand off to the router, if one is present, so the splash can lead into
+    // the gallery home screen instead of straight to sheets. Wrapped for the
+    // same reason as fullscreen below: a fault in a later-loaded module must
+    // never be able to strand the kiosk on an undismissable splash.
+    try {
+      if (window.KIOSK_ROUTER && typeof window.KIOSK_ROUTER.onSplashDismissed === 'function') {
+        window.KIOSK_ROUTER.onSplashDismissed();
+      }
+    } catch (err) {
+      console.log('[router] onSplashDismissed failed (non-fatal):', err && err.message ? err.message : err);
+    }
+
     tryEnterFullscreen();
     requestWakeLock();
   }
@@ -197,9 +248,24 @@
 
   function startScreensaver() {
     if (screensaverActive || !galleryEntered) return;
+    if (!sheets.length) return; // nothing to cycle through
     screensaverActive = true;
     document.body.classList.add('screensaver');
     if (isZoomed()) resetZoom();
+
+    /* The mixed video+flash reel takes over ONLY if it has clips to play.
+     * start() returns false when there are none, or when the catalog has no
+     * stills, and then the original sheet cycle below runs exactly as it
+     * always has. This is the whole degradation story: no clips, no change
+     * to what is on the wall today. */
+    try {
+      if (window.Screensaver && window.Screensaver.start(document.getElementById('kioskCanvas'))) {
+        return;
+      }
+    } catch (err) {
+      console.log('[screensaver] reel failed to start, falling back to sheets:',
+        err && err.message ? err.message : err);
+    }
 
     screensaverTimer = setInterval(() => {
       navigate((current + 1) % sheets.length, 'left');
@@ -210,6 +276,7 @@
     if (!screensaverActive) return;
     screensaverActive = false;
     clearInterval(screensaverTimer);
+    try { if (window.Screensaver) window.Screensaver.stop(); } catch (err) {}
     clearTimeout(idleTimer);
     document.body.classList.remove('screensaver');
     galleryEntered = false;
@@ -226,6 +293,16 @@
     }
   }
 
+  // The gallery UI (added later) needs real scrolling — a grid of designs and
+  // a horizontal chip bar. The blanket preventDefault() below would kill it,
+  // so surfaces that genuinely want native scrolling opt out by tagging
+  // themselves [data-native-scroll]. Nothing in the legacy sheet viewer
+  // carries that attribute, so its behaviour is unchanged.
+  function wantsNativeScroll(e) {
+    const t = e.target;
+    return !!(t && t.closest && t.closest('[data-native-scroll]'));
+  }
+
   // Capture phase so this always sees a touch first, before any component
   // (nav buttons, dots, the stage's own drag/swipe handling) can act on it —
   // stopping propagation here fully consumes the "wake up" tap so it can't
@@ -236,7 +313,7 @@
   // back/forward navigation, overscroll) ever claiming a gesture instead of
   // the page, independent of touch-action CSS or the per-element JS below.
   document.addEventListener('touchstart', e => {
-    e.preventDefault();
+    if (!wantsNativeScroll(e)) e.preventDefault();
     if (screensaverActive) {
       e.stopPropagation();
       exitScreensaver();
@@ -253,8 +330,10 @@
   // if preventDefault() wasn't called on an earlier move in the same
   // gesture, so every touchmove is unconditionally prevented here, at the
   // earliest possible point (document, capture phase) — not just
-  // multi-touch ones.
-  document.addEventListener('touchmove', e => e.preventDefault(), { capture: true, passive: false });
+  // multi-touch ones. Scrollable gallery surfaces are the sole exemption.
+  document.addEventListener('touchmove', e => {
+    if (!wantsNativeScroll(e)) e.preventDefault();
+  }, { capture: true, passive: false });
 
   // WebKit-only pinch gesture events (Chrome never fires these, so this is
   // a no-op there, but it's a real vector on Safari-based kiosk browsers).
@@ -314,7 +393,7 @@
   function init() {
     buildDots();
     renderQrCode();
-    loadSheet(0, 'none');
+    if (sheets.length) loadSheet(0, 'none');
     bindEventListeners();
     requestWakeLock();
     tryEnterFullscreen();
@@ -670,6 +749,17 @@
     addTap(btnNext, () => navigate(current + 1));
     addTap(fsExitBtn, exitFS);
 
+    // Only present when a sheet was opened from a gallery grid tile; CSS
+    // keeps it hidden otherwise, so the sheets-only kiosk never shows it.
+    const sheetBack = document.getElementById('sheetBackBtn');
+    if (sheetBack) {
+      addTap(sheetBack, () => {
+        if (window.KIOSK_ROUTER && typeof window.KIOSK_ROUTER.leaveSheetViewer === 'function') {
+          window.KIOSK_ROUTER.leaveSheetViewer();
+        }
+      });
+    }
+
     document.addEventListener('keydown', e => {
       if (e.key === 'ArrowLeft')  navigate(current - 1);
       if (e.key === 'ArrowRight') navigate(current + 1);
@@ -699,6 +789,30 @@
     // On resize, reset to resting state if not zoomed
     window.addEventListener('resize', () => { if (!isZoomed()) resetZoom(); });
   }
+
+  /* ── Public surface ──────────────────────────────────────────────────────
+   * The gallery router drives this viewer for sheet browsing rather than
+   * reimplementing it. Kept deliberately small: everything above — the touch
+   * model, the ghost-contact handling, the slide transitions — stays private
+   * and unchanged. */
+  window.SheetViewer = {
+    /* Replace the browsable set — e.g. only one artist's sheets. Pass nothing
+     * to restore the full production list. Items need { title, file }. */
+    setSheets(list) {
+      sheets = (Array.isArray(list) && list.length) ? list : GALLERY_DATA.sheets;
+      current = 0;
+      buildDots();
+      if (sheets.length) loadSheet(0, 'none');
+    },
+    openAt(idx) {
+      if (!sheets.length) return;
+      const i = Math.max(0, Math.min(sheets.length - 1, idx | 0));
+      if (i === current) { resetZoom(); updateUI(); }
+      else loadSheet(i, 'none');
+    },
+    get count() { return sheets.length; },
+    get current() { return current; },
+  };
 
   /* ── Start ──────────────────────────────────────────────────────────────── */
   init();

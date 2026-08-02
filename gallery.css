@@ -1,0 +1,941 @@
+/* Flash Gallery — browse UI styles (home / grid / detail)
+ *
+ * Loaded after styles.css and scoped entirely under #gallery or the
+ * body.mode-* classes, so nothing here can alter the legacy sheet viewer.
+ * Sized for the kiosk's 1080x1920 portrait panel; degrades to phone widths
+ * for previewing.
+ */
+
+/* ── Mode switching ───────────────────────────────────────────────────────
+ * Exactly one experience is visible. Defaults keep the legacy viewer showing
+ * so that if this stylesheet or gallery.js ever fails to load, the kiosk
+ * falls back to the thing that works rather than to a blank screen. */
+#gallery { display: none; }
+
+body.mode-gallery #gallery {
+  display: flex;
+  flex-direction: column;
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  background: var(--bg);
+}
+
+body.mode-gallery #header,
+body.mode-gallery #viewer,
+body.mode-gallery #footer,
+body.mode-gallery #qrBadge { display: none; }
+
+body.mode-sheets #gallery { display: none; }
+
+/* The attract loop takes over the whole screen in either mode. */
+body.screensaver #gallery { display: none !important; }
+body.screensaver #viewer  { display: flex !important; }
+
+/* Back-to-gallery control, only when a sheet was opened from a grid tile. */
+#sheetBackBtn { display: none; }
+body.sheets-has-back #sheetBackBtn { display: inline-flex; }
+
+/* ── Placeholder-content banner ───────────────────────────────────────────
+ * Loud on purpose. Seed art in a screenshot is otherwise indistinguishable
+ * from real flash, and this is going on a wall in a shop. */
+.g-seedbanner {
+  flex: 0 0 auto;
+  background: var(--pink);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-align: center;
+  padding: 8px 14px;
+}
+
+/* ── Top bar ──────────────────────────────────────────────────────────── */
+.g-topbar {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 18px 20px 14px;
+  background: var(--surface);
+  min-height: 96px;
+}
+
+/* Centred and large — the brand is the first thing read from across a room.
+   Absolutely positioning the back control keeps the logo optically centred
+   instead of shoved off-axis by a button on one side only. */
+.g-topbar-logo {
+  height: 128px;
+  width: auto;
+  max-width: 76%;
+  object-fit: contain;
+  display: block;
+}
+
+.g-topbar-title {
+  font-family: 'Bebas Neue', 'Inter', sans-serif;
+  font-size: 40px;
+  letter-spacing: 0.06em;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Persistent, large, top-left (PRD §3.2). 96px wide clears the 44px minimum
+   touch target with room for a gloved or imprecise finger. */
+.g-back {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 96px;
+  min-height: 52px;
+  padding: 0 18px 0 12px;
+  background: var(--pink);
+  border: none;
+  border-radius: 0;
+  color: #fff;
+  font-family: 'Inter', sans-serif;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  flex: 0 0 auto;
+  transition: transform 0.1s, background 0.1s;
+}
+
+.g-back svg { width: 22px; height: 22px; }
+.g-back.pressed { transform: translateY(-50%) scale(0.94); background: #c2156f; }
+
+/* ── Scroll surfaces ──────────────────────────────────────────────────────
+ * styles.css sets `touch-action: none` globally and script.js calls
+ * preventDefault() on every touchmove to stop the browser claiming gestures.
+ * Both would kill scrolling here, so these surfaces opt back in and are
+ * marked [data-native-scroll] for the exemption in script.js. */
+.g-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  padding: 20px;
+}
+
+.g-scroll-grid { padding: 14px; }
+
+/* ── Home ─────────────────────────────────────────────────────────────── */
+.g-home-title {
+  flex: 0 0 auto;
+  font-family: 'Bebas Neue', 'Inter', sans-serif;
+  font-size: 48px;
+  letter-spacing: 0.05em;
+  color: var(--text);
+  text-align: center;
+  line-height: 1.05;
+  margin-bottom: 2px;
+}
+
+.g-home-help {
+  flex: 0 0 auto;
+  font-size: 19px;
+  font-weight: 300;
+  line-height: 1.4;
+  color: rgba(26, 26, 26, 0.68);
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.g-home-help strong { font-weight: 600; color: var(--pink); }
+
+.g-card {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: var(--text);
+  border: none;
+  border-radius: 0;
+  padding: 18px;
+  transition: transform 0.1s, filter 0.1s;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.g-card.pressed { transform: scale(0.985); filter: brightness(1.6); }
+
+/* Studio-wide card reads as "browse everything", not as another artist. */
+.g-card-all {
+  background: linear-gradient(135deg, var(--pink), #c2156f);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.g-card-all-title {
+  font-family: 'Bebas Neue', 'Inter', sans-serif;
+  font-size: 46px;
+  letter-spacing: 0.05em;
+  color: #fff;
+  line-height: 1.05;
+}
+
+.g-card-all-sub {
+  font-size: 18px;
+  color: rgba(255, 255, 255, 0.85);
+  letter-spacing: 0.05em;
+  margin-top: 4px;
+}
+
+.g-card-sheets {
+  background: var(--text);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.g-card-sheets .g-card-all-title { color: #fff; font-size: 40px; }
+.g-card-sheets .g-card-all-sub { color: rgba(255, 255, 255, 0.6); }
+
+/* ── Home: fixed, non-scrolling ───────────────────────────────────────────
+ * Every artist visible at once. The pane clips rather than scrolls, and the
+ * grid divides its height into equal rows, so the only way to fit more cards
+ * is more columns — which pickHomeLayout() in gallery.js solves for. */
+.g-home {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 14px 16px 16px;
+}
+
+.g-homegrid {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(var(--home-cols, 2), 1fr);
+  grid-template-rows: repeat(var(--home-rows, 5), minmax(0, 1fr));
+  gap: var(--home-gap, 12px);
+}
+
+/* Last-resort escape hatch: only set when even the densest packing cannot
+   fit, which for this studio would mean a roster far beyond a dozen. */
+.g-homegrid.is-overflow {
+  grid-template-rows: none;
+  grid-auto-rows: minmax(120px, auto);
+  overflow-y: auto;
+  touch-action: pan-y;
+}
+
+.g-card-span { grid-column: 1 / -1; }
+
+/* Pink fill rather than black — the wall of black cards read as heavy.
+   Brand pink at full strength (#E91E8C) only gives white text 4.18:1, so the
+   fill is a shade deeper: the hue is unchanged but white now clears 5.8:1 and
+   the logo yellow clears 4.5:1, both comfortable at arm's length. */
+.g-card-artist {
+  background: var(--pink-card);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 0;
+  min-height: 0;
+  padding: 14px 18px;
+  overflow: hidden;
+}
+
+.g-card-artist.pressed { filter: brightness(1.12); }
+
+.g-card-artist.is-empty { opacity: 0.55; }
+
+.g-card-portrait {
+  flex: 0 0 auto;
+  width: 104px;
+  height: 104px;
+  border-radius: 0;
+  overflow: hidden;
+  /* Portraits are drawn on a dark ground; a translucent black well keeps them
+     from looking like bright holes punched in a pink card. */
+  background: rgba(0, 0, 0, 0.28);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.g-card-portrait img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.g-card-initials {
+  font-family: 'Bebas Neue', 'Inter', sans-serif;
+  font-size: 52px;
+  color: #fff;
+}
+
+.g-card-meta { min-width: 0; }
+
+.g-card-name {
+  font-family: 'Bebas Neue', 'Inter', sans-serif;
+  font-size: 38px;
+  letter-spacing: 0.04em;
+  line-height: 1.05;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.g-card-handle {
+  font-size: 18px;
+  color: rgba(255, 255, 255, 0.92);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.g-card-count {
+  font-size: 18px;
+  color: var(--gold);
+  font-weight: 600;
+  margin-top: 6px;
+  letter-spacing: 0.05em;
+}
+
+.g-card-styles {
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.72);
+  margin-top: 4px;
+  text-transform: capitalize;
+}
+
+/* ── Filter bar ───────────────────────────────────────────────────────── */
+.g-filterwrap {
+  flex: 0 0 auto;
+  background: var(--bg);
+  padding: 10px 0;
+}
+
+.g-filterbar {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  touch-action: pan-x;
+  -webkit-overflow-scrolling: touch;
+  padding: 2px 14px;
+  scrollbar-width: none;
+}
+
+.g-filterbar::-webkit-scrollbar { display: none; }
+
+.g-chip {
+  flex: 0 0 auto;
+  min-height: 54px;
+  padding: 0 22px;
+  border-radius: 0;
+  border: none;
+  background: var(--surface);
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  transition: transform 0.1s, background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.g-chip.pressed { transform: scale(0.94); }
+
+.g-chip.is-active {
+  background: var(--pink);
+  color: #fff;
+}
+
+.g-chip-clear {
+  background: var(--text);
+  color: #fff;
+}
+
+.g-chip-artist { background: rgba(233, 30, 140, 0.12); color: var(--pink); }
+
+/* ── Grid ─────────────────────────────────────────────────────────────── */
+.g-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--cols, 3), 1fr);
+  /* Square cells, set in JS from the measured column width. Content-sized
+     rows let a tall sheet stretch every row it spanned. */
+  grid-auto-rows: var(--cell, 340px);
+  /* Dense packing is what lets the three singles after a sheet slot into the
+     single leftover column beside it instead of starting a new row. */
+  grid-auto-flow: row dense;
+  gap: 12px;
+}
+
+/* NO column media query. The grid is ONE layout at every width — a phone
+   shows the same 3-column composition as the kiosk, scaled down. A media
+   query here would be a second source of truth fighting the module spans
+   computed in gallery.js, which is exactly what broke the phone layout. */
+
+.g-tile {
+  position: relative;
+  display: block;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: var(--surface);
+  overflow: hidden;
+  transition: transform 0.1s, border-color 0.1s;
+}
+
+.g-tile.pressed { transform: scale(0.96); filter: brightness(0.94); }
+
+.g-tile-img {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  background: #fff;
+  display: block;
+}
+
+.g-tile-img img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+}
+
+/* Two tile modules, one cell shape. A single fills the frame; a sheet is
+   letterboxed so the whole composition stays readable — cropping a sheet to
+   square would hide most of what makes it a sheet. */
+.g-tile-design .g-tile-img img { object-fit: cover; }
+.g-tile-sheet  .g-tile-img img { object-fit: contain; padding: 6px; }
+.g-tile-sheet .g-tile-img { background: #fff; }
+
+.g-tile-img.is-broken::after {
+  content: 'image unavailable';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  background: #f4f4f4;
+}
+
+.g-tile-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: var(--text);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  padding: 4px 8px;
+  border-radius: 0;
+}
+
+.g-tile-badge-featured { background: var(--gold); color: var(--text); }
+
+.g-tile-cap {
+  padding: 8px 10px 10px;
+  text-align: left;
+  background: var(--surface);
+}
+
+.g-tile-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.g-tile-artist {
+  font-size: 14px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Empty state (PRD §3.2 — never a blank screen) ────────────────────── */
+.g-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  text-align: center;
+  padding: 70px 30px;
+}
+
+.g-empty-title {
+  font-family: 'Bebas Neue', 'Inter', sans-serif;
+  font-size: 40px;
+  letter-spacing: 0.04em;
+  color: var(--text);
+}
+
+.g-empty-sub {
+  font-size: 19px;
+  font-weight: 300;
+  color: var(--text-dim);
+  max-width: 42ch;
+}
+
+/* ── Detail ───────────────────────────────────────────────────────────── */
+.g-detail {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+.g-detail-stage {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  touch-action: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.g-detail-inner {
+  width: 100%;
+  height: 100%;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.g-detail-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  pointer-events: none;
+}
+
+.g-detail-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0));
+  pointer-events: none;
+}
+
+.g-detail-bar > * { pointer-events: auto; }
+
+.g-detail-counter {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--gold);
+  letter-spacing: 0.1em;
+}
+
+.g-detail-meta {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 5;
+  padding: 22px 20px 26px;
+  background: linear-gradient(to top, rgba(255, 255, 255, 0.97) 60%, rgba(255, 255, 255, 0));
+  pointer-events: none;
+}
+
+.g-detail-title {
+  font-family: 'Bebas Neue', 'Inter', sans-serif;
+  font-size: 48px;
+  letter-spacing: 0.04em;
+  color: var(--text);
+  line-height: 1.05;
+}
+
+.g-detail-sub {
+  font-size: 18px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+.g-detail-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 6;
+  width: 72px;
+  height: 160px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--pink);
+}
+
+.g-detail-nav svg { width: 46px; height: 46px; filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.18)); }
+.g-detail-nav.pressed { transform: translateY(-50%) scale(0.82); opacity: 0.65; }
+.g-detail-prev { left: 4px; }
+.g-detail-next { right: 4px; }
+.g-detail-nav.hidden { display: none; }
+
+/* ── Shared button reset ──────────────────────────────────────────────── */
+#gallery button {
+  font-family: 'Inter', sans-serif;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+#gallery button:disabled { pointer-events: none; }
+
+/* Detail view has its own bar; the back control there is in normal flow. */
+.g-back-detail {
+  position: static;
+  transform: none;
+}
+
+.g-back-detail.pressed { transform: scale(0.94); }
+
+/* Seniority label — hidden unless KIOSK_CONFIG.showSeniority is on. */
+.g-card-seniority {
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.66);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+/* The design count sits on black now, where the logo yellow finally has the
+   contrast to be used at full strength (13.6:1) instead of a darkened
+   substitute. */
+.g-card-count { color: var(--gold); }
+
+/* ── Artist follow panel ──────────────────────────────────────────────────
+ * Reuses the existing .qr-badge treatment (white ground, dark modules) and
+ * only overrides what has to change: it sits in flow instead of pinned to the
+ * corner, and it is larger because this one is meant to be scanned from
+ * standing distance rather than noticed in passing. */
+.g-artistinfo {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  background: var(--text);
+  padding: 22px;
+  margin-bottom: 14px;
+}
+
+/* The inline artist QR lives INSIDE the follow panel. It shares the
+   .qr-badge class purely to inherit the visual treatment, so its positioning
+   has to beat anything targeting .qr-badge generally — a stray
+   `position: absolute` on that class detaches it and it floats to the corner
+   of the canvas, which is exactly what happened once. */
+.g-artistinfo .qr-badge.qr-inline,
+.qr-badge.qr-inline {
+  position: static !important;
+  left: auto !important;
+  right: auto !important;
+  top: auto !important;
+  bottom: auto !important;
+  flex: 0 0 auto;
+  width: 260px;
+  height: 260px;
+  /* 28px = a 4-module quiet zone at this size (204px code, 7.0px module).
+     Was 12px, which is 1.5 modules — below what the QR spec allows, because
+     the SVG viewBox is the bare 29x29 matrix and this padding is the only
+     quiet zone the code gets. Decoders are permitted to refuse that. */
+  padding: 28px;
+  box-shadow: none;
+  border-radius: 20px;   /* container only — see note in styles.css */
+}
+
+.g-artistinfo-meta { min-width: 0; }
+
+/* Was the single word "Follow" at 40px. It is now a sentence read standing
+   up, so it drops to 30px and is allowed to wrap — line-height 1 was fine for
+   one word and would have collided the moment it wrapped. White on the
+   near-black panel is 16.9:1. */
+.g-artistinfo-follow {
+  font-family: 'Bebas Neue', 'Inter', sans-serif;
+  font-size: 30px;
+  letter-spacing: 0.04em;
+  color: #fff;
+  line-height: 1.12;
+  text-transform: uppercase;
+}
+
+.g-artistinfo-handle {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--gold);
+  letter-spacing: 0.03em;
+  margin-top: 4px;
+  word-break: break-word;
+}
+
+.g-artistinfo-bio {
+  font-size: 18px;
+  font-weight: 300;
+  color: rgba(255, 255, 255, 0.6);
+  margin-top: 8px;
+}
+
+.g-artistinfo-hint {
+  font-size: 14px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.4);
+  margin-top: 10px;
+}
+
+/* ── Sheet module: 2 columns x 3 rows ─────────────────────────────────────
+ * Span is set inline by layoutModules (it alternates sides), so this only
+ * has to undo the square-cell assumptions the single-design tile makes. */
+.g-tile-module {
+  display: flex;
+  flex-direction: column;
+}
+
+.g-tile-module .g-tile-img {
+  flex: 1 1 auto;
+  aspect-ratio: auto;
+  min-height: 0;
+}
+
+.g-tile-module .g-tile-img img {
+  /* Fill the block with a centre crop — never letterbox. The block's row span
+     is chosen from the image's real aspect (see moduleSpan in gallery.js), so
+     what gets cropped is a few percent, not the composition. */
+  object-fit: cover;
+  object-position: center;
+  padding: 0;
+}
+
+/* Sheets outside a module (2-column layouts, or a sheets-only filter) keep
+   the square letterboxed treatment so nothing is cropped away. */
+.g-tile-sheet:not(.g-tile-module) .g-tile-img img {
+  object-fit: contain;
+  padding: 6px;
+}
+
+
+/* ── QR on the artist card ────────────────────────────────────────────────
+ * Sized from the physical panel, not from taste. Cards solve to roughly
+ * 518x259 design px in the 2-column layout (TARGET_CARD_ASPECT is 2.0), and
+ * 1080 design px spans about 15.7 inches of glass on a 32" panel — call it
+ * 69 ppi. A 180px badge is therefore ~2.6 inches of real QR, and the working
+ * rule for a phone camera is that scan distance tops out around ten times the
+ * code's width, so ~26 inches. That covers anyone standing at the kiosk.
+ *
+ * It does NOT survive the phone. At a 390px viewport the canvas scales to
+ * 0.361, so the same badge lands at ~65 CSS px — under half an inch. That is
+ * fine, because scanning a code on the screen you are already holding is not
+ * a thing anyone does; on a phone the whole card is the tap target and that
+ * is the real path. The QR is for the wall. */
+.g-card-qr {
+  flex: 0 0 auto;
+  width: 180px;
+  height: 180px;
+  /* 19px, not a round 10. The QR spec requires a quiet zone of 4 blank
+     modules on every side or decoders are entitled to fail, and the white
+     padding IS the quiet zone here — the SVG viewBox is the bare 29x29
+     matrix with no margin of its own. At 180px total, 19px of padding leaves
+     a 141px code, so one module is 4.9px and the padding is exactly 4
+     modules. Change the width and this has to change with it. */
+  padding: 19px;
+  background: #fff;
+  /* Container rounding only. Rounding the individual MODULES was the other
+     option and it is the more designed look, but it eats into each dark
+     module's area, and at 4.9px per module on this card there is not much
+     area to give away — it would want error correction raised from M to Q or
+     H first, which grows the code from 29 to 33+ modules and shrinks every
+     module again. Not a good trade at card size. Offered rather than assumed:
+     the detail-page code at 7px/module has the headroom if he wants it. */
+  border-radius: 14px;
+  /* No border — fill and the pink card behind it do the separating. The white
+     ground is not decoration: a QR needs a quiet zone to decode at all. */
+  border: none;
+  box-shadow: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;   /* the card underneath stays tappable */
+}
+
+.g-card-qr svg { width: 100%; height: 100%; display: block; }
+
+.g-card-artist .g-card-meta { flex: 1 1 auto; }
+
+/* The portrait yields first. Between a decorative headshot and a code that
+   takes a customer to the artist's actual finished work, the code wins. */
+.g-card-artist.has-qr .g-card-portrait { width: 84px; height: 84px; }
+
+/* Dense variant — three or more columns, or short rows. The portrait and the
+   style list are the first things to go: at this size they are decoration,
+   whereas the name, handle and count are what the tap is actually for. */
+.g-card-artist.is-dense { gap: 12px; padding: 10px 14px; }
+.g-card-artist.is-dense .g-card-portrait { display: none; }
+/* At three columns a card is ~340px wide. A QR small enough to fit would be
+   too small to scan, and a QR nobody can scan is worse than none — it invites
+   a customer to walk up and fail. Dropped outright. */
+.g-card-artist.is-dense .g-card-qr { display: none !important; }
+.g-card-artist.is-dense .g-card-name { font-size: 28px; }
+.g-card-artist.is-dense .g-card-handle,
+.g-card-artist.is-dense .g-card-count { font-size: 15px; }
+
+/* Caption under the sheet viewer's corner QR — says what scanning will do,
+   which matters more now that the destination changes per artist. */
+.qr-caption {
+  position: absolute;
+  left: 16px;
+  bottom: 0;
+  z-index: 40;
+  width: 138px;
+  padding: 4px 0 6px;
+  text-align: center;
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--text);
+  pointer-events: none;
+}
+
+body.mode-gallery .qr-caption,
+body.screensaver .qr-caption { display: none; }
+
+/* No viewport-width rule here either — see the long note in styles.css where
+   the equivalent QR rule used to live. The caption belongs to the sheet
+   viewer's corner badge and is scoped by mode, not by screen size. */
+
+/* ── QR visibility, asserted positively ───────────────────────────────────
+ * The artist's inline Instagram code has now been hidden twice by rules
+ * written for the studio badge — once by `.qr-badge { position: absolute
+ * !important }` and once by a `.qr-badge { display: none }` media query. Both
+ * times the cause was a selector matching the CLASS the two share.
+ *
+ * So this is stated as a positive assertion rather than trusting that nothing
+ * else hides it. Two class selectors out-specify any single-class rule, and
+ * the inline code is visible in gallery mode by definition — it only exists
+ * on an artist's page. */
+.qr-badge.qr-inline { display: flex !important; }
+body.mode-gallery .qr-badge.qr-inline { display: flex !important; }
+
+/* ── Cover: navigation modes, not a roster ────────────────────────────────
+ * Three or four full-width targets. Fixed height regardless of how many
+ * artists exist, so the cover never re-flows as the studio grows. */
+.g-covergrid {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: repeat(var(--cover-rows, 3), minmax(0, 1fr));
+  gap: 14px;
+}
+
+.g-card-mode {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 22px 26px;
+}
+
+/* Each mode gets its own colour so they are told apart at a glance rather
+   than by reading. Only one is black — a full screen of black cards was the
+   thing that read as heavy. */
+.g-mode-all      { background: var(--pink-card); }
+.g-mode-artist   { background: var(--text); }
+.g-mode-category { background: var(--gold); }
+.g-mode-sheets   { background: var(--surface); }
+
+.g-mode-all .g-card-all-title,
+.g-mode-artist .g-card-all-title { color: #fff; }
+.g-mode-all .g-card-all-sub,
+.g-mode-artist .g-card-all-sub { color: rgba(255, 255, 255, 0.8); }
+
+/* Ink on the logo yellow is 13.6:1 — the one place the brand yellow can be
+   used at full strength and still be read from across the room. */
+.g-mode-category .g-card-all-title { color: var(--text); }
+.g-mode-category .g-card-all-sub { color: rgba(26, 26, 26, 0.7); }
+
+.g-mode-sheets .g-card-all-title { color: var(--text); }
+.g-mode-sheets .g-card-all-sub { color: rgba(26, 26, 26, 0.55); }
+
+.g-card-mode.pressed { filter: brightness(1.08); }
+.g-mode-category.pressed,
+.g-mode-sheets.pressed { filter: brightness(0.94); }
+
+/* ── Category cards ─────────────────────────────────────────────────────── */
+.g-card-category {
+  background: var(--pink-card);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 16px 20px;
+}
+
+.g-card-category .g-card-name {
+  font-family: 'Bebas Neue', 'Inter', sans-serif;
+  font-size: 38px;
+  letter-spacing: 0.04em;
+  line-height: 1.05;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.g-card-category .g-card-count { color: rgba(255, 255, 255, 0.85); margin-top: 2px; }
+.g-card-category.pressed { filter: brightness(1.12); }
+
+/* Counts on a pink card: the logo yellow clears 4.5:1 here. */
+.g-card-artist .g-card-count { color: var(--gold); }
+
+/* ── Proportional scaling ─────────────────────────────────────────────────
+ * The kiosk is 1080x1920 and a phone is ~390x844 — both portrait, so the
+ * layout scales instead of reflowing. Cell size is measured and set as
+ * --cell by gallery.js, which makes the grid itself proportional for free.
+ *
+ * Type is the one thing NOT scaled linearly: every label has a clamp() floor
+ * so it stays readable on a phone. That is a deliberate divergence — at 390px
+ * a linearly scaled caption would be about 4px.
+ */
+.g-tile,
+.g-tile-cap {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.g-tile-cap {
+  box-sizing: border-box;
+  width: 100%;
+}
+
+/* Badges scale with the tile but keep a floor so they stay readable. */
+.g-tile-badge {
+  font-size: clamp(8px, calc(var(--cell, 340px) * 0.032), 12px);
+  padding: clamp(2px, calc(var(--cell, 340px) * 0.012), 5px)
+           clamp(4px, calc(var(--cell, 340px) * 0.024), 9px);
+}
+
+.g-tile-title { font-size: clamp(9px, calc(var(--cell, 340px) * 0.046), 16px); }
+.g-tile-artist { font-size: clamp(8px, calc(var(--cell, 340px) * 0.040), 14px); }
+.g-tile-cap { padding: clamp(4px, calc(var(--cell, 340px) * 0.024), 10px); }
