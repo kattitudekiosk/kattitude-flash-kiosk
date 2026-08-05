@@ -10,6 +10,13 @@
  * row-level security in Postgres. The client never decides what someone may
  * do — it only decides what to SHOW. An artist who forged a request would
  * still be refused by the database. There is no service-role key here.
+ *
+ * That posture is why the category-request feature is shaped the way it is.
+ * The "artists cannot create categories" rule is an RLS policy on
+ * `categories`; the "no two spellings of the same category" rule is a UNIQUE
+ * index on a generated canonical key; the "only an admin approves" rule is an
+ * is_admin() guard inside a SECURITY DEFINER function. Everything below is
+ * the friendly face of those three, and none of it is load-bearing.
  */
 (function () {
   'use strict';
@@ -19,6 +26,20 @@
     auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
   });
 
+  /* Categories are two different kinds of thing wearing one label. `style` is
+   * how a piece is drawn (Fine Line, Blackwork). `theme` is what it evokes
+   * (summertime, Texas, love). `subject` is what it literally depicts (snakes,
+   * roses). They are orthogonal — a piece can be all three — so they are shown
+   * as separate shelves rather than one flat run of chips. An admin picks the
+   * kind at approval time; artists never set it. */
+  const KINDS = [
+    ['style',   'Style'],
+    ['theme',   'Theme'],
+    ['subject', 'Subject'],
+  ];
+
+  const KIND_LABEL = { style: 'Styles', theme: 'Themes', subject: 'Subjects' };
+
   /* == State == */
   const state = {
     user: null,
@@ -27,6 +48,7 @@
     artists: [],
     categories: [],
     designs: [],
+    requests: [],      // rows from category_request_queue (RLS decides which)
     queue: [],         // files staged for upload
     view: 'upload',
   };
@@ -55,6 +77,16 @@
   function fail(where, error) {
     console.error(where, error);
     toast((error && error.message) ? `${where}: ${error.message}` : where, 'error');
+  }
+
+  function when(ts) {
+    if (!ts) return '';
+    const d = new Date(ts);
+    const days = Math.floor((Date.now() - d.getTime()) / 86400000);
+    if (days === 0) return 'today';
+    if (days === 1) return 'yesterday';
+    if (days < 30) return days + ' days ago';
+    return d.toLocaleDateString();
   }
 
   /* == Auth == */
@@ -113,7 +145,7 @@
     $('#whoRole').textContent = state.isAdmin ? 'Admin' : 'Artist';
     $$('.admin-only').forEach(t => { t.hidden = !state.isAdmin; });
 
-    await Promise.all([loadArtists(), loadCategories()]);
+    await Promise.all([loadArtists(), loadCategories(), loadRequests()]);
     await loadDesigns();
     show('upload');
   }
@@ -146,6 +178,31 @@
       .order('display_order').order('created_at', { ascending: false });
     if (error) return fail('Loading designs', error);
     state.designs = data || [];
+  }
+
+  async function loadRequests() {
+    // Same query for everyone. The view is security_invoker, so an artist
+    // gets their own rows and an admin gets all of them — the client is not
+    // filtering, and could not be trusted to.
+    const { data, error } = await sb.from('category_request_queue')
+      .select('*').order('created_at', { ascending: false });
+    if (error) return fail('Loading category requests', error);
+    state.requests = data || [];
+    paintRequestBadge();
+  }
+
+  function pendingForMe() {
+    return state.requests.filter(r => r.status === 'pending' &&
+      (state.isAdmin || r.requested_by === state.me.id));
+  }
+
+  function paintRequestBadge() {
+    const tab = $('.tab[data-view="requests"]');
+    if (!tab) return;
+    const n = pendingForMe().length;
+    tab.innerHTML = '';
+    tab.appendChild(document.createTextNode('Requests'));
+    if (n) tab.appendChild(el('span', 'count', String(n)));
   }
 
   /* == Image handling == */
@@ -203,6 +260,355 @@
     return new Promise(res => c.toBlob(res, 'image/webp', 0.86));
   }
 
+  /* == Category chips, grouped by kind ====================================
+   *
+   * Used by the staged-file cards, the bulk tagger and the designs list, so
+   * the grouping cannot drift between them. `selected` is an array of
+   * category ids; `onToggle(category, isOn)` does whatever that surface does.
+   */
+  function chipGroups(selected, onToggle) {
+    const wrap = el('div', 'kindgroups');
+    let any = false;
+
+    KINDS.forEach(([kind]) => {
+      // A category written before `kind` existed defaults to style, matching
+      // the column default. Nothing should vanish because a field is null.
+      const cats = state.categories.filter(c => (c.kind || 'style') === kind);
+      if (!cats.length) return;
+      any = true;
+
+      const g = el('div', 'kindgroup');
+      // Only label the groups once there is more than one kind in play —
+      // until themes exist, headings over a single list are just noise.
+      g.appendChild(el('div', 'muted small kindlabel', KIND_LABEL[kind]));
+
+      const chips = el('div', 'chips');
+      cats.forEach(c => {
+        const on = selected.indexOf(c.id) !== -1;
+        const b = el('button', 'chip' + (on ? ' is-on' : ''), c.name);
+        b.onclick = () => onToggle(c, on);
+        chips.appendChild(b);
+      });
+      g.appendChild(chips);
+      wrap.appendChild(g);
+    });
+
+    if (!any) wrap.appendChild(el('div', 'muted small', 'No categories yet.'));
+
+    const ask = el('button', 'btn btn-quiet', 'Request a new category…');
+    ask.onclick = () => show('requests');
+    wrap.appendChild(ask);
+
+    return wrap;
+  }
+
+  /* == The request panel ==================================================
+   *
+   * Two tiers, and they are not the same mechanism:
+   *
+   *   EXACT   — canonical key match against an existing category. Blocks.
+   *             The artist is told what it already is and no request is
+   *             created, so duplicate requests never enter the queue.
+   *
+   *   NEAR    — trigram similarity. Does NOT block. It is shown here as a
+   *             courtesy and shown to the admin at review time as
+   *             "did you mean". Auto-merging on similarity would fold
+   *             genuinely different categories together silently, which is
+   *             worse than the duplicate it would prevent.
+   *
+   * Both come from one round trip to check_category_name().
+   */
+  function requestPanel() {
+    const card = el('div', 'card req-panel');
+    card.appendChild(el('h2', null, 'Request a new category'));
+
+    const p = el('p', 'muted');
+    p.textContent = 'Ask for anything you actually want to tag work with — a ' +
+      'theme like “summertime” or “Texas”, a subject like “snakes”, or a ' +
+      'drawing style. Kat approves it before it shows up on the kiosk, so the ' +
+      'shop does not end up with three spellings of the same thing.';
+    card.appendChild(p);
+
+    const input = el('input', 'input');
+    input.placeholder = 'e.g. summertime';
+    input.setAttribute('autocapitalize', 'words');
+    card.appendChild(input);
+
+    const fb = el('div', 'req-feedback');
+    card.appendChild(fb);
+
+    const submit = el('button', 'btn btn-primary', 'Send request');
+    submit.disabled = true;
+    card.appendChild(submit);
+
+    let answer = null;      // the last check_category_name() result
+    let timer = null;
+    let seq = 0;            // guards against an old response landing last
+
+    function say(cls, nodes) {
+      fb.className = 'req-feedback ' + (cls || '');
+      fb.innerHTML = '';
+      nodes.forEach(n => fb.appendChild(n));
+    }
+
+    async function check() {
+      const name = input.value.trim();
+      answer = null;
+      submit.disabled = true;
+
+      if (!name) { say('', []); return; }
+
+      const mine = ++seq;
+      const { data, error } = await sb.rpc('check_category_name', { p_name: name });
+      if (mine !== seq) return;        // a later keystroke has already answered
+      if (error) return fail('Checking that name', error);
+
+      answer = data;
+
+      if (data.reason === 'empty') {
+        say('req-exists', [el('span', null, data.message)]);
+        return;
+      }
+
+      if (data.reason === 'exists') {
+        const line = el('div');
+        line.appendChild(document.createTextNode('That already exists as '));
+        line.appendChild(el('strong', null, data.exact.name));
+        line.appendChild(document.createTextNode(
+          ' (' + data.exact.kind + '). Tag your work with it instead.'));
+        say('req-exists', [line]);
+        return;
+      }
+
+      if (data.reason === 'already_requested') {
+        say('req-dupe', [el('div', null,
+          'You already asked for “' + data.my_pending.requested_name + '” ' +
+          when(data.my_pending.created_at) + '. It is still waiting on Kat.')]);
+        return;
+      }
+
+      // Available. Near matches are advisory — the button stays enabled.
+      const nodes = [el('div', null, 'Nobody has this one yet. Send it over.')];
+      if (data.near && data.near.length) {
+        const n = el('div', 'req-near');
+        n.textContent = 'Close to what already exists: ' +
+          data.near.map(x => x.name).join(', ') +
+          '. Send it anyway if you mean something different — Kat decides ' +
+          'whether they are the same thing.';
+        nodes.push(n);
+      }
+      say('req-ok', nodes);
+      submit.disabled = false;
+    }
+
+    input.oninput = () => { clearTimeout(timer); timer = setTimeout(check, 300); };
+    input.onblur = check;
+
+    submit.onclick = async () => {
+      const name = input.value.trim();
+      if (!name) return;
+      submit.disabled = true;
+
+      // requested_by is left to its column default, current_artist_id(). The
+      // RLS check refuses anything else, so sending it from here would only
+      // create a second place for it to be wrong.
+      const { error } = await sb.from('category_requests')
+        .insert({ requested_name: name });
+
+      if (error) {
+        // The database is allowed to know things the client does not — a
+        // category created by someone else thirty seconds ago, for instance.
+        submit.disabled = false;
+        return fail('Sending request', error);
+      }
+
+      input.value = '';
+      say('', []);
+      toast('Sent. Kat will see it in her Requests tab.');
+      await loadRequests();
+      renderRequests();
+    };
+
+    return card;
+  }
+
+  /* == Requests view ======================================================
+   * One tab, two audiences. An artist sees the ask-form and their own
+   * history. An admin sees the review queue first, then the same history.
+   */
+  function renderRequests() {
+    const v = $('#view-requests');
+    v.innerHTML = '';
+
+    if (state.isAdmin) v.appendChild(reviewQueue());
+
+    v.appendChild(requestPanel());
+    v.appendChild(myRequests());
+  }
+
+  function reviewQueue() {
+    const wrap = el('div');
+
+    const head = el('div', 'card');
+    head.appendChild(el('h2', null, 'Category requests'));
+    const p = el('p', 'muted');
+    p.textContent = 'Approve to create the category, merge if the artist meant ' +
+      'one we already have, or reject with a note so they know why. Nothing ' +
+      'here is automatic — “did you mean” suggestions are similarity only, ' +
+      'and similar is not the same.';
+    head.appendChild(p);
+    wrap.appendChild(head);
+
+    const pending = state.requests.filter(r => r.status === 'pending');
+    if (!pending.length) {
+      wrap.appendChild(el('div', 'card muted', 'Nothing waiting.'));
+      return wrap;
+    }
+
+    pending.forEach(r => wrap.appendChild(reviewCard(r)));
+    return wrap;
+  }
+
+  function reviewCard(r) {
+    const card = el('div', 'card req-item');
+
+    card.appendChild(el('div', 'req-name', r.requested_name));
+
+    const who = el('div', 'muted small req-who');
+    who.textContent = (r.requested_by_name || 'Unknown') +
+      (r.requested_by_handle ? ' (' + r.requested_by_handle + ')' : '') +
+      ' · ' + when(r.created_at) +
+      (r.pending_duplicates > 1
+        ? ' · ' + r.pending_duplicates + ' artists have asked for this'
+        : '');
+    card.appendChild(who);
+
+    const near = r.near_matches || [];
+    if (near.length) {
+      const n = el('div', 'req-near-list');
+      n.appendChild(el('div', 'muted small', 'Did you mean:'));
+      const row = el('div', 'row');
+      near.forEach(m => {
+        const b = el('button', 'btn btn-quiet',
+          'Merge into ' + m.name + ' (' + Math.round(m.similarity * 100) + '% alike)');
+        b.onclick = () => doMerge(r, m.id, null);
+        row.appendChild(b);
+      });
+      n.appendChild(row);
+      card.appendChild(n);
+    }
+
+    const actions = el('div', 'req-actions');
+
+    // Kind defaults to theme: Joshua's whole complaint is that the existing
+    // list is all styles and artists want themes. The common case should be
+    // the zero-thought case.
+    const kind = el('select', 'input');
+    KINDS.forEach(([value, label]) => {
+      const o = el('option', null, label);
+      o.value = value;
+      if (value === 'theme') o.selected = true;
+      kind.appendChild(o);
+    });
+    kind.title = 'What kind of category is this?';
+
+    const ok = el('button', 'btn btn-primary', 'Approve');
+    ok.onclick = async () => {
+      ok.disabled = true;
+      const { data, error } = await sb.rpc('approve_category_request', {
+        p_request_id: r.id, p_kind: kind.value,
+      });
+      if (error) { ok.disabled = false; return fail('Approving', error); }
+      toast('Created “' + (data ? data.name : r.requested_name) + '”.');
+      await Promise.all([loadCategories(), loadRequests()]);
+      renderRequests();
+    };
+
+    // Merge into anything, not only the near matches — similarity is a hint,
+    // not the whole list.
+    const mergeSel = el('select', 'input');
+    mergeSel.appendChild(el('option', null, 'Merge into…'));
+    state.categories.forEach(c => {
+      const o = el('option', null, c.name + ' · ' + (c.kind || 'style'));
+      o.value = c.id;
+      mergeSel.appendChild(o);
+    });
+    mergeSel.onchange = () => {
+      if (!mergeSel.value) return;
+      doMerge(r, mergeSel.value, null);
+    };
+
+    const no = el('button', 'btn btn-danger', 'Reject');
+    no.onclick = async () => {
+      const note = prompt('Why? The artist sees this.\n\n' +
+        'e.g. "Too close to Floral — use that one."');
+      if (note === null) return;
+      const { error } = await sb.rpc('reject_category_request', {
+        p_request_id: r.id, p_note: note,
+      });
+      if (error) return fail('Rejecting', error);
+      await loadRequests();
+      renderRequests();
+    };
+
+    actions.append(kind, ok, mergeSel, no);
+    card.appendChild(actions);
+    return card;
+  }
+
+  async function doMerge(r, categoryId, note) {
+    const target = state.categories.find(c => c.id === categoryId);
+    if (!confirm('Tell ' + (r.requested_by_name || 'them') + ' to use “' +
+        (target ? target.name : 'that category') + '” instead of “' +
+        r.requested_name + '”?')) return;
+    const { error } = await sb.rpc('merge_category_request', {
+      p_request_id: r.id, p_category_id: categoryId, p_note: note,
+    });
+    if (error) return fail('Merging', error);
+    await loadRequests();
+    renderRequests();
+  }
+
+  function myRequests() {
+    const mine = state.requests.filter(r => r.requested_by === state.me.id);
+
+    const card = el('div', 'card req-history');
+    card.appendChild(el('h3', null, state.isAdmin ? 'Your own requests' : 'Your requests'));
+
+    if (!mine.length) {
+      card.appendChild(el('p', 'muted small',
+        'Nothing yet. Anything you ask for shows up here with its answer, so ' +
+        'you never have to wonder whether it went through.'));
+      return card;
+    }
+
+    mine.forEach(r => {
+      const row = el('div', 'req-item');
+      row.appendChild(el('div', 'req-name', r.requested_name));
+
+      const status = el('div', 'row status');
+      const pillClass =
+        r.status === 'approved' ? 'pill ok' :
+        r.status === 'pending'  ? 'pill warn' : 'pill';
+      status.appendChild(el('span', pillClass,
+        r.status === 'merged' ? 'Use an existing one' :
+        r.status.charAt(0).toUpperCase() + r.status.slice(1)));
+      status.appendChild(el('span', 'muted small', 'asked ' + when(r.created_at)));
+      row.appendChild(status);
+
+      if (r.merged_into_category_id) {
+        const c = state.categories.find(x => x.id === r.merged_into_category_id);
+        if (c) row.appendChild(el('div', 'muted small', 'Tag with: ' + c.name));
+      }
+      if (r.review_note) {
+        row.appendChild(el('div', 'muted small', '“' + r.review_note + '”'));
+      }
+      card.appendChild(row);
+    });
+
+    return card;
+  }
+
   /* == Upload view == */
   function renderUpload() {
     const v = $('#view-upload');
@@ -240,6 +646,10 @@
     const list = el('div', 'queue');
     list.id = 'queue';
     v.appendChild(list);
+
+    // The affordance lives on the tagging screen, which is where an artist
+    // discovers the vocabulary is missing something.
+    v.appendChild(requestPanel());
 
     renderQueue();
   }
@@ -280,21 +690,15 @@
 
     // Batch tagging — the PRD's actual complaint is that artists add work in
     // batches, so tagging one at a time is the thing to avoid.
-    const bulkCats = el('div', 'chips');
-    state.categories.forEach(c => {
-      const b = el('button', 'chip', c.name);
-      b.onclick = () => {
-        state.queue.forEach(item => {
-          if (item.categories.indexOf(c.id) === -1) item.categories.push(c.id);
-        });
-        renderQueue();
-        toast(`Tagged all ${state.queue.length} with ${c.name}`);
-      };
-      bulkCats.appendChild(b);
-    });
-    const bulkLabel = el('div', 'muted small', 'Tap a style to apply it to every staged file:');
-    bulk.appendChild(bulkLabel);
-    bulk.appendChild(bulkCats);
+    bulk.appendChild(el('div', 'muted small',
+      'Tap a category to apply it to every staged file:'));
+    bulk.appendChild(chipGroups([], c => {
+      state.queue.forEach(item => {
+        if (item.categories.indexOf(c.id) === -1) item.categories.push(c.id);
+      });
+      renderQueue();
+      toast(`Tagged all ${state.queue.length} with ${c.name}`);
+    }));
 
     const actions = el('div', 'row');
     const draftBtn = el('button', 'btn btn-quiet', 'Save all as drafts');
@@ -345,18 +749,11 @@
       body.appendChild(sel);
     }
 
-    const chips = el('div', 'chips');
-    state.categories.forEach(c => {
-      const on = item.categories.indexOf(c.id) !== -1;
-      const b = el('button', 'chip' + (on ? ' is-on' : ''), c.name);
-      b.onclick = () => {
-        const i = item.categories.indexOf(c.id);
-        if (i === -1) item.categories.push(c.id); else item.categories.splice(i, 1);
-        renderQueue();
-      };
-      chips.appendChild(b);
-    });
-    body.appendChild(chips);
+    body.appendChild(chipGroups(item.categories, (c, on) => {
+      const i = item.categories.indexOf(c.id);
+      if (i === -1) item.categories.push(c.id); else item.categories.splice(i, 1);
+      renderQueue();
+    }));
 
     if (item.status !== 'ready') {
       body.appendChild(el('div', 'muted small', item.status));
@@ -381,8 +778,8 @@
     if (publish) {
       const untagged = usable.filter(i => !i.categories.length);
       if (untagged.length) {
-        toast(`${untagged.length} file(s) have no style yet. A design needs at ` +
-              `least one before it can be published — save as drafts, or tag them.`, 'error');
+        toast(`${untagged.length} file(s) have no category yet. A design needs ` +
+              `at least one before it can be published — save as drafts, or tag them.`, 'error');
         return;
       }
     }
@@ -515,31 +912,24 @@
     body.appendChild(status);
 
     // Categories
-    const chips = el('div', 'chips');
     const mine = (d.design_categories || []).map(x => x.category_id);
-    state.categories.forEach(c => {
-      const on = mine.indexOf(c.id) !== -1;
-      const b = el('button', 'chip' + (on ? ' is-on' : ''), c.name);
-      b.onclick = async () => {
-        if (on) {
-          if (mine.length === 1 && d.published) {
-            toast('That is its only style, and it is published. Unpublish first, ' +
-                  'or add another style — a published design needs at least one.', 'error');
-            return;
-          }
-          const { error } = await sb.from('design_categories').delete()
-            .eq('design_id', d.id).eq('category_id', c.id);
-          if (error) return fail('Removing style', error);
-        } else {
-          const { error } = await sb.from('design_categories')
-            .insert({ design_id: d.id, category_id: c.id });
-          if (error) return fail('Adding style', error);
+    body.appendChild(chipGroups(mine, async (c, on) => {
+      if (on) {
+        if (mine.length === 1 && d.published) {
+          toast('That is its only category, and it is published. Unpublish first, ' +
+                'or add another — a published design needs at least one.', 'error');
+          return;
         }
-        await loadDesigns(); renderDesigns();
-      };
-      chips.appendChild(b);
-    });
-    body.appendChild(chips);
+        const { error } = await sb.from('design_categories').delete()
+          .eq('design_id', d.id).eq('category_id', c.id);
+        if (error) return fail('Removing category', error);
+      } else {
+        const { error } = await sb.from('design_categories')
+          .insert({ design_id: d.id, category_id: c.id });
+        if (error) return fail('Adding category', error);
+      }
+      await loadDesigns(); renderDesigns();
+    }));
 
     const row = el('div', 'row');
 
@@ -686,23 +1076,34 @@
     const add = el('div', 'card');
     add.appendChild(el('h2', null, 'Categories'));
     add.appendChild(el('p', 'muted',
-      'A managed list, not free text — this is what stops "blackwork" and ' +
-      '"black work" both existing. Merge folds one into another and moves ' +
-      'every design across.'));
-    const nm = el('input', 'input'); nm.placeholder = 'New style name';
+      'A managed list, not free text. Postgres holds a canonical key for each ' +
+      'name — lowercased with every space, hyphen and underscore stripped — ' +
+      'behind a unique index, so “Water Sports”, “water-sports” and ' +
+      '“watersports” cannot all exist. Adding a near-duplicate here is ' +
+      'refused by the database, not just by this form.'));
+    const nm = el('input', 'input'); nm.placeholder = 'New category name';
+
+    const kindSel = el('select', 'input');
+    KINDS.forEach(([value, label]) => {
+      const o = el('option', null, label);
+      o.value = value;
+      kindSel.appendChild(o);
+    });
+
     const b = el('button', 'btn btn-primary', 'Add');
     b.onclick = async () => {
       const name = nm.value.trim();
       if (!name) return;
       const { error } = await sb.from('categories').insert({
         name, slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+        kind: kindSel.value,
         display_order: state.categories.length,
       });
       if (error) return fail('Adding category', error);
       nm.value = '';
       await loadCategories(); renderCategories();
     };
-    add.append(nm, b);
+    add.append(nm, kindSel, b);
     v.appendChild(add);
 
     state.categories.forEach(c => {
@@ -713,9 +1114,24 @@
         const { error } = await sb.from('categories')
           .update({ name: i.value.trim() }).eq('id', c.id);
         if (error) return fail('Renaming', error);
-        await loadCategories(); toast('Renamed.');
+        await loadCategories(); renderCategories(); toast('Renamed.');
       };
       card.appendChild(i);
+
+      const k = el('select', 'input');
+      KINDS.forEach(([value, label]) => {
+        const o = el('option', null, label);
+        o.value = value;
+        if ((c.kind || 'style') === value) o.selected = true;
+        k.appendChild(o);
+      });
+      k.onchange = async () => {
+        const { error } = await sb.from('categories')
+          .update({ kind: k.value }).eq('id', c.id);
+        if (error) return fail('Changing kind', error);
+        await loadCategories(); renderCategories(); toast('Updated.');
+      };
+      card.appendChild(k);
 
       const mergeSel = el('select', 'input');
       mergeSel.appendChild(el('option', null, 'Merge into…'));
@@ -748,7 +1164,7 @@
 
       const del = el('button', 'btn btn-danger', 'Delete');
       del.onclick = async () => {
-        if (!confirm(`Delete "${c.name}"? Designs keep existing but lose this style.`)) return;
+        if (!confirm(`Delete "${c.name}"? Designs keep existing but lose this category.`)) return;
         const { error } = await sb.from('categories').delete().eq('id', c.id);
         if (error) return fail('Deleting', error);
         await Promise.all([loadCategories(), loadDesigns()]);
@@ -808,13 +1224,17 @@
   const RENDER = {
     upload: renderUpload,
     designs: renderDesigns,
+    requests: renderRequests,
     artists: renderArtists,
     categories: renderCategories,
     review: renderReview,
   };
 
+  // `requests` is deliberately absent from this list: every artist gets it.
+  const ADMIN_VIEWS = ['artists', 'categories', 'review'];
+
   function show(view) {
-    if ((view === 'artists' || view === 'categories' || view === 'review') && !state.isAdmin) {
+    if (ADMIN_VIEWS.indexOf(view) !== -1 && !state.isAdmin) {
       view = 'upload';
     }
     state.view = view;
