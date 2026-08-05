@@ -17,6 +17,9 @@
  * index on a generated canonical key; the "only an admin approves" rule is an
  * is_admin() guard inside a SECURITY DEFINER function. Everything below is
  * the friendly face of those three, and none of it is load-bearing.
+ *
+ * The Artists tab lives in artists-tab.js — it is the largest surface here
+ * and the one Kat uses most, so it earns its own file.
  */
 (function () {
   'use strict';
@@ -71,7 +74,10 @@
     t.className = 'toast' + (kind ? ' toast-' + kind : '');
     t.hidden = false;
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => { t.hidden = true; }, kind === 'error' ? 7000 : 3500);
+    // An error people have to act on needs longer than a success they can
+    // ignore, and the invite-failed message is long.
+    setTimeout(() => {}, 0);
+    toastTimer = setTimeout(() => { t.hidden = true; }, kind === 'error' ? 12000 : 4000);
   }
 
   function fail(where, error) {
@@ -144,6 +150,11 @@
     $('#whoName').textContent = state.me.name;
     $('#whoRole').textContent = state.isAdmin ? 'Admin' : 'Artist';
     $$('.admin-only').forEach(t => { t.hidden = !state.isAdmin; });
+
+    window.ArtistsTab.init({
+      sb, state, el, toast, fail,
+      reload: async () => { await loadArtists(); renderArtists(); },
+    });
 
     await Promise.all([loadArtists(), loadCategories(), loadRequests()]);
     await loadDesigns();
@@ -278,8 +289,6 @@
       any = true;
 
       const g = el('div', 'kindgroup');
-      // Only label the groups once there is more than one kind in play —
-      // until themes exist, headings over a single list are just noise.
       g.appendChild(el('div', 'muted small kindlabel', KIND_LABEL[kind]));
 
       const chips = el('div', 'chips');
@@ -341,7 +350,6 @@
     submit.disabled = true;
     card.appendChild(submit);
 
-    let answer = null;      // the last check_category_name() result
     let timer = null;
     let seq = 0;            // guards against an old response landing last
 
@@ -353,7 +361,6 @@
 
     async function check() {
       const name = input.value.trim();
-      answer = null;
       submit.disabled = true;
 
       if (!name) { say('', []); return; }
@@ -362,8 +369,6 @@
       const { data, error } = await sb.rpc('check_category_name', { p_name: name });
       if (mine !== seq) return;        // a later keystroke has already answered
       if (error) return fail('Checking that name', error);
-
-      answer = data;
 
       if (data.reason === 'empty') {
         say('req-exists', [el('span', null, data.message)]);
@@ -978,94 +983,9 @@
     return card;
   }
 
-  /* == Artists view (admin) == */
+  /* == Artists view (admin) — see artists-tab.js == */
   function renderArtists() {
-    const v = $('#view-artists');
-    v.innerHTML = '';
-
-    const add = el('div', 'card');
-    add.appendChild(el('h2', null, 'Artists'));
-    add.appendChild(el('p', 'muted',
-      'Set an artist’s email here and their next sign-in link claims this ' +
-      'card automatically. Until then they can sign in but will own nothing.'));
-
-    const name = el('input', 'input'); name.placeholder = 'Name';
-    const handle = el('input', 'input'); handle.placeholder = '@handle';
-    const email = el('input', 'input'); email.placeholder = 'email (optional)';
-    const btn = el('button', 'btn btn-primary', 'Add artist');
-    btn.onclick = async () => {
-      if (!name.value.trim()) return toast('Name required', 'error');
-      const h = handle.value.trim();
-      const { error } = await sb.from('artists').insert({
-        name: name.value.trim(),
-        handle: h || null,
-        instagram_url: h ? 'https://instagram.com/' + h.replace(/^@/, '') : null,
-        email: email.value.trim() || null,
-        display_order: state.artists.length,
-      });
-      if (error) return fail('Adding artist', error);
-      name.value = handle.value = email.value = '';
-      await loadArtists(); renderArtists();
-      toast('Artist added.');
-    };
-    add.append(name, handle, email, btn);
-    v.appendChild(add);
-
-    state.artists.forEach(a => {
-      const c = el('div', 'card');
-      c.appendChild(el('h3', null, a.name));
-
-      const f = (label, key, transform) => {
-        const wrap = el('label', 'field');
-        wrap.appendChild(el('span', 'muted small', label));
-        const i = el('input', 'input');
-        i.value = a[key] || '';
-        i.onchange = async () => {
-          const patch = {};
-          patch[key] = i.value.trim() || null;
-          if (transform) Object.assign(patch, transform(i.value.trim()));
-          const { error } = await sb.from('artists').update(patch).eq('id', a.id);
-          if (error) return fail('Saving ' + label, error);
-          await loadArtists(); toast('Saved.');
-        };
-        wrap.appendChild(i);
-        return wrap;
-      };
-
-      c.appendChild(f('Name', 'name'));
-      // Handle and Instagram URL are kept in step; the kiosk QR reads the URL
-      // and a mismatch would send customers to the wrong profile.
-      c.appendChild(f('Instagram handle', 'handle', v => ({
-        instagram_url: v ? 'https://instagram.com/' + v.replace(/^@/, '') : null,
-      })));
-      c.appendChild(f('Email (for sign-in)', 'email'));
-      c.appendChild(f('Bio', 'bio'));
-
-      const roleRow = el('div', 'row');
-      const roleSel = el('select', 'input');
-      ['artist', 'admin'].forEach(r => {
-        const o = el('option', null, r === 'admin' ? 'Admin' : 'Artist');
-        o.value = r; if (a.role === r) o.selected = true;
-        roleSel.appendChild(o);
-      });
-      roleSel.onchange = async () => {
-        const { error } = await sb.from('artists').update({ role: roleSel.value }).eq('id', a.id);
-        if (error) return fail('Changing role', error);
-        await loadArtists(); toast('Role updated.');
-      };
-      roleRow.append(el('span', 'muted small', 'Role'), roleSel);
-
-      const act = el('button', 'btn btn-quiet', a.active ? 'Hide from kiosk' : 'Show on kiosk');
-      act.onclick = async () => {
-        const { error } = await sb.from('artists').update({ active: !a.active }).eq('id', a.id);
-        if (error) return fail('Updating visibility', error);
-        await loadArtists(); renderArtists();
-      };
-      roleRow.appendChild(act);
-      c.appendChild(roleRow);
-
-      v.appendChild(c);
-    });
+    window.ArtistsTab.render($('#view-artists'));
   }
 
   /* == Categories view (admin) == */
