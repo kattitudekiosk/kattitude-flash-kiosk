@@ -15,7 +15,9 @@
  * (`artists_admin_all`) is what actually decides whether Kat may edit someone
  * else's row, and the `artists_guard` trigger is what stops a non-admin
  * escalating their own `role` even if they craft the request by hand. This
- * file only decides what to render.
+ * file only decides what to render. The same is true of the photo control
+ * added below: an artist tapping another artist's avatar would be refused by
+ * the `avatars` bucket policy, not by this file hiding a button.
  *
  * signInWithOtp() works with the publishable key and needs no service role,
  * which is why onboarding can live in a static page at all.
@@ -73,6 +75,22 @@ window.ArtistsTab = (function () {
     if (a.auth_user_id) return el('span', 'pill ok', 'Signed in');
     if (a.email) return el('span', 'pill warn', 'Invited, not signed in yet');
     return el('span', 'pill', 'No email yet');
+  }
+
+  /* A tappable circle avatar for one artist. Falls back to the generated
+   * monogram when there is no photo, which is most of the roster today. */
+  function avatarButton(a) {
+    const btn = el('button', 'avatar-btn');
+    btn.type = 'button';
+    btn.setAttribute('aria-label', 'Change ' + a.name + '’s profile photo');
+    btn.title = 'Change ' + a.name + '’s profile photo';
+    btn.appendChild(window.AvatarKit.node(a, 'md'));
+    btn.onclick = () => window.AvatarKit.edit({
+      artist: a,
+      toast: toast,
+      onSaved: async () => { await reload(); },
+    });
+    return btn;
   }
 
   /* == Add an artist ====================================================== */
@@ -143,9 +161,15 @@ window.ArtistsTab = (function () {
     const card = el('div', 'card');
 
     const head = el('div', 'row');
+    head.appendChild(avatarButton(a));
     head.appendChild(el('h3', null, a.name));
     head.appendChild(statusPill(a));
     card.appendChild(head);
+
+    card.appendChild(el('div', 'muted small',
+      a.portrait_url
+        ? 'Tap the photo to change it.'
+        : 'No photo yet — their initials show on the kiosk. Tap the circle to add one.'));
 
     const fields = {};
     function field(label, key, opts) {
@@ -248,6 +272,22 @@ window.ArtistsTab = (function () {
       };
       row.appendChild(again);
     }
+
+    /* Clearing someone's tutorial so they get the walkthrough again. Kat asks
+     * for this the moment an artist says "I don't know where anything is" —
+     * it is stored on the row rather than in the browser precisely so she
+     * can do it from her own phone. */
+    const retour = el('button', 'btn btn-quiet',
+      a.tutorial_seen_at ? 'Replay their tutorial' : 'Tutorial not done yet');
+    retour.disabled = !a.tutorial_seen_at;
+    retour.onclick = async () => {
+      const { error } = await sb.from('artists')
+        .update({ tutorial_seen_at: null }).eq('id', a.id);
+      if (error) return fail('Resetting the tutorial', error);
+      toast(a.name + ' gets the walkthrough again next time they sign in.');
+      await reload();
+    };
+    row.appendChild(retour);
 
     const roleSel = el('select', 'input');
     ['artist', 'admin'].forEach(r => {

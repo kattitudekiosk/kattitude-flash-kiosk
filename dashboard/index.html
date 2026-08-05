@@ -9,6 +9,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="dashboard.css" />
 <link rel="stylesheet" href="requests.css" />
+<link rel="stylesheet" href="avatar.css" />
+<link rel="stylesheet" href="tour.css" />
 </head>
 <body>
 
@@ -20,8 +22,15 @@
 <header id="topbar" hidden>
   <div class="brand">KATTITUDE<span>flash dashboard</span></div>
   <div class="who">
+    <!-- Your own photo. Tapping it is how you change it — there is no
+         profile tab, because a fifth tab is a fifth thing to learn and this
+         is the control you would reach for anyway. -->
+    <button id="myAvatar" class="avatar-btn" hidden></button>
     <span id="whoName"></span>
     <span id="whoRole" class="pill"></span>
+    <!-- Permanent, never dismissed. Somebody who skips the walkthrough on
+         day one must not be stranded because of it. -->
+    <button id="howThisWorks" class="btn btn-quiet tour-launch" hidden>How this works</button>
     <button id="signOut" class="btn btn-quiet">Sign out</button>
   </div>
 </header>
@@ -69,9 +78,17 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="config.js"></script>
+<!-- dash-client.js hands avatar.js and tour.js a Supabase client that shares
+     app.js's session without competing to refresh it. It must load first. -->
+<script src="dash-client.js"></script>
+<script src="avatar.js"></script>
+<script src="my-avatar.js"></script>
 <!-- artists-tab.js defines window.ArtistsTab and must load BEFORE app.js,
      which wires it up during sign-in. -->
 <script src="artists-tab.js"></script>
 <script src="app.js"></script>
+<!-- tour.js watches for the top bar unhiding, so it loads last and does not
+     need app.js to know it exists. -->
+<script src="tour.js"></script>
 </body>
 </html>
