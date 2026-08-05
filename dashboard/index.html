@@ -44,7 +44,12 @@
 </nav>
 
 <main id="app">
-  <section id="signin" class="pane">
+  <!-- Starts hidden, like every other pane. app.js unhides it only after
+       getSession() comes back with no session. Shipping it visible meant
+       somebody arriving on a magic link was shown "Email me a sign-in link"
+       for the length of the token exchange — the one screen that makes a
+       working link look broken. -->
+  <section id="signin" class="pane" hidden>
     <div class="card signin-card">
       <h1>Flash Dashboard</h1>
       <p class="muted">
