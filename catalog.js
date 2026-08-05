@@ -32,7 +32,7 @@ window.Catalog = (function () {
     error: null,
   };
 
-  /* ── Sheets ────────────────────────────────────────────────────────────
+  /* ── Sheets ────────────────────────────────────────────────────
    * Sheets come from data.js, which is the live production source and stays
    * untouched. A sheet has no artist until someone assigns one; that is a
    * real state (the 4 current sheets are studio-wide), so artistId is null
@@ -65,7 +65,7 @@ window.Catalog = (function () {
     }));
   }
 
-  /* ── Seed source ───────────────────────────────────────────────────────── */
+  /* ── Seed source ────────────────────────────────────────────────── */
   function loadSeed() {
     const seed = window.SEED_CATALOG;
     if (!seed) {
@@ -114,7 +114,7 @@ window.Catalog = (function () {
     };
   }
 
-  /* ── Live source (Supabase REST over the kiosk_catalog view) ───────────── */
+  /* ── Live source (Supabase REST over the kiosk_catalog view) ─────────── */
   async function loadLive() {
     const live = cfg.live || {};
     if (!live.url) throw new Error('catalogSource is "live" but config.live.url is empty');
@@ -166,12 +166,28 @@ window.Catalog = (function () {
   }
 
   function normalizeArtist(a) {
+    /* HEADSHOTS — two sizes, one meaning.
+     *
+     * `portrait` is "the picture to draw", and it deliberately prefers the
+     * 256px derivative the dashboard generates. Every place the kiosk shows a
+     * face is small: the artist card well is 104px (84px when the card also
+     * carries a QR) and the Follow panel is 160px. Pulling a 1024px original
+     * for a 104px circle is 16x the pixels for no visible gain, and on the
+     * home hub that is one download per artist on the roster.
+     *
+     * `portraitFull` keeps the original available for anything that ever
+     * wants it, and is the fallback for a row uploaded before the derivative
+     * existed — an artist whose photo predates this must not lose their face.
+     */
+    const full = a.portraitFull || a.portrait_url || a.portrait || '';
+    const small = a.portraitThumb || a.portrait_thumb_url || '';
     return {
       id: a.id,
       name: a.name || 'Unnamed',
       handle: a.handle || '',
       bio: a.bio || '',
-      portrait: a.portrait || a.portrait_url || '',
+      portrait: small || full,
+      portraitFull: full,
       // Studio Owner / Senior Artist / Junior Artist. Carried through for
       // ordering and possible display; hidden on the kiosk unless
       // KIOSK_CONFIG.showSeniority is turned on, since telling a walk-in
@@ -192,13 +208,17 @@ window.Catalog = (function () {
       if (!d.artistId || seen.has(d.artistId)) return;
       seen.set(d.artistId, {
         id: d.artistId, name: d.artistName || 'Unnamed',
-        handle: d.artistHandle || '', bio: '', portrait: '', displayOrder: seen.size,
+        handle: d.artistHandle || '', bio: '',
+        // No photo here by design: this path exists only when the artists
+        // endpoint is unavailable, and the kiosk falls back to the generated
+        // monogram, which cannot 404.
+        portrait: '', portraitFull: '', displayOrder: seen.size,
       });
     });
     return [...seen.values()];
   }
 
-  /* ── Load / refresh ────────────────────────────────────────────────────── */
+  /* ── Load / refresh ─────────────────────────────────────────────── */
   async function load() {
     const source = cfg.catalogSource || 'seed';
     const sheets = loadSheets();
@@ -263,7 +283,7 @@ window.Catalog = (function () {
     }, ms);
   }
 
-  /* ── Queries ───────────────────────────────────────────────────────────── */
+  /* ── Queries ────────────────────────────────────────────────────── */
   function singles() { return state.items.filter(i => i.type === 'design'); }
   function sheets()  { return state.items.filter(i => i.type === 'sheet'); }
 
@@ -384,6 +404,7 @@ window.Catalog = (function () {
     isSheetsOnlyArtist,
     categoriesFor,
     snapshot,
+    _normalizeArtist: normalizeArtist,
     get artists() { return state.artists; },
     get categories() { return state.categories; },
   };
