@@ -69,6 +69,9 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="config.js"></script>
+<!-- artists-tab.js defines window.ArtistsTab and must load BEFORE app.js,
+     which wires it up during sign-in. -->
+<script src="artists-tab.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
