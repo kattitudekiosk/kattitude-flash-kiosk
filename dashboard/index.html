@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="dashboard.css" />
+<link rel="stylesheet" href="requests.css" />
 </head>
 <body>
 
@@ -28,6 +29,9 @@
 <nav id="tabs" hidden>
   <button class="tab is-active" data-view="upload">Upload</button>
   <button class="tab" data-view="designs">My Designs</button>
+  <!-- Deliberately NOT admin-only: artists use this tab to ask, admins use
+       the same tab to answer. -->
+  <button class="tab" data-view="requests">Requests</button>
   <button class="tab admin-only" data-view="artists" hidden>Artists</button>
   <button class="tab admin-only" data-view="categories" hidden>Categories</button>
   <button class="tab admin-only" data-view="review" hidden>Review</button>
@@ -55,6 +59,7 @@
 
   <section id="view-upload" class="pane" hidden></section>
   <section id="view-designs" class="pane" hidden></section>
+  <section id="view-requests" class="pane" hidden></section>
   <section id="view-artists" class="pane" hidden></section>
   <section id="view-categories" class="pane" hidden></section>
   <section id="view-review" class="pane" hidden></section>
