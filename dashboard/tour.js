@@ -34,6 +34,17 @@
  * NOTHING HERE SENDS EMAIL. The tour reads the roster and writes one
  * timestamp. It never calls signInWithOtp and never touches an artist's
  * email address, so running it — or replaying it — cannot invite anybody.
+ *
+ * THE BUBBLE MUST STAY REACHABLE. Three things below exist because it did
+ * not, on the Artists tab, where the anchor is a card taller than a phone:
+ *   - onReflow repositions but never re-renders, because render() scrolls
+ *     and scrolling fires onReflow. That loop pinned the page in place and
+ *     bounced the reader back every time they tried to scroll.
+ *   - render() aligns a too-tall anchor to the top instead of centring it.
+ *   - place() clamps the bubble inside the viewport no matter where the
+ *     anchor ended up.
+ * The bubble's buttons are the only way forward, so anything that can put
+ * them off screen is a dead end, not a cosmetic flaw.
  */
 window.Tour = (function () {
   'use strict';
@@ -215,7 +226,13 @@ window.Tour = (function () {
     let left = rect.left + window.scrollX;
     left = Math.max(12, Math.min(left, vw - w - 12));
 
-    node.style.top = Math.max(12 + window.scrollY, top) + 'px';
+    // Clamp into the viewport. An anchor taller than the screen puts its own
+    // bottom edge below the fold, and a bubble pinned under it goes with it —
+    // taking Next and Skip out of reach, which strands the reader on that
+    // step. Being slightly detached from the anchor beats being unreachable.
+    const minTop = 12 + window.scrollY;
+    const maxTop = window.scrollY + vh - h - 12;
+    node.style.top = Math.min(Math.max(minTop, top), Math.max(minTop, maxTop)) + 'px';
     node.style.left = left + 'px';
     node.classList.toggle('is-below', below);
     node.classList.toggle('is-above', !below);
@@ -237,6 +254,23 @@ window.Tour = (function () {
     return row;
   }
 
+  /* Move the spotlight and the bubble onto wherever the anchor is NOW.
+   * Deliberately does no scrolling and rebuilds nothing, so it is safe to
+   * call from a scroll handler. */
+  function reposition() {
+    if (!running || !ui) return;
+    const step = steps[i];
+    if (!step) return;
+    const node = target(step);
+    if (!node) return;
+    const r = node.getBoundingClientRect();
+    ui.spot.style.top = (r.top + window.scrollY) + 'px';
+    ui.spot.style.left = (r.left + window.scrollX) + 'px';
+    ui.spot.style.width = r.width + 'px';
+    ui.spot.style.height = r.height + 'px';
+    place(ui.bubble, r);
+  }
+
   function render() {
     if (!running) return;
 
@@ -251,7 +285,12 @@ window.Tour = (function () {
 
     const step = steps[i];
     const node = target(step);
-    node.scrollIntoView({ block: 'center', behavior: 'smooth' });
+
+    // An anchor taller than the viewport cannot be centred: centring puts its
+    // middle at the middle, which pushes the bottom — and the bubble pinned
+    // under it — off the screen. Align such an anchor to the top instead.
+    const tall = node.getBoundingClientRect().height > window.innerHeight * 0.7;
+    node.scrollIntoView({ block: tall ? 'start' : 'center', behavior: 'smooth' });
 
     // One frame for the smooth scroll to settle before measuring.
     requestAnimationFrame(() => requestAnimationFrame(() => {
@@ -289,7 +328,9 @@ window.Tour = (function () {
       ui.bubble.appendChild(actions);
 
       place(ui.bubble, r);
-      next.focus();
+      // preventScroll: focusing a button the browser thinks is out of view
+      // scrolls to it, which is another way back into the loop above.
+      next.focus({ preventScroll: true });
     }));
   }
 
@@ -306,7 +347,10 @@ window.Tour = (function () {
   let reflow = null;
   function onReflow() {
     clearTimeout(reflow);
-    reflow = setTimeout(() => { if (running) render(); }, 120);
+    // reposition(), NOT render(). render() calls scrollIntoView, scrolling
+    // fires this handler, and the page fights every attempt to scroll — the
+    // reader gets yanked back and can never reach the bottom of a long step.
+    reflow = setTimeout(reposition, 120);
   }
 
   async function markSeen() {
@@ -326,6 +370,7 @@ window.Tour = (function () {
   function finish() {
     if (!running) return;
     running = false;
+    clearTimeout(reflow);
     document.removeEventListener('keydown', onKey, true);
     window.removeEventListener('resize', onReflow);
     window.removeEventListener('scroll', onReflow, true);
