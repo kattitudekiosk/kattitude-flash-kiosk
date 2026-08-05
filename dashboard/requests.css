@@ -1,0 +1,47 @@
+/* Category requests — additive styles.
+ *
+ * Kept in its own file so the feature can be reverted without touching
+ * dashboard.css. Dashboard rules apply here, not kiosk rules: this is a
+ * phone tool, so borders and rounded corners are fine (CLAUDE.md, DESIGN
+ * RULES: "The dashboard is exempt from the kiosk canvas and from the
+ * no-borders and no-rounded-corners rules").
+ */
+
+.req-panel .req-feedback { min-height: 22px; font-size: 13px; line-height: 1.5; margin: 4px 0 8px; }
+
+.req-exists  { color: var(--danger); }
+.req-dupe    { color: var(--warn); }
+.req-ok      { color: var(--ok); }
+.req-near    { color: var(--muted); }
+
+.req-feedback strong { font-weight: 700; }
+.req-feedback .btn { margin-top: 8px; }
+
+/* Kind grouping — the whole point of the kind column is that these read as
+ * separate shelves rather than one long undifferentiated run of chips. */
+.kindgroup { margin: 10px 0; }
+.kindlabel { text-transform: uppercase; letter-spacing: 0.10em; font-weight: 700; }
+.kindgroup .chips { margin-top: 4px; }
+
+/* Review queue */
+.req-item { display: block; }
+.req-name { font-size: 17px; font-weight: 700; }
+.req-who { margin: 2px 0 8px; }
+.req-near-list { margin: 8px 0; }
+.req-near-list .pill { margin-right: 6px; }
+
+.req-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
+.req-actions .input { width: auto; min-width: 150px; flex: 0 1 auto; margin: 0; }
+
+.req-history .req-item { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 12px; }
+.req-history .req-item:first-child { border-top: 0; padding-top: 0; margin-top: 0; }
+
+.tab .count {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--pink);
+  color: #fff;
+  font-size: 11px;
+}
