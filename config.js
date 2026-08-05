@@ -41,10 +41,17 @@ window.KIOSK_CONFIG = {
      * longer has SELECT on the whole artists row — email, role and
      * auth_user_id are revoked from it, because this key is in the kiosk's
      * page source and artist emails are not public information. A bare
-     * `select=*` here now returns 42501 permission denied. */
+     * `select=*` here now returns 42501 permission denied.
+     *
+     * The flip side of that, and the reason this comment is longer than it
+     * looks like it needs to be: a NEW column is invisible to the kiosk until
+     * somebody adds it to this list. portrait_thumb_url is the 256px headshot
+     * the dashboard generates, and if it is missing here the kiosk silently
+     * falls back to the 1024px original — which works, and is 16x the bytes,
+     * and nothing anywhere reports it. */
     artistsUrl: 'https://tovydesiocfgmasvzjvt.supabase.co/rest/v1/artists'
       + '?active=eq.true&order=display_order'
-      + '&select=id,name,handle,portrait_url,bio,instagram_url,seniority,display_order',
+      + '&select=id,name,handle,portrait_url,portrait_thumb_url,bio,instagram_url,seniority,display_order',
     categoriesUrl: 'https://tovydesiocfgmasvzjvt.supabase.co/rest/v1/categories?order=display_order',
     // Kiosk re-fetches on this interval. On failure the last good catalog is
     // kept and reused — a dropped network mid-shift must never blank the
@@ -92,7 +99,7 @@ window.KIOSK_CONFIG = {
     defaultSort: 'newest', // 'newest' | 'artist' | 'category'
   },
 
-  /* ── Attract loop ────────────────────────────────────────────────────────
+  /* ── Attract loop ──────────────────────────────────────────────────
    * One reel of video clips and flash stills woven together, NOT two modes
    * that alternate. With zero clips this whole subsystem stands down and
    * script.js runs its original sheet cycle — the thing on the wall today —
