@@ -74,7 +74,10 @@ Live URLs live in `LINKS.md`. Keep it current.
 | Kiosk shell, canvas scaling, sheet viewer | `script.js` |
 | Attract loop (video + flash reel) | `screensaver.js` |
 | Kiosk Supabase URL and publishable key | `config.js` |
+| Kiosk artist headshots (circles, Follow panel) | `avatars.css`, `avatars.js` |
 | **Dashboard** Supabase URL, key, image spec | `dashboard/config.js` |
+| Dashboard headshot upload + crop confirm | `dashboard/avatar.js`, `dashboard/my-avatar.js` |
+| Dashboard guided tutorial (per role) | `dashboard/tour.js`, `dashboard/tour.css` |
 | Seed/placeholder content | `seed/`, `assets/seed/` (gitignored — never commit) |
 | Deploy helper | `tools/deploy-preview.sh` |
 
@@ -109,6 +112,12 @@ Fixing one QR state and breaking another has now happened three times.
 rasterises the real SVG and decodes it with OpenCV. It used to rebuild a matrix
 by re-parsing the path data, which only ever confirmed what we meant to draw.
 
+**Storage and RLS work:** prove the refusal, in a transaction you roll back.
+Set `role authenticated` and a `request.jwt.claims` for one artist, attempt the
+write that must fail, and attempt the neighbouring write that must succeed. A
+test where everything is refused proves nothing — it passes just as happily
+when the claim is malformed and `current_artist_id()` is null.
+
 ## BLOCKER DISCLOSURE RULE — highest priority for communication
 
 **The moment work stalls, say so. Do not wait until you have good news to pair
@@ -119,7 +128,9 @@ a blocker in seconds.
   completed and what did not.
 - Do not retry quietly more than once before reporting.
 - **The Vercel connector token expires mid-call.** Expect it in long sessions.
-  Only Joshua can reconnect it.
+  Only Joshua can reconnect it. **A session may also have no Vercel connector
+  at all** — say so plainly and hand over the branch and commit rather than
+  describing a deployment that did not happen.
 - **Say when something is impossible rather than expensive.** Inlining the
   image assets through the deploy connector is not "extra effort" — the bytes
   pass through the agent's context window and a 3 MB payload exceeds it by
@@ -167,6 +178,13 @@ Singles **2048 x 2048**. Sheets **2160 x 3840**. Derivatives at 512 x 512
 (cover) and 1024 x 1536 (contain), WebP. Off-size uploads are **rejected with
 the required dimensions in the error**. Never auto-crop an artist's work.
 
+**Headshots are not artist work and are the one exception.** A profile photo is
+a picture *of* a person, every avatar surface is a circle, and something has to
+decide what lands inside it. So `dashboard/avatar.js` DOES centre-crop to
+square — and shows the artist exactly what will be kept, with a slider, and
+makes them press a button before anything uploads. Cropping is fine here.
+Cropping silently is not, and that distinction is the whole of the rule.
+
 ### 4. Sheets-only artists bypass the grid
 
 An artist with only full sheets routes straight into the linear sheet viewer.
@@ -191,6 +209,18 @@ draft claimed "from the first migration". It is on now and must stay on.
 grants are the tool for that, and `anon` now holds SELECT only on the display
 columns. **When revoking from `anon`, never revoke from `authenticated`** — the
 dashboard resolves admin by reading its own `role`.
+
+The flip side, and it bites quietly: **a new column on `artists` is invisible
+to the kiosk until it is granted to `anon` AND named in `config.js`'s explicit
+select list.** `portrait_thumb_url` needs both. Nothing errors if you forget
+the second one; the kiosk just silently serves the full-size original.
+
+**Storage RLS is per-bucket and per-policy.** The `avatars` bucket scopes every
+write to `(storage.foldername(name))[1] = current_artist_id()::text` so an
+artist cannot overwrite another artist's face. `flash` originally did this on
+DELETE but not on UPDATE, which meant any signed-in artist could overwrite any
+other artist's artwork; that is fixed. Adding a bucket means adding four
+policies, and then proving the refusal.
 
 A service-role key must never appear in any static file. Verify anonymous
 insert is refused before calling auth work done.
@@ -252,7 +282,9 @@ time, without being asked. No exceptions.
   the GitHub repo. Update it whenever a URL changes. Joshua works from his
   phone and cannot dig through history for a link.
 - A blocked or partial deploy still gets a status line — say which URL is
-  current and which is not yet updated.
+  current and which is not yet updated. **If there is no deploy connector in
+  the session, give the branch name and commit SHA instead and say that is
+  what you are giving.**
 
 ## DESIGN RULES
 
@@ -271,14 +303,59 @@ State the ratio when you commit a colour. **[CORRECTED]** ink on logo yellow is
 
 **No borders.** Fill, spacing and shadow separate things — not outlines.
 
-**No rounded corners**, with one measured exception: **QR container tiles**,
-which are rounded because Joshua asked and because it cannot affect decoding.
-
 **Page titles are UPPERCASE.** Not body text, captions, buttons or errors.
+
+### No rounded corners — and the two exceptions, both measured
+
+Corners are square. There are exactly **two** recorded exceptions, and they are
+recorded precisely so that neither becomes a precedent for a third:
+
+1. **QR container tiles.** Rounded because Joshua asked, and because rounding
+   the white *container* cannot affect decoding — only rounding the finder
+   patterns can, and that is separately forbidden under QR RULES.
+
+2. **Artist headshots are circles.** `avatars.css` on the kiosk and
+   `dashboard/avatar.css` on the dashboard round avatars to 50%, on the artist
+   cards, the Follow panel, the dashboard roster and the top bar.
+
+   The reason, stated so it can be argued with: the no-rounded-corners rule
+   exists to stop the kiosk drifting into looking like a generic web app. A
+   headshot in a hard square does not read as "crisp", it reads as an ID
+   photo, and the roster is real people whose faces go on a wall in their own
+   shop. A circle is the shape a face is expected to be in, and it is the
+   shape that makes the centre-crop in invariant 3 legible — the artist can
+   see what is being kept because the mask *is* the crop.
+
+   **Scope: avatars and nothing else.** This is not licence to round buttons,
+   tiles, chips or cards. If a third exception is ever wanted, it goes in this
+   list with its reason, or it does not happen.
 
 **The dashboard is exempt from the kiosk canvas** and from the no-borders and
 no-rounded-corners rules. It is a phone tool, not wall furniture. Never apply
 invariant 2 to `dashboard/`.
+
+## ONBOARDING AND HELP
+
+The dashboard teaches itself. `dashboard/tour.js` is a coach-mark walkthrough —
+speech bubbles pinned to the real controls — with one script for artists and a
+longer one for admins, which is the artist script plus the Artists tab, the
+category review queue and the approval queue.
+
+Four rules it must keep, because breaking any of them turns help into an
+obstacle:
+
+- **It never blocks the app.** The veil is `pointer-events: none`. Escape, the
+  Skip button, or simply ignoring it all work.
+- **It never traps focus.** Tab still walks the page. Focus moves to the
+  bubble when a step opens; that is all the focus handling there is.
+- **A missing anchor is skipped, not fatal.** An empty Requests queue has no
+  cards. A step whose element is absent is dropped and the tour continues.
+- **Completion lives in `artists.tutorial_seen_at`, not localStorage.** It has
+  to follow an artist from her phone to the shop iPad, and Kat has to be able
+  to clear it for someone — there is a button on each artist card that does.
+
+Copy is short and plain. These are tattoo artists on phones. No "row-level
+security", no "derivative", no "canonical key".
 
 ## QR RULES
 
@@ -363,11 +440,18 @@ had just set — because during signup there is no JWT, so `is_admin()` is false
 No error, no claim, every artist stranded. When two triggers touch a table,
 check what the second does to the first's write.
 
+`artists_guard` pins `role`, `auth_user_id` and `active` for non-admins and
+leaves every other column alone — so `portrait_url`, `portrait_thumb_url` and
+`tutorial_seen_at` are self-writable by design.
+
 ## BROWSER AND VERIFICATION LIMITS
 
 - The sandbox **cannot reach `*.vercel.app`** — verify deployments through the
   Vercel connector's fetch. It can reach `supabase.co` and the npm/PyPI
   registries.
+- The sandbox also **cannot reach this private repo**, so code pushed through
+  the GitHub connector cannot be pulled back down and run. Say so rather than
+  implying a test ran.
 - There is **no browser** in the sandbox. The Chrome extension may or may not
   be connected; check rather than assume. You can confirm markup, endpoints,
   bytes and decoded output; you cannot confirm that a page paints. When the
@@ -391,6 +475,10 @@ The roster is real people whose names appear on a wall in a shop.
   them. Correct before production.
 - Artist emails are personal data. They are not readable by the kiosk's
   publishable key and must stay that way.
+- **Headshots are personal data too, but public by nature** — they go on a wall
+  where customers see them. They live in a public bucket. `tutorial_seen_at`
+  is the opposite: `anon` has no grant on it, because whether someone has
+  finished a walkthrough is nobody's business but the studio's.
 - Pricing does not appear on the kiosk unless Joshua says so.
 
 ## OPEN DECISIONS
@@ -406,3 +494,5 @@ are settled:
 - Whether per-design videos belong in the grid, or the attract reel is the
   whole video ask — **unanswered**; `screensaver_clips` is deliberately kept
   separate from `designs` so this stays open
+- Whether the Follow panel should show the artist's face at all, or whether the
+  QR alone is cleaner at 1080 wide — defaulted to showing it, at 160px
