@@ -8,30 +8,39 @@
  * Skip. Not a video, not a docs page — the thing being explained is on
  * screen while it is explained.
  *
- * FIVE RULES THIS FILE KEEPS
+ * SIX RULES THIS FILE KEEPS
  *
- * 1. It never blocks the app. The veil is pointer-events:none and the tour
+ * 1. EVERYONE gets it on their first sign-in — admin and artist alike, with
+ *    no opt-in and nothing to click first. Admins get the artist walkthrough
+ *    plus the admin one, because Kat uploads her own flash like everybody
+ *    else and is the studio's busiest artist.
+ * 2. It never blocks the app. The veil is pointer-events:none and the tour
  *    can be dismissed with Escape, the Skip button, or by ignoring it.
- * 2. It never traps focus. Tab still walks the page. We move focus to the
+ * 3. It never traps focus. Tab still walks the page. We move focus to the
  *    bubble when a step opens so a keyboard user is not lost, and that is
  *    the whole of the focus handling.
- * 3. A missing target is skipped, not fatal. Steps point at real elements,
+ * 4. A missing target is skipped, not fatal. Steps point at real elements,
  *    and elements come and go — an empty Requests queue has no cards. A step
  *    whose anchor is absent is dropped silently and the tour continues.
- * 4. Completion lives in the DATABASE (artists.tutorial_seen_at), not
+ *    Because that can change the total, the count is computed from the steps
+ *    that will ACTUALLY run, so "2 of 6" never turns out to be a lie.
+ * 5. Completion lives in the DATABASE (artists.tutorial_seen_at), not
  *    localStorage. An artist who does the tour on her phone should not get
  *    it again on the shop iPad, and Kat needs to be able to clear it for
  *    someone who asks for a refresher.
- * 5. The copy is short and plain. These are tattoo artists on phones. No
+ * 6. The copy is short and plain. These are tattoo artists on phones. No
  *    "row-level security", no "derivative", no "canonical key".
+ *
+ * NOTHING HERE SENDS EMAIL. The tour reads the roster and writes one
+ * timestamp. It never calls signInWithOtp and never touches an artist's
+ * email address, so running it — or replaying it — cannot invite anybody.
  */
 window.Tour = (function () {
   'use strict';
 
   /* ── Scripts ───────────────────────────────────────────────────────────
    * `view` switches tab first (by clicking the real tab button, which is
-   * what a person would do). `sel` is the element the bubble points at.
-   * `optional` marks a step whose anchor may legitimately not exist. */
+   * what a person would do). `sel` is the element the bubble points at. */
 
   const ARTIST_STEPS = [
     {
@@ -44,9 +53,9 @@ window.Tour = (function () {
       view: 'upload', sel: '#view-upload > .card',
       title: 'Sizes are strict',
       body: 'A single design has to be 2048×2048. A full sheet has to be ' +
-            '2160×3840. Anything else is refused with the size it needs. ' +
-            'We will not resize or crop your art to make it fit — that is ' +
-            'your drawing, not ours to cut into.',
+            '2160×3840. Anything else is refused, and the message tells you ' +
+            'the size it needs. We will not resize or crop your art to make ' +
+            'it fit — that is your drawing, not ours to cut into.',
     },
     {
       view: 'upload', sel: '#view-upload .req-panel',
@@ -80,11 +89,6 @@ window.Tour = (function () {
       body: 'Tap your circle to change your headshot. This is the picture ' +
             'customers see next to your flash on the wall.',
     },
-    {
-      sel: '#howThisWorks',
-      title: 'Lost? Tap this',
-      body: 'This walkthrough is always here. Nothing to remember.',
-    },
   ];
 
   const ADMIN_STEPS = [
@@ -101,13 +105,13 @@ window.Tour = (function () {
             'email sends a fresh one; saving anything else does not.',
     },
     {
-      view: 'artists', sel: '#view-artists .avatar-btn', optional: true,
+      view: 'artists', sel: '#view-artists .avatar-btn',
       title: 'You can set anyone’s photo',
       body: 'Tap an artist’s circle to upload a headshot for them. ' +
             'Handy when someone has not got round to it.',
     },
     {
-      view: 'requests', sel: '#view-requests .req-item', optional: true,
+      view: 'requests', sel: '#view-requests .req-item',
       title: 'Category requests',
       body: 'Approve to create it. Merge if they meant one we already have. ' +
             'Reject with a note so they know why. The “did you mean” ' +
@@ -115,7 +119,7 @@ window.Tour = (function () {
             'same, so nothing merges on its own.',
     },
     {
-      view: 'requests', sel: '#view-requests .req-actions select', optional: true,
+      view: 'requests', sel: '#view-requests .req-actions select',
       title: 'What “kind” means',
       body: 'Style is how it is drawn — fine line, blackwork. Theme is the ' +
             'mood — summertime, Texas. Subject is what it shows — ' +
@@ -129,6 +133,13 @@ window.Tour = (function () {
             'it is here for the day you want to check work first.',
     },
   ];
+
+  const LAST_STEP = {
+    sel: '#howThisWorks',
+    title: 'Lost? Tap the question mark',
+    body: 'It is always down here. One tap and this walkthrough starts again ' +
+          'from the beginning. Nothing to remember.',
+  };
 
   /* ── Engine ─────────────────────────────────────────────────────────── */
 
@@ -154,9 +165,26 @@ window.Tour = (function () {
   function switchView(view) {
     if (!view) return;
     const tab = document.querySelector('.tab[data-view="' + view + '"]');
-    // Hidden means this role does not have the tab; the step is dropped by
-    // the caller when its anchor then fails to resolve.
+    // Hidden means this role does not have the tab; the step is then dropped
+    // when its anchor fails to resolve.
     if (tab && !tab.hidden) tab.click();
+  }
+
+  /* Walk the whole script once up front, visiting each tab, and keep only the
+   * steps whose anchor actually exists right now.
+   *
+   * This is what makes "2 of 6" honest. Counting the authored steps instead
+   * would promise six and deliver four the moment the Requests queue is
+   * empty, and a progress indicator that lies is worse than none. */
+  function resolve(script) {
+    const kept = [];
+    const startTab = document.querySelector('.tab.is-active');
+    script.forEach(s => {
+      switchView(s.view);
+      if (target(s)) kept.push(s);
+    });
+    if (startTab) startTab.click();
+    return kept;
   }
 
   function build() {
@@ -197,17 +225,27 @@ window.Tour = (function () {
     node.style.setProperty('--tail', tail + 'px');
   }
 
+  function progressRow() {
+    const row = el('div', 'tour-progress');
+    row.appendChild(el('span', 'tour-count', (i + 1) + ' of ' + steps.length));
+    const dots = el('div', 'tour-dots');
+    for (let n = 0; n < steps.length; n++) {
+      dots.appendChild(el('span', 'tour-dot' +
+        (n < i ? ' is-done' : n === i ? ' is-now' : '')));
+    }
+    row.appendChild(dots);
+    return row;
+  }
+
   function render() {
     if (!running) return;
 
-    // Drop steps whose anchor is gone rather than showing a bubble pointing
-    // at nothing. This is what stops an empty Requests queue from stalling
-    // the whole tour.
+    // Belt to the braces of resolve(): a step's anchor can still disappear
+    // between resolving and arriving at it. Skip rather than stall.
     while (i < steps.length) {
-      const s = steps[i];
-      switchView(s.view);
-      if (target(s)) break;
-      i++;
+      switchView(steps[i].view);
+      if (target(steps[i])) break;
+      steps.splice(i, 1);
     }
     if (i >= steps.length) { finish(true); return; }
 
@@ -226,8 +264,7 @@ window.Tour = (function () {
       ui.spot.style.height = r.height + 'px';
 
       ui.bubble.innerHTML = '';
-      ui.bubble.appendChild(el('div', 'tour-step',
-        'Step ' + (i + 1) + ' of ' + steps.length));
+      ui.bubble.appendChild(progressRow());
       ui.bubble.appendChild(el('div', 'tour-title', step.title));
       ui.bubble.appendChild(el('p', 'tour-body', step.body));
 
@@ -280,28 +317,28 @@ window.Tour = (function () {
       if (!me || !me.id) return;
       const sb = await window.DashClient.client();
       if (!sb) return;
-      await sb.from('artists')
-        .update({ tutorial_seen_at: new Date().toISOString() })
-        .eq('id', me.id);
-      me.tutorial_seen_at = new Date().toISOString();
+      const now = new Date().toISOString();
+      await sb.from('artists').update({ tutorial_seen_at: now }).eq('id', me.id);
+      me.tutorial_seen_at = now;
     } catch (e) { console.warn('tour: could not record completion', e); }
   }
 
-  function finish(completed) {
+  function finish() {
     if (!running) return;
     running = false;
     document.removeEventListener('keydown', onKey, true);
     window.removeEventListener('resize', onReflow);
     window.removeEventListener('scroll', onReflow, true);
     if (ui) { ui.veil.remove(); ui.spot.remove(); ui.bubble.remove(); ui = null; }
-    // Skipping still counts. Someone who skipped can replay from the
-    // permanent link, and re-ambushing them every sign-in is not teaching.
+    const q = document.getElementById('howThisWorks');
+    if (q) q.classList.remove('is-touring');
+    // Skipping counts too. Someone who skipped can restart from the question
+    // mark, and re-ambushing them on every sign-in is not teaching.
     markSeen();
-    if (completed) { /* nothing else to do */ }
   }
 
   /**
-   * Run the tour.
+   * Run the tour from step one.
    * @param opts.artist  the artists row (needs id, role, name)
    */
   function start(opts) {
@@ -309,15 +346,23 @@ window.Tour = (function () {
     if (!artist) return;
     me = artist;
 
-    const isAdmin = artist.role === 'admin';
-    // Admins get the artist tour too — they upload their own flash like
-    // everyone else, and Kat is the studio's busiest artist.
-    steps = isAdmin ? ARTIST_STEPS.concat(ADMIN_STEPS) : ARTIST_STEPS.slice();
+    if (running) finish();
 
-    if (running) finish(false);
+    // Admins get the artist walkthrough AND the admin one. Kat uploads her
+    // own flash like everybody else; a tour that skipped the upload screen
+    // because she is an admin would skip the part she uses most.
+    const script = (artist.role === 'admin')
+      ? ARTIST_STEPS.concat(ADMIN_STEPS, [LAST_STEP])
+      : ARTIST_STEPS.concat([LAST_STEP]);
+
+    steps = resolve(script);
+    if (!steps.length) return;      // nothing on screen to point at yet
+
     i = 0;
     running = true;
     ui = build();
+    const q = document.getElementById('howThisWorks');
+    if (q) q.classList.add('is-touring');
     document.addEventListener('keydown', onKey, true);
     window.addEventListener('resize', onReflow);
     window.addEventListener('scroll', onReflow, true);
@@ -327,21 +372,25 @@ window.Tour = (function () {
   /** Called once the dashboard has signed someone in. */
   function attach(artist) {
     me = artist;
-    const launch = document.getElementById('howThisWorks');
-    if (launch) {
-      launch.hidden = false;
-      launch.onclick = () => start({ artist: me });
+
+    // The question mark is permanent from here on, for everybody.
+    const q = document.getElementById('howThisWorks');
+    if (q) {
+      q.hidden = false;
+      q.onclick = () => start({ artist: me });
     }
-    // First sign-in: run it unprompted. Anyone who has seen it (or skipped
-    // it) is left alone.
+
+    // First visit: it just runs. No opt-in, no "would you like a tour",
+    // same for admins and artists. The delay lets app.js finish painting
+    // the first tab so the anchors exist to point at.
     if (!artist.tutorial_seen_at) {
-      setTimeout(() => start({ artist: me }), 700);
+      setTimeout(() => start({ artist: me }), 800);
     }
   }
 
   return {
     start, attach, finish,
-    _steps: { artist: ARTIST_STEPS, admin: ADMIN_STEPS },
+    _steps: { artist: ARTIST_STEPS, admin: ADMIN_STEPS, last: LAST_STEP },
   };
 })();
 

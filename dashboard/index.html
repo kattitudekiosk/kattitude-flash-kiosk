@@ -28,9 +28,6 @@
     <button id="myAvatar" class="avatar-btn" hidden></button>
     <span id="whoName"></span>
     <span id="whoRole" class="pill"></span>
-    <!-- Permanent, never dismissed. Somebody who skips the walkthrough on
-         day one must not be stranded because of it. -->
-    <button id="howThisWorks" class="btn btn-quiet tour-launch" hidden>How this works</button>
     <button id="signOut" class="btn btn-quiet">Sign out</button>
   </div>
 </header>
@@ -75,6 +72,12 @@
 </main>
 
 <div id="toast" class="toast" hidden></div>
+
+<!-- The replay affordance: one small question mark, bottom right, always
+     there. Tap it and the walkthrough starts again at step one. It is
+     deliberately not a menu item and not a text link — somebody who is lost
+     is not going to go looking in a menu. Styled in tour.css. -->
+<button id="howThisWorks" aria-label="Show me how this works" title="How this works" hidden>?</button>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="config.js"></script>

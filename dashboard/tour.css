@@ -56,12 +56,36 @@
   border-top-color: #fff;
 }
 
-.tour-step {
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #7a7a7a;
+/* ── Progress ─────────────────────────────────────────────────────
+ * "2 of 6" plus a dot strip. Two ways of saying the same thing on purpose:
+ * the number tells you where you are, the dots tell you at a glance that
+ * this ends soon. Somebody who does not know how long a walkthrough is will
+ * bail out of it. */
+.tour-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
 }
+
+.tour-count {
+  font-family: 'Bebas Neue', Inter, sans-serif;
+  font-size: 15px;
+  letter-spacing: 0.08em;
+  color: #C2156F;
+  white-space: nowrap;
+}
+
+.tour-dots { display: flex; gap: 4px; flex-wrap: wrap; }
+
+.tour-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;      /* progress dots — dots are round or they are dashes */
+  background: #d9d9d9;
+}
+.tour-dot.is-done { background: #E91E8C; }
+.tour-dot.is-now  { background: #C2156F; transform: scale(1.5); }
 
 .tour-title {
   font-family: 'Bebas Neue', Inter, sans-serif;
@@ -90,4 +114,39 @@
 .tour-actions .btn { min-height: 44px; }
 .tour-actions .tour-spacer { flex: 1 1 auto; }
 
-.tour-launch { white-space: nowrap; }
+/* ── The persistent "?" ───────────────────────────────────────────
+ * Bottom corner, always there, never dismissed. One tap restarts the whole
+ * walkthrough from step one — no menu, no submenu, nothing to find.
+ *
+ * Round, and that is the third rounded thing in this product. It is on the
+ * DASHBOARD, which CLAUDE.md exempts from the no-rounded-corners rule
+ * outright ("it is a phone tool, not wall furniture"), so it needs no
+ * exception of its own. A help affordance that is not a circle reads as a
+ * form control. */
+#howThisWorks {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 700;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: none;
+  padding: 0;
+  background: #E91E8C;
+  color: #fff;
+  font-family: 'Bebas Neue', Inter, sans-serif;
+  font-size: 30px;
+  line-height: 52px;
+  text-align: center;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#howThisWorks:active { transform: scale(0.94); }
+#howThisWorks:focus-visible { outline: 3px solid #1a1a1a; outline-offset: 3px; }
+
+/* While the tour is running it would only be in the way, and it is one of the
+ * things the tour points at. */
+#howThisWorks.is-touring { opacity: 0.35; }
