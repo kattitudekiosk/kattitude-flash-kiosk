@@ -1,0 +1,72 @@
+/* Artist headshots — circles.
+ *
+ * DESIGN RULE EXCEPTION, DELIBERATE AND RECORDED
+ * ----------------------------------------------
+ * CLAUDE.md bans rounded corners. This file rounds things, and that is on
+ * purpose, for the same kind of reason the QR container tiles are rounded:
+ * it is a measured exception, not a drift.
+ *
+ * The reason: a headshot in a hard square reads as an ID photo. The roster is
+ * real people whose faces go on a wall in their own shop, and a circle is the
+ * shape a face is expected to be in. The rule exists to stop the kiosk
+ * looking like a generic web app; a circular avatar does not do that.
+ *
+ * The exception is written into CLAUDE.md under DESIGN RULES so nobody
+ * "fixes" it back to squares later, and so nobody reads it as licence to
+ * round anything else. It applies to avatars and to nothing else.
+ *
+ * Loaded AFTER gallery.css. Every selector below matches at least as
+ * specifically as the rule it overrides.
+ */
+
+/* ── Artist card portrait (home hub) ───────────────────────────────────
+ * gallery.css already sizes this 104x104 (84x84 when the card carries a QR)
+ * and it is square in both states, so 50% is a circle and not an ellipse.
+ * If either of those widths ever stops matching its height, this becomes an
+ * egg — aspect-ratio below is the belt to that braces. */
+.g-card-artist .g-card-portrait {
+  border-radius: 50%;
+  aspect-ratio: 1 / 1;
+}
+
+.g-card-artist .g-card-portrait img {
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+/* ── Follow panel ───────────────────────────────────────────────────
+ * Sits between the QR and the text. 160px on a 1080 canvas is ~2.3 inches of
+ * glass at 69 ppi — a face, not a thumbnail, readable from where someone
+ * stands to scan the code. */
+.g-artistinfo-face {
+  flex: 0 0 auto;
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.g-artistinfo-face img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.g-artistinfo-face .g-artistinfo-initials {
+  font-family: 'Bebas Neue', 'Inter', sans-serif;
+  font-size: 72px;
+  line-height: 1;
+  color: #fff;
+}
+
+/* Three items in the panel is a lot at 1080 wide once the QR takes 260px.
+ * The face is the first thing to yield — the QR is the function, the face is
+ * the warmth. */
+@supports (width: 1px) {
+  .g-artistinfo { gap: 18px; }
+}

@@ -9,9 +9,14 @@
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="gallery.css" />
+  <!-- Circular artist headshots. Loaded after gallery.css because it
+       overrides the square portrait well defined there. See the note at the
+       top of the file: this is a recorded exception to the no-rounded-corners
+       rule, alongside the QR container tiles. -->
+  <link rel="stylesheet" href="avatars.css" />
 </head>
 <body>
-<!-- FIXED DESIGN CANVAS ─────────────────────────────────────────────────
+<!-- FIXED DESIGN CANVAS ───────────────────────────────────────────
      The whole app is laid out at exactly 1080x1920 — the kiosk panel — and
      this wrapper is CSS-scaled to fit whatever screen it lands on. A phone
      therefore shows a literally identical composition, just smaller.
@@ -106,6 +111,10 @@
   <script src="catalog.js"></script>
   <script src="screensaver.js"></script>
   <script src="gallery.js"></script>
+  <!-- Adds the artist's headshot to the Follow panel. Purely additive: it
+       watches for the panel and decorates it, and every failure path inside
+       is swallowed, so a fault here cannot take the gallery down with it. -->
+  <script src="avatars.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
