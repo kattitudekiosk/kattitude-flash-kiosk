@@ -137,6 +137,52 @@ a blocker in seconds.
   orders of magnitude. Saying "this will take a while" when the honest answer
   is "this cannot work" wastes more of Joshua's time than the blocker did.
 
+## CAPABILITY CLAIMS RULE — exhaust the routes before reporting a blocker
+
+**"I can't" is a claim about the world and needs the same evidence as any
+other claim.** One failed call is not a capability assessment. It is one
+failed call.
+
+This rule exists because a session told Joshua four times that it had no
+access to this repository, having tried exactly one thing: `add_repo` with
+`access: "read"`. The GitHub MCP tools could read *and write* the repo the
+entire time. Hours of work were handed back as instructions for Joshua to
+carry out by hand, and he was the one who eventually said "use the github
+cli?" — which is backwards. He should not have to be the one who suspects
+the capability report is wrong.
+
+**Before reporting that something cannot be done:**
+
+1. **Try every route, and name them.** Say what you tried and what each
+   returned. "No repo access" is not a finding; "add_repo read → denied,
+   add_repo push → not tried, GitHub MCP get_file_contents → worked" is.
+2. **Read the error text.** It often names the next route. The 403 that ended
+   the attempt above said, in full: *"Use add_repo to request access... call
+   add_repo again with access:'push'"*. The answer was inside the failure and
+   nobody read past the first clause.
+3. **A blocked path is not a blocked task.** The raw GitHub API through the
+   proxy is blocked; the GitHub MCP is not. The Terminal is off the table;
+   committing through the MCP is not. Distinguish "this tool refused" from
+   "this cannot be done".
+4. **Record the route that worked** — here, in `LINKS.md`, or in the commit —
+   so the next session starts from it instead of rediscovering it.
+
+**Known-good routes, in order.** Try the next one when one fails:
+
+| Job | 1st | 2nd | 3rd |
+|---|---|---|---|
+| Read repo files | GitHub MCP `get_file_contents` | `add_repo` then clone | fetch the file off a deployment |
+| Commit a change | GitHub MCP `create_or_update_file` | `add_repo` with `access:"push"`, then git | hand Joshua the patch |
+| Deploy | push to a git-connected project and let it build | Vercel connector (text files only) | ask Joshua to click |
+| Inspect a deployment | Vercel MCP `web_fetch_vercel_url` | the deployment's own URL, not the alias | build logs |
+| Schema change | Supabase MCP `apply_migration` | — | never hand-written SQL |
+
+**Things that genuinely have no route today**, so stop looking: promoting a
+Vercel deployment to production, connecting a Vercel project to git, and
+editing Supabase Auth email templates. All three are Joshua's click. Say so
+in one line and give the exact path — do not repeat the instruction as though
+refusing.
+
 ## SEVEN CRITICAL INVARIANTS
 
 ### 1. Arrow buttons are primary navigation — **[CORRECTED: the code violates this today]**
@@ -215,6 +261,15 @@ to the kiosk until it is granted to `anon` AND named in `config.js`'s explicit
 select list.** `portrait_thumb_url` needs both. Nothing errors if you forget
 the second one; the kiosk just silently serves the full-size original.
 
+**`active` and `kiosk_visible` are different questions.** `active` means "may
+use the dashboard, and is eligible for admin". `kiosk_visible` means "appears
+on the wall". They were one column once, and a developer who was hidden from
+the wall with `active = false` was locked out of the dashboard by his own
+invisibility: `artists_public_read` filtered him out, `is_admin()` requires
+`active`, so no policy returned his own row and the app told him he had no
+profile. If you need somebody off the wall but working, that is
+`kiosk_visible = false`, never `active = false`.
+
 **Storage RLS is per-bucket and per-policy.** The `avatars` bucket scopes every
 write to `(storage.foldername(name))[1] = current_artist_id()::text` so an
 artist cannot overwrite another artist's face. `flash` originally did this on
@@ -243,6 +298,14 @@ There are two routes and only one of them scales:
 Nothing passes through the agent's context. This is how a full deploy happens.
 Never push `main` (invariant 5).
 
+**[CORRECTED]** An agent can take this route unaided: the GitHub MCP's
+`create_or_update_file` commits straight to a branch, and a git-connected
+Vercel project builds it within seconds. No Terminal, no upload, no click.
+Both dashboard fixes on 5 Aug shipped that way. Before committing JS, write it
+to disk and `node --check` it, then compare `git hash-object` against the blob
+SHA the API returns — that proves the file that landed is the file you
+checked.
+
 **The deploy connector (text only).** Every byte must be inlined by the agent,
 so it is viable for HTML/CSS/JS and *never* for images or video. The kiosk's
 assets are ~3 MB; as base64 through a context window that is roughly a million
@@ -265,6 +328,12 @@ After creating any deployment you MUST:
 5. Re-fetch production and confirm it is untouched.
 
 Never verify against production before your deploy is `READY`.
+
+**Fetch the deployment's own URL, not the branch alias.** The alias sits behind
+a CDN and answers with `x-vercel-cache: HIT` from the *previous* build for a
+while after a push. Checking it too early shows the old file and looks exactly
+like a fix that did not work. The per-deployment URL is always the build you
+mean.
 
 ## ALWAYS SHIP A LINK RULE
 
@@ -354,6 +423,22 @@ obstacle:
   to follow an artist from her phone to the shop iPad, and Kat has to be able
   to clear it for someone — there is a button on each artist card that does.
 
+**And a fifth, learned the hard way: the bubble must stay reachable.** Its
+Next and Skip buttons are the only way forward, so anything that can push them
+off screen is a dead end, not a cosmetic flaw. Two things caused exactly that
+and are now guarded against in `tour.js`: a scroll handler that called
+`render()`, which calls `scrollIntoView`, which fires the scroll handler —
+a loop that undid every attempt to scroll; and centring an anchor taller than
+the viewport, which puts its bottom edge, and the bubble pinned under it,
+below the fold. Reposition on scroll, never re-render; align tall anchors to
+the top; clamp the bubble inside the viewport.
+
+**A pane that starts visible will flash.** `dashboard/index.html` hides every
+pane and lets `app.js` reveal the right one. The sign-in pane once shipped
+without `hidden`, so somebody arriving on a magic link was shown "Email me a
+sign-in link" for the length of the token exchange — the one screen that makes
+a working link look broken.
+
 Copy is short and plain. These are tattoo artists on phones. No "row-level
 security", no "derivative", no "canonical key".
 
@@ -440,6 +525,14 @@ had just set — because during signup there is no JWT, so `is_admin()` is false
 No error, no claim, every artist stranded. When two triggers touch a table,
 check what the second does to the first's write.
 
+**This bites migrations too.** `artists_guard` pins `role`, `auth_user_id` and
+`active` for any caller that is not `is_admin()`, and a migration carries no
+JWT — so `is_admin()` is false and an `UPDATE ... SET active = true` from
+`apply_migration` is silently reverted while the unpinned columns in the same
+statement land. `apply_migration` still returns success. Query the row back;
+if a pinned column must change, `ALTER TABLE ... DISABLE TRIGGER artists_guard`
+for that one statement and re-enable it in the same migration.
+
 `artists_guard` pins `role`, `auth_user_id` and `active` for non-admins and
 leaves every other column alone — so `portrait_url`, `portrait_thumb_url` and
 `tutorial_seen_at` are self-writable by design.
@@ -449,17 +542,24 @@ leaves every other column alone — so `portrait_url`, `portrait_thumb_url` and
 - The sandbox **cannot reach `*.vercel.app`** — verify deployments through the
   Vercel connector's fetch. It can reach `supabase.co` and the npm/PyPI
   registries.
-- The sandbox also **cannot reach this private repo**, so code pushed through
-  the GitHub connector cannot be pulled back down and run. Say so rather than
-  implying a test ran.
+- **[CORRECTED]** The draft said the sandbox "cannot reach this private repo".
+  It can: the **GitHub MCP tools read and write it**, and that is the route to
+  use. What fails is the raw GitHub API over the proxy (403) and `add_repo`
+  with `access: "read"`. Do not conclude "no repo access" from either — see the
+  CAPABILITY CLAIMS RULE.
+- **[CORRECTED]** "Git push from the sandbox fails" is true of the `git` CLI
+  and beside the point. `create_or_update_file` commits directly to a branch,
+  and a git-connected Vercel project builds it. Code can be shipped from a
+  session with no Terminal and no local clone.
+- Code committed this way still **cannot be pulled back down and run** in the
+  sandbox. Fetch it back off the deployment to confirm what shipped; say so
+  rather than implying a test ran.
 - There is **no browser** in the sandbox. The Chrome extension may or may not
   be connected; check rather than assume. You can confirm markup, endpoints,
   bytes and decoded output; you cannot confirm that a page paints. When the
   last mile needs eyes, say so plainly.
 - **Terminal on the Mac is off the table.** Joshua is usually not at the shop.
   Prefer paths that need no Terminal.
-- Git push from the sandbox fails — credentials are in the Mac's keychain, a
-  different filesystem.
 
 ## CONTENT AND PEOPLE
 
