@@ -1,0 +1,93 @@
+/* Guided tutorial — coach marks.
+ *
+ * THE RULE THIS FILE OBEYS: the tour may never be a wall. The backdrop is
+ * `pointer-events: none` so every tap still reaches the app underneath, and
+ * the highlight is drawn with an outline rather than a cut-out overlay. If
+ * the tour breaks, the dashboard still works; if an artist ignores it, she
+ * can just carry on.
+ */
+
+.tour-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 800;
+  pointer-events: none;   /* never block the app — see above */
+  background: rgba(20, 20, 20, 0.35);
+  transition: opacity 140ms ease;
+}
+
+.tour-spot {
+  position: absolute;
+  z-index: 801;
+  pointer-events: none;
+  outline: 3px solid #E91E8C;
+  outline-offset: 3px;
+  box-shadow: 0 0 0 9999px rgba(20, 20, 20, 0.35);
+  transition: top 160ms ease, left 160ms ease, width 160ms ease, height 160ms ease;
+}
+
+/* The speech bubble. Joshua asked for thought bubbles; this is one, with a
+ * tail that points at whatever is being described. */
+.tour-bubble {
+  position: absolute;
+  z-index: 802;
+  pointer-events: auto;
+  width: min(320px, calc(100vw - 24px));
+  background: #fff;
+  padding: 16px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.tour-bubble::after {
+  content: '';
+  position: absolute;
+  width: 0;
+  height: 0;
+  border: 10px solid transparent;
+}
+.tour-bubble.is-below::after {
+  top: -20px;
+  left: var(--tail, 24px);
+  border-bottom-color: #fff;
+}
+.tour-bubble.is-above::after {
+  bottom: -20px;
+  left: var(--tail, 24px);
+  border-top-color: #fff;
+}
+
+.tour-step {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #7a7a7a;
+}
+
+.tour-title {
+  font-family: 'Bebas Neue', Inter, sans-serif;
+  font-size: 22px;
+  letter-spacing: 0.02em;
+  margin: 2px 0 6px;
+  color: #1a1a1a;
+}
+
+.tour-body {
+  font-size: 15px;
+  line-height: 1.45;
+  color: #1a1a1a;
+  margin: 0 0 14px;
+}
+
+.tour-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* 44px minimum on every control: this is used one-handed, on a phone, by
+ * someone who is between clients. */
+.tour-actions .btn { min-height: 44px; }
+.tour-actions .tour-spacer { flex: 1 1 auto; }
+
+.tour-launch { white-space: nowrap; }
