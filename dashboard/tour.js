@@ -35,6 +35,11 @@
  * timestamp. It never calls signInWithOtp and never touches an artist's
  * email address, so running it — or replaying it — cannot invite anybody.
  *
+ * A STEP IS A PROMISE. Only teach what the database will actually allow. An
+ * admin step once said "you can set anyone's photo"; portraits are now the
+ * artist's own and that step is gone rather than reworded, because a lesson
+ * left in this file reads as intent to somebody restoring it later.
+ *
  * THE BUBBLE MUST STAY REACHABLE. Three things below exist because it did
  * not, on the Artists tab, where the anchor is a card taller than a phone:
  *   - onReflow repositions but never re-renders, because render() scrolls
@@ -98,7 +103,8 @@ window.Tour = (function () {
       sel: '#myAvatar',
       title: 'Your photo',
       body: 'Tap your circle to change your headshot. This is the picture ' +
-            'customers see next to your flash on the wall.',
+            'customers see next to your flash on the wall. It is yours — ' +
+            'nobody else can change it for you, not even an admin.',
     },
   ];
 
@@ -114,12 +120,6 @@ window.Tour = (function () {
       body: 'There is no separate invite button. Put an email on a card and ' +
             'save it, and that person gets their sign-in link. Changing an ' +
             'email sends a fresh one; saving anything else does not.',
-    },
-    {
-      view: 'artists', sel: '#view-artists .avatar-btn',
-      title: 'You can set anyone’s photo',
-      body: 'Tap an artist’s circle to upload a headshot for them. ' +
-            'Handy when someone has not got round to it.',
     },
     {
       view: 'requests', sel: '#view-requests .req-item',
