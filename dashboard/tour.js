@@ -67,10 +67,11 @@
  * The bubble's buttons are the only way forward, so anything that can put
  * them off screen is a dead end, not a cosmetic flaw.
  *
- * AND IT MUST NOT JUMP. Two things caused that, both timing rather than
- * animation: measuring the anchor before the smooth scroll had finished, and
- * a debounce that froze the bubble mid-drag. See afterScroll() and the
- * tracking block near the bottom.
+ * AND IT MUST NOT JUMP. Three things caused that, all of them timing rather
+ * than animation: measuring the anchor before the smooth scroll had
+ * finished, measuring it before the tab's pane had finished filling itself
+ * from the database, and a debounce that froze the bubble mid-drag. See
+ * settle() and the tracking block near the bottom.
  */
 window.Tour = (function () {
   'use strict';
@@ -293,17 +294,21 @@ window.Tour = (function () {
     const room = vh - (rect.bottom + pad);
     const below = room > h || rect.top < h + pad;
 
-    const top = below ? rect.bottom + pad + window.scrollY
-                      : rect.top - h - pad + window.scrollY;
-    let left = rect.left + window.scrollX;
+    // Viewport coordinates, because the bubble is position: fixed. It used to
+    // be absolute with window.scrollY added, which had a second cost beyond
+    // the arithmetic: a bubble placed low on a SHORT pane extended the
+    // document, and the page lurched as the scrollbar appeared. Joshua called
+    // that "making the page jolt". Fixed cannot grow the document at all.
+    const top = below ? rect.bottom + pad : rect.top - h - pad;
+    let left = rect.left;
     left = Math.max(12, Math.min(left, vw - w - 12));
 
     // Clamp into the viewport. An anchor taller than the screen puts its own
     // bottom edge below the fold, and a bubble pinned under it goes with it —
     // taking Next and Skip out of reach, which strands the reader on that
     // step. Being slightly detached from the anchor beats being unreachable.
-    const minTop = 12 + window.scrollY;
-    const maxTop = window.scrollY + vh - h - 12;
+    const minTop = 12;
+    const maxTop = vh - h - 12;
     node.style.top = Math.min(Math.max(minTop, top), Math.max(minTop, maxTop)) + 'px';
     node.style.left = left + 'px';
     node.classList.toggle('is-below', below);
@@ -326,28 +331,61 @@ window.Tour = (function () {
     return row;
   }
 
-  /* Wait for a smooth scroll to actually finish.
+  /* Wait for the ANCHOR to stop moving — not for the scroll to stop.
    *
-   * scrollIntoView({behavior:'smooth'}) resolves nothing and fires no event
-   * anywhere near universally — `scrollend` is still missing on iOS Safari,
-   * which is most of this audience. Two animation frames, which is what this
-   * used to wait, is ~32ms against a scroll that runs 300–500ms: the anchor
-   * was measured mid-flight, the bubble was placed where the element was
-   * PASSING THROUGH, and it sat there stale until a scroll event dragged it
-   * somewhere else. That is the jump.
+   * This is the fix for the jump Joshua saw: "when it's switched to the tab,
+   * it started at the top, and then it jumped down to the bottom."
    *
-   * So: watch scrollY until it stops changing for three consecutive frames,
-   * with a hard cap so a scroll that never settles cannot hang the tour. */
-  function afterScroll(cb) {
-    var last = window.scrollY;
+   * The previous version watched window.scrollY. That is the wrong thing to
+   * watch, and a tab switch proves it. render() clicks the tab, app.js
+   * re-renders that pane and fills it from the database a moment later, and
+   * scrollIntoView often does not move the page at all because it is already
+   * at the top. So scrollY was stable within three frames — about 50ms — the
+   * anchor got measured against a pane that was still EMPTY, and the bubble
+   * was placed near the top. Then the rows arrived, everything below the fold
+   * shifted down, and the bubble was left somewhere that no longer meant
+   * anything until the next reflow dragged it. That is the jump.
+   *
+   * Watching the anchor's own rectangle catches both causes at once: a scroll
+   * in flight moves it, and a pane growing underneath it moves it too. It
+   * does not care WHY the thing moved, which is the point.
+   *
+   * It also re-queries the anchor every frame. app.js rebuilds a pane's DOM
+   * wholesale, so the element found before the tab switch is frequently
+   * detached by the time the pane is ready — and a detached node reports a
+   * rectangle of all zeros, which is perfectly "stable" and would have pinned
+   * the bubble to the top-left corner. */
+  function settle(step, cb) {
+    var last = null;
     var still = 0;
     var frames = 0;
     (function tick() {
       if (!running) return;
-      var y = window.scrollY;
-      if (Math.abs(y - last) < 0.5) { still++; } else { still = 0; }
-      last = y;
-      if (still >= 3 || ++frames > 60) { cb(); return; }   // ~1s cap at 60fps
+      var node = target(step);
+
+      // The pane is mid-rebuild and the anchor does not exist this frame.
+      // Wait for it rather than measuring a corpse.
+      if (!node || !node.isConnected) {
+        last = null;
+        still = 0;
+        if (++frames > 90) { cb(null); return; }
+        requestAnimationFrame(tick);
+        return;
+      }
+
+      var r = node.getBoundingClientRect();
+      var same = last && last.node === node &&
+        Math.abs(r.top - last.top) < 0.5 &&
+        Math.abs(r.left - last.left) < 0.5 &&
+        Math.abs(r.width - last.width) < 0.5 &&
+        Math.abs(r.height - last.height) < 0.5;
+
+      still = same ? still + 1 : 0;
+      last = { node: node, top: r.top, left: r.left, width: r.width, height: r.height };
+
+      // Four still frames rather than three: a pane that renders in two
+      // passes can be briefly stable between them.
+      if (still >= 4 || ++frames > 90) { cb(node); return; }   // ~1.5s cap
       requestAnimationFrame(tick);
     })();
   }
@@ -362,11 +400,64 @@ window.Tour = (function () {
     const node = target(step);
     if (!node) return;
     const r = node.getBoundingClientRect();
-    ui.spot.style.top = (r.top + window.scrollY) + 'px';
-    ui.spot.style.left = (r.left + window.scrollX) + 'px';
+    ui.spot.style.top = r.top + 'px';
+    ui.spot.style.left = r.left + 'px';
     ui.spot.style.width = r.width + 'px';
     ui.spot.style.height = r.height + 'px';
     place(ui.bubble, r);
+    homeRect = { top: r.top, left: r.left };
+  }
+
+  /* The anchor moved for a reason that was NOT the reader scrolling — a pane
+   * finished loading, a card expanded, rows arrived. Following that instantly
+   * is the jolt: the bubble teleports across the screen in full view while
+   * nobody has touched anything.
+   *
+   * Scrolling is different and is handled elsewhere: there, moving every
+   * frame is exactly right, because the bubble is staying glued to something
+   * the reader is dragging. The difference is who moved it.
+   *
+   * So a content shift is treated like arriving at the step: fade out, bring
+   * the anchor back on screen, wait for it to settle, fade back in. The
+   * bubble is never seen travelling. */
+  function rehome() {
+    if (!running || !ui || tracking) return;
+    const step = steps[i];
+    if (!step) return;
+    const node = target(step);
+    if (!node) return;
+
+    const r = node.getBoundingClientRect();
+    // Ignore sub-pixel and cosmetic movement; only re-home for a shift big
+    // enough to actually break the connection to the anchor.
+    if (homeRect &&
+        Math.abs(r.top - homeRect.top) < 24 &&
+        Math.abs(r.left - homeRect.left) < 24) return;
+
+    ui.bubble.classList.remove('is-visible');
+    const tall = r.height > window.innerHeight * 0.7;
+    node.scrollIntoView({ block: tall ? 'start' : 'center', behavior: 'smooth' });
+
+    settle(step, function (live) {
+      if (!running || !ui || !live) return;
+      const rr = live.getBoundingClientRect();
+      ui.spot.style.top = rr.top + 'px';
+      ui.spot.style.left = rr.left + 'px';
+      ui.spot.style.width = rr.width + 'px';
+      ui.spot.style.height = rr.height + 'px';
+      place(ui.bubble, rr);
+      homeRect = { top: rr.top, left: rr.left };
+      requestAnimationFrame(function () {
+        if (running && ui) ui.bubble.classList.add('is-visible');
+      });
+    });
+  }
+
+  function onContentReflow() {
+    if (!running) return;
+    clearTimeout(rehomeTimer);
+    // One re-home for a burst of mutations, not one per row that lands.
+    rehomeTimer = setTimeout(rehome, 150);
   }
 
   function render() {
@@ -395,13 +486,23 @@ window.Tour = (function () {
     ui.bubble.classList.remove('is-visible');
     node.scrollIntoView({ block: tall ? 'start' : 'center', behavior: 'smooth' });
 
-    // Measure only once the scroll has genuinely stopped — see afterScroll.
-    afterScroll(function () {
+    /* Measure only once the ANCHOR has stopped moving — see settle(). It
+     * hands back the anchor as it exists at that moment, which is not
+     * necessarily the element we scrolled to: switching tabs makes app.js
+     * rebuild the pane, so `node` above is often detached by now. Using the
+     * stale reference is how the bubble ended up measuring a rectangle of
+     * zeros and pinning itself to the corner. */
+    settle(step, function (live) {
       if (!running) return;
-      const r = node.getBoundingClientRect();
 
-      ui.spot.style.top = (r.top + window.scrollY) + 'px';
-      ui.spot.style.left = (r.left + window.scrollX) + 'px';
+      // The anchor never came back — the pane no longer contains it. Drop the
+      // step rather than pointing at nothing.
+      if (!live) { steps.splice(i, 1); render(); return; }
+
+      const r = live.getBoundingClientRect();
+
+      ui.spot.style.top = r.top + 'px';
+      ui.spot.style.left = r.left + 'px';
       ui.spot.style.width = r.width + 'px';
       ui.spot.style.height = r.height + 'px';
 
@@ -433,6 +534,7 @@ window.Tour = (function () {
       // Place while still invisible, then fade in on the next frame so the
       // browser has a painted "before" state to transition from.
       place(ui.bubble, r);
+      homeRect = { top: r.top, left: r.left };
       requestAnimationFrame(function () {
         if (running) ui.bubble.classList.add('is-visible');
       });
@@ -468,6 +570,9 @@ window.Tour = (function () {
   let tracking = false;
   let trackRaf = null;
   let trackStop = null;
+  let reflowObs = null;
+  let rehomeTimer = null;
+  let homeRect = null;      // where the anchor was when the bubble was placed
 
   function trackFrame() {
     reposition();
@@ -535,6 +640,9 @@ window.Tour = (function () {
     document.removeEventListener('keydown', onKey, true);
     window.removeEventListener('resize', onReflow);
     window.removeEventListener('scroll', onReflow, true);
+    if (reflowObs) { reflowObs.disconnect(); reflowObs = null; }
+    clearTimeout(rehomeTimer);
+    homeRect = null;
     if (ui) { ui.veil.remove(); ui.spot.remove(); ui.bubble.remove(); ui = null; }
     const q = document.getElementById('howThisWorks');
     if (q) q.classList.remove('is-touring');
@@ -578,6 +686,22 @@ window.Tour = (function () {
     document.addEventListener('keydown', onKey, true);
     window.addEventListener('resize', onReflow);
     window.addEventListener('scroll', onReflow, true);
+
+    /* scroll and resize are not enough, and this is the other half of the
+     * tab-switch jump. A pane that finishes loading and grows underneath the
+     * bubble fires NEITHER event: the window did not resize and nobody
+     * scrolled, the content simply got taller. The bubble then sat pointing
+     * at where the anchor used to be until something incidental jogged it.
+     *
+     * Observing #app catches exactly that, and it is cheap — one callback
+     * when a pane changes size, feeding the re-home path below. */
+    if (window.ResizeObserver) {
+      reflowObs = new ResizeObserver(function () { onContentReflow(); });
+      const app = document.getElementById('app');
+      if (app) reflowObs.observe(app);
+      reflowObs.observe(document.documentElement);
+    }
+
     render();
   }
 
