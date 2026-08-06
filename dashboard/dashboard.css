@@ -5,6 +5,22 @@
  * fixed 1080x1920 canvas exists because that panel is a fixed physical
  * object; applying it here would give a phone user 6px labels. Deliberately
  * a different approach for a different job.
+ *
+ * That licence covers LAYOUT ONLY. It is not licence for a different visual
+ * language, and reading it that way is how this file spent its whole life
+ * out of brand.
+ *
+ * GEOMETRY: NO ROUNDED CORNERS. The rule is stated in styles.css at
+ * .qr-badge — "The one deliberate exception to the no-rounded-corners rule"
+ * — and the kiosk enforces it positively, with an explicit
+ * `border-radius: 0` on .fs-exit-btn and #zoomBadge rather than just leaving
+ * the property out. Every box here is 0.
+ *
+ * Circles are allowed ONLY where the shape IS the element, which is the same
+ * licence the kiosk gives its .dot at 50%: the avatar, the "..." toggle and
+ * the three dots inside it, the tour's progress dots, the new-feature dot,
+ * and the "?" button. A card, a button, an input, a pill, a chip, a panel, a
+ * thumbnail and a toast are all boxes. Do not give a box a radius.
  */
 
 :root {
@@ -96,9 +112,10 @@ body {
 
 /* ── Top bar overflow menu ──────────────────────────────────────────────── */
 
-/* The "..." button. Round, 40px, and the three dots are elements rather than
- * an ellipsis character — a text "…" inherits Inter's baseline and sits low
- * in a circle instead of centred in it. */
+/* The "..." button. Round — the shape IS the element, so this is one of the
+ * permitted circles — 40px, and the three dots are elements rather than an
+ * ellipsis character, because a text "…" inherits Inter's baseline and sits
+ * low in a circle instead of centred in it. */
 .who-menu-toggle {
   flex: 0 0 auto;
   display: flex;
@@ -133,7 +150,9 @@ body {
  * z-index 30: above #topbar's own 20 and #tabs' 19, because it hangs below
  * the bar and would otherwise be drawn behind the tab strip. Still far under
  * the tour bubble at 802 — a walkthrough step has to stay readable even with
- * this open. */
+ * this open.
+ *
+ * A panel is a box. Square. */
 .who-menu {
   position: absolute;
   top: calc(100% + 10px);
@@ -148,7 +167,7 @@ body {
   padding: 8px;
   background: var(--bg);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 0;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
 }
 
@@ -212,7 +231,7 @@ body {
 .card {
   background: var(--bg);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 0;
   padding: 16px;
   margin-bottom: 12px;
 }
@@ -239,7 +258,7 @@ p.muted { line-height: 1.5; margin: 0 0 12px; }
   color: var(--text);
   background: var(--bg);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 0;
   min-height: 48px;
 }
 
@@ -250,7 +269,7 @@ p.muted { line-height: 1.5; margin: 0 0 12px; }
   font: inherit;
   font-size: 14px;
   font-weight: 600;
-  border-radius: 8px;
+  border-radius: 0;
   border: 1px solid transparent;
   cursor: pointer;
   min-height: 48px;
@@ -265,7 +284,7 @@ p.muted { line-height: 1.5; margin: 0 0 12px; }
 .pill {
   display: inline-block;
   padding: 3px 8px;
-  border-radius: 999px;
+  border-radius: 0;
   background: var(--surface);
   border: 1px solid var(--line);
   font-size: 11px;
@@ -284,7 +303,7 @@ p.muted { line-height: 1.5; margin: 0 0 12px; }
   padding: 8px 12px;
   font: inherit;
   font-size: 13px;
-  border-radius: 999px;
+  border-radius: 0;
   border: 1px solid var(--line);
   background: var(--bg);
   color: var(--text);
@@ -307,7 +326,7 @@ p.muted { line-height: 1.5; margin: 0 0 12px; }
   gap: 4px;
   padding: 28px 16px;
   border: 2px dashed var(--line);
-  border-radius: 10px;
+  border-radius: 0;
   background: var(--surface);
   cursor: pointer;
   text-align: center;
@@ -320,7 +339,7 @@ p.muted { line-height: 1.5; margin: 0 0 12px; }
 .item.is-bad { border-color: #f0c9c6; background: #fdf5f5; }
 .item-thumb {
   width: 84px; height: 84px; flex: 0 0 auto;
-  object-fit: contain; background: var(--surface); border-radius: 6px;
+  object-fit: contain; background: var(--surface); border-radius: 0;
 }
 .item-body { flex: 1 1 auto; min-width: 0; }
 
@@ -336,7 +355,7 @@ p.muted { line-height: 1.5; margin: 0 0 12px; }
 .design { display: flex; gap: 12px; align-items: flex-start; }
 .design-thumb {
   width: 96px; height: 96px; flex: 0 0 auto;
-  object-fit: cover; background: var(--surface); border-radius: 6px;
+  object-fit: cover; background: var(--surface); border-radius: 0;
 }
 .design-title { font-weight: 600; margin-bottom: 2px; }
 .status { margin-top: 6px; }
@@ -347,7 +366,7 @@ p.muted { line-height: 1.5; margin: 0 0 12px; }
   left: 12px; right: 12px; bottom: 12px;
   z-index: 50;
   padding: 14px 16px;
-  border-radius: 10px;
+  border-radius: 0;
   background: var(--text);
   color: #fff;
   font-size: 14px;
