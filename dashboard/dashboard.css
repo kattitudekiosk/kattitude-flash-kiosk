@@ -31,6 +31,19 @@ body {
 }
 
 /* ── Chrome ─────────────────────────────────────────────────────────────── */
+
+/* The header is a two-column flex row and it must NEVER be taller than one
+ * line of it. It went wrong because both columns were free to size
+ * themselves: .who kept gaining controls — avatar, name, role pill, Sign
+ * out, View as artist — and on a 390px phone the row could not hold them, so
+ * "View as artist" wrapped to three lines and "Sign out" ran off the edge
+ * where nothing could reach it.
+ *
+ * The fix is in two halves. Here: min-width: 0 on both columns, because a
+ * flex item defaults to min-width: auto and refuses to shrink below its
+ * content — that default is what let .who push past the screen instead of
+ * compressing. In topbar-menu.js: every ACTION folds behind one button, so
+ * the bar carries identity only and stops growing altogether. */
 #topbar {
   position: sticky;
   top: 0;
@@ -45,6 +58,8 @@ body {
 }
 
 .brand {
+  flex: 0 1 auto;
+  min-width: 0;
   font-family: 'Bebas Neue', sans-serif;
   font-size: 22px;
   letter-spacing: 0.08em;
@@ -61,7 +76,103 @@ body {
   margin-top: 3px;
 }
 
-.who { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+/* position: relative because the overflow panel hangs off it. */
+.who {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 13px;
+}
+
+/* A long name shortens rather than shoving the menu button off-screen. */
+#whoName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Top bar overflow menu ──────────────────────────────────────────────── */
+
+/* The "..." button. Round, 40px, and the three dots are elements rather than
+ * an ellipsis character — a text "…" inherits Inter's baseline and sits low
+ * in a circle instead of centred in it. */
+.who-menu-toggle {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.who-menu-toggle i {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #fff;
+}
+
+.who-menu-toggle.is-on { background: var(--pink); border-color: var(--pink); }
+.who-menu-toggle:active { transform: scale(0.94); }
+.who-menu-toggle:focus { outline: none; }
+.who-menu-toggle:focus-visible { outline: 3px solid var(--pink); outline-offset: 2px; }
+
+/* The panel. Anchored to the right edge of .who so it never runs off screen,
+ * and capped so it cannot grow wider than the phone.
+ *
+ * z-index 30: above #topbar's own 20 and #tabs' 19, because it hangs below
+ * the bar and would otherwise be drawn behind the tab strip. Still far under
+ * the tour bubble at 802 — a walkthrough step has to stay readable even with
+ * this open. */
+.who-menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: max-content;
+  min-width: 180px;
+  max-width: calc(100vw - 32px);
+  padding: 8px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
+}
+
+.who-menu[hidden] { display: none; }
+
+/* Full-width rows, left aligned, and NOWRAP is the point of the whole
+ * exercise: "View as artist" broke onto three lines in the bar because it
+ * was being squeezed. Here it has the width to say itself on one. */
+.who-menu .btn {
+  width: 100%;
+  margin: 0;
+  text-align: left;
+  white-space: nowrap;
+}
+
+/* Sign out stays last no matter what order things arrive in. view-as.js
+ * appends its toggle whenever sign-in resolves — sometimes before Sign out
+ * has been adopted, sometimes after — and the destructive control should
+ * never land above the harmless one by accident of timing. */
+.who-menu #signOut {
+  order: 99;
+  color: var(--danger);
+  border-color: #f0c9c6;
+}
 
 #tabs {
   position: sticky;
