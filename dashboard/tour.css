@@ -267,6 +267,34 @@
   .tour-bubble { transform: none; }
 }
 
+/* ── The new-feature dot ──────────────────────────────────────────
+ * Joshua: "put in the notification dot, the same dot that we used on the
+ * request... If they hit skip, then it bounces them back to the front page,
+ * and the notification dot goes above in the tab."
+ *
+ * Same pink as the Requests count badge (.tab .count in requests.css), minus
+ * the number — this answers "is there something here I have not seen", and a
+ * count would be answering a question nobody asked.
+ *
+ * Positioned rather than inline so it does not shove the tab label sideways
+ * and change the width of the tab strip when it appears and disappears. .tab
+ * gets position: relative here; dashboard.css owns everything else about it.
+ */
+.tab { position: relative; }
+
+.tab .new-dot {
+  position: absolute;
+  top: 9px;
+  right: 5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--pink, #E91E8C);
+  /* A ring in the tab-strip's own background, so the dot reads as sitting
+     ON the tab rather than being part of the label. */
+  box-shadow: 0 0 0 2px var(--bg, #fff);
+}
+
 /* ── The persistent "?" ───────────────────────────────────────────
  * Bottom corner, always there, never dismissed. One tap walks the screen you
  * are on — no menu, no submenu, nothing to find.
