@@ -52,10 +52,12 @@
        flash-sales.js, which takes this tab's click handler after app.js has
        bound its own — app.js has no renderer for this view.
 
-       TEMPORARY display:none — staging for the pass-1 tutorial run, so the
-       dashboard reads as it did before this feature existed. Remove the
-       style attribute to restore it. -->
-  <button class="tab admin-only" data-view="flashsales" hidden style="display:none">Flash Sales</button>
+       HOW TO WITHHOLD A FEATURE FOR A TUTORIAL TEST, since the obvious way
+       does not work: an inline display:none hides the tab from a person but
+       NOT from the tour, which used to click it regardless. tour.js now
+       checks whether a tab is genuinely on screen before walking into it, so
+       display:none is enough — but only since that fix. -->
+  <button class="tab admin-only" data-view="flashsales" hidden>Flash Sales</button>
   <button class="tab admin-only" data-view="review" hidden>Review</button>
 </nav>
 
