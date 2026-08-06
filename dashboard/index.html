@@ -75,10 +75,47 @@
         Sign in with your studio email. We'll send a link — no password to
         remember, and nothing for anyone to steal.
       </p>
-      <label for="email">Email</label>
-      <input id="email" type="email" autocomplete="email" inputmode="email"
-             placeholder="you@example.com" />
-      <button id="sendLink" class="btn btn-primary">Email me a sign-in link</button>
+
+      <!-- THE FORM IS HERE FOR AUTOFILL, and that is the whole of its job.
+           A lone input with no form, no name and no submit context is the
+           ambiguous case for iOS: Safari flips between the inline QuickType
+           suggestion strip and the full "AutoFill Contact" sheet depending
+           on the load. A form with a labelled, named email field is
+           unambiguously a sign-in field and gets the same treatment every
+           time.
+
+           onsubmit="return false" because app.js ALREADY sends on Enter via
+           its own keydown listener. Without this, Enter would request the
+           link AND implicitly submit the form, reloading the page out from
+           under the request. novalidate keeps Safari's native validation
+           bubble away for the same reason.
+
+           novalidate and type="button" are load-bearing, not tidiness — see
+           the note on the button below. -->
+      <form id="signinForm" novalidate onsubmit="return false">
+        <label for="email">Email</label>
+
+        <!-- NO inputmode. It used to say inputmode="email" on top of
+             type="email", which is redundant — and it is where the emoji
+             keyboard came from: iOS remembers the last keyboard for fields
+             it treats as generic text, while the dedicated email keyboard is
+             its own type and does not carry the emoji plane over. type
+             drives the keyboard on its own.
+
+             autocapitalize/autocorrect/spellcheck off so the text-prediction
+             strip cannot take the place of the autofill strip. -->
+        <input id="email" name="email" type="email"
+               autocomplete="email"
+               autocapitalize="none" autocorrect="off" spellcheck="false"
+               enterkeyhint="go"
+               placeholder="you@example.com" />
+
+        <!-- type="button" is REQUIRED now there is a form around it. A
+             <button> with no type defaults to submit, which was harmless
+             while it stood alone and would reload the page here. -->
+        <button id="sendLink" class="btn btn-primary" type="button">Email me a sign-in link</button>
+      </form>
+
       <p id="signinMsg" class="msg"></p>
       <p class="muted small">
         Not seeing it? Check spam. The link works once and expires after an
