@@ -15,9 +15,15 @@
  * (`artists_admin_all`) is what actually decides whether Kat may edit someone
  * else's row, and the `artists_guard` trigger is what stops a non-admin
  * escalating their own `role` even if they craft the request by hand. This
- * file only decides what to render. The same is true of the photo control
- * added below: an artist tapping another artist's avatar would be refused by
- * the `avatars` bucket policy, not by this file hiding a button.
+ * file only decides what to render.
+ *
+ * PHOTOS ARE THE ONE THING AN ADMIN CANNOT TOUCH. A headshot belongs to the
+ * person in it, so `portrait_url` and `portrait_thumb_url` are pinned by the
+ * guard trigger unless the row's `auth_user_id` is the caller — and that
+ * check runs before the trigger's is_admin() early-out, so being an admin is
+ * not a way past it. The `avatars` bucket policies match. There is therefore
+ * no photo control on these cards: not hidden, not disabled, absent, because
+ * the request behind it would be refused.
  *
  * signInWithOtp() works with the publishable key and needs no service role,
  * which is why onboarding can live in a static page at all.
@@ -77,20 +83,12 @@ window.ArtistsTab = (function () {
     return el('span', 'pill', 'No email yet');
   }
 
-  /* A tappable circle avatar for one artist. Falls back to the generated
-   * monogram when there is no photo, which is most of the roster today. */
-  function avatarButton(a) {
-    const btn = el('button', 'avatar-btn');
-    btn.type = 'button';
-    btn.setAttribute('aria-label', 'Change ' + a.name + '’s profile photo');
-    btn.title = 'Change ' + a.name + '’s profile photo';
-    btn.appendChild(window.AvatarKit.node(a, 'md'));
-    btn.onclick = () => window.AvatarKit.edit({
-      artist: a,
-      toast: toast,
-      onSaved: async () => { await reload(); },
-    });
-    return btn;
+  /* Their face, shown and nothing more. Deliberately not a button: an admin
+   * cannot change another artist's photo, so a tappable circle here would be
+   * an offer the database refuses. Falls back to the generated monogram,
+   * which is most of the roster until people sign in and pick one. */
+  function avatarFor(a) {
+    return window.AvatarKit.node(a, 'md');
   }
 
   /* == Add an artist ====================================================== */
@@ -161,15 +159,16 @@ window.ArtistsTab = (function () {
     const card = el('div', 'card');
 
     const head = el('div', 'row');
-    head.appendChild(avatarButton(a));
+    head.appendChild(avatarFor(a));
     head.appendChild(el('h3', null, a.name));
     head.appendChild(statusPill(a));
     card.appendChild(head);
 
     card.appendChild(el('div', 'muted small',
       a.portrait_url
-        ? 'Tap the photo to change it.'
-        : 'No photo yet — their initials show on the kiosk. Tap the circle to add one.'));
+        ? 'Their photo. Only they can change it.'
+        : 'No photo yet — their initials show on the kiosk until they sign in ' +
+          'and add one themselves.'));
 
     const fields = {};
     function field(label, key, opts) {
