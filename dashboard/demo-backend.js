@@ -59,6 +59,16 @@
   function ago(days) { return new Date(now - days * 86400000).toISOString(); }
   function ahead(days) { return new Date(now + days * 86400000).toISOString(); }
 
+  function monogram(name) {
+    var ch = (name || '?').trim().charAt(0).toUpperCase();
+    var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512">' +
+              '<rect width="512" height="512" fill="#0a0a0a"/>' +
+              '<text x="256" y="256" fill="#ffffff" font-family="Inter,Helvetica,Arial" ' +
+              'font-size="240" font-weight="700" text-anchor="middle" ' +
+              'dominant-baseline="central">' + ch + '</text></svg>';
+    return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+  }
+
   /* ── Seed ──────────────────────────────────────────────────────────────
    * The real roster, real handles. See the header for why, and for what is
    * deliberately missing. The demo signs in as the studio owner. */
@@ -86,8 +96,13 @@
       /* The handle carries a leading @; the URL must not. */
       a.instagram_url = 'https://instagram.com/' + a.handle.replace(/^@/, '');
       a.bio = null;
-      a.portrait_url = null;
-      a.portrait_thumb_url = null;
+      /* A generated monogram, not a photograph. Stock faces belong to real
+       * people who did not agree to appear here, and a real artist's headshot
+       * is exactly the personal data Joshua asked to keep out. An initial on
+       * the studio's own black is honest about being a placeholder and still
+       * fills the roster out. Inline SVG so it needs no network and no asset. */
+      a.portrait_url = monogram(a.name);
+      a.portrait_thumb_url = a.portrait_url;
       /* Empty on purpose: this is what makes the walkthrough run on open,
        * which is the first thing Joshua asked for. */
       a.tutorial_seen = [];
@@ -108,7 +123,11 @@
     var designs = titles.map(function (t, i) {
       return {
         id: 'd-' + (i + 1),
-        artist_id: artists[1 + (i % 6)].id,
+        /* Index 0 is the signed-in demo user. Including her in the rotation is
+         * deliberate: "View as artist" is a view of YOUR OWN dashboard with the
+         * admin tabs hidden, so if the signed-in row owns nothing, the artist
+         * view a prospect is being shown is an empty state. */
+        artist_id: artists[i % artists.length].id,
         title: t,
         type: i % 5 === 0 ? 'sheet' : 'design',
         image_url: ART[i % ART.length],
@@ -343,17 +362,17 @@
 
   /* ── The session has to exist in localStorage too ────────────────────
    * Answering auth.getSession() is not enough. dash-client.js — which is how
-   * tour.js and avatar.js reach the database — does NOT ask the client for the
-   * session. It reads it straight out of localStorage:
+   * tour.js, avatar.js and view-as.js reach the database — does NOT ask the
+   * client for the session. It reads it straight out of localStorage:
    *
    *     const raw = key && window.localStorage.getItem(key);
    *     if (!raw) return null;
    *
    * With nothing there it returns null, and every caller is UI code that fails
-   * quietly by design. That is why the demo opened with no walkthrough and no
-   * avatar: not an error anywhere, just two modules deciding nobody was signed
-   * in. Writing the session here puts the demo through the same code path the
-   * real app uses rather than around it.
+   * quietly by design. That is why the demo opened with no walkthrough, no
+   * avatar and no "View as artist": not an error anywhere, just three modules
+   * deciding nobody was signed in. Writing the session here puts the demo
+   * through the same code path the real app uses rather than around it.
    *
    * The key is derived exactly as dash-client.js derives it, from the same
    * config value, so the two cannot drift. DASH_CONFIG does not exist yet at
