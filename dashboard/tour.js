@@ -44,6 +44,13 @@
  *    the moment somebody hits it, in the error message, where it is an
  *    answer rather than an unprompted argument.
  *
+ * AND AN EIGHTH, ABOUT LEAVING: SKIP MEANS "NOT NOW", NOT "NEVER". It used
+ * to mark everything seen, so a feature waved away once was never explained
+ * again. It now snoozes — the steps stay unseen, the tab keeps its dot, the
+ * "?" still teaches them — it just stops the tour opening itself again
+ * uninvited. And it puts you back on the tab you started from, rather than
+ * abandoning you on whichever screen the tour had walked you to.
+ *
  * NOTHING HERE SENDS EMAIL. The tour reads the roster and writes its own
  * progress. It never calls signInWithOtp and never touches an artist's email
  * address, so running it — or replaying it — cannot invite anybody.
@@ -207,6 +214,8 @@ window.Tour = (function () {
   let ui = null;
   let me = null;          // the artists row of whoever is running it
   let running = false;
+  let dotObs = null;      // keeps the tab dots alive across app.js repaints
+  let startedOn = null;   // the tab this run began on — where Skip returns to
 
   function el(tag, cls, text) {
     const n = document.createElement(tag);
@@ -262,10 +271,92 @@ window.Tour = (function () {
     return (me && Array.isArray(me.tutorial_seen)) ? me.tutorial_seen : [];
   }
 
-  /** Steps this person has never been shown. The whole of rule 5. */
+  function snoozedIds() {
+    return (me && Array.isArray(me.tutorial_snoozed)) ? me.tutorial_snoozed : [];
+  }
+
+  /** Steps this person has never been shown. The whole of rule 5.
+   *
+   * This is what the NOTIFICATION DOT is computed from — deliberately not
+   * filtered by snooze. Skipping a new feature must leave the dot up: it is
+   * the only remaining signal that the thing is there and unexplained. */
   function unseen(script) {
     const seen = seenIds();
     return script.filter(function (s) { return seen.indexOf(s.id) === -1; });
+  }
+
+  /* What may AMBUSH somebody on sign-in: unseen, minus anything they have
+   * already waved away. Skip means "not now", and answering that by opening
+   * the same tour again on the next sign-in is not teaching, it is nagging.
+   * The dot survives; the interruption does not. */
+  function dueNow(script) {
+    const snoozed = snoozedIds();
+    return unseen(script).filter(function (s) {
+      return snoozed.indexOf(s.id) === -1;
+    });
+  }
+
+  /* ── THE NOTIFICATION DOT ──────────────────────────────────────────
+   * Joshua: "you just put in the notification dot, the same dot that we used
+   * on the request... and then that new feature comes up... If they hit
+   * skip, then it bounces them back to the front page, and the notification
+   * dot goes above in the tab."
+   *
+   * A tab wearing a dot means: there is something on this screen you have
+   * never been shown. It is the same pink as the Requests count badge, minus
+   * the number — a count would be answering a question nobody asked.
+   *
+   * REPAINTED FROM AN OBSERVER, not once. app.js rebuilds the Requests tab
+   * wholesale every time the queue changes (paintRequestBadge does
+   * `tab.innerHTML = ''`), which would silently eat a dot placed there. */
+  function paintDots() {
+    if (!me) return;
+    const script = fullScript(me);
+    const owed = {};
+    unseen(script).forEach(function (st) { if (st.view) owed[st.view] = true; });
+
+    Array.prototype.forEach.call(document.querySelectorAll('.tab'), function (tab) {
+      const view = tab.dataset.view;
+      const want = !!owed[view] && onScreen(tab);
+      const has = tab.querySelector('.new-dot');
+      if (want && !has) {
+        const d = el('span', 'new-dot');
+        d.setAttribute('aria-label', 'New — not shown to you yet');
+        tab.appendChild(d);
+      } else if (!want && has) {
+        has.remove();
+      }
+    });
+  }
+
+  function watchTabs() {
+    const tabs = document.getElementById('tabs');
+    if (!tabs || dotObs) return;
+    dotObs = new MutationObserver(function () { paintDots(); });
+    dotObs.observe(tabs, { childList: true, subtree: true });
+  }
+
+  /* Tapping a dotted tab runs what that tab owes you — including anything
+   * you skipped, because tapping it IS asking. */
+  function bindDotTabs() {
+    const tabs = document.getElementById('tabs');
+    if (!tabs || tabs.dataset.tourBound) return;
+    tabs.dataset.tourBound = '1';
+    tabs.addEventListener('click', function (e) {
+      /* A HUMAN tap, not the tour's own navigation. resolve() and
+       * switchView() drive the tabs with tab.click(), which fires this
+       * handler with running still false — it would schedule a second tour
+       * that tears the first one down mid-render. isTrusted is false for any
+       * click dispatched from script, which is exactly the distinction. */
+      if (!e.isTrusted) return;
+      const tab = e.target.closest ? e.target.closest('.tab') : null;
+      if (!tab || !tab.querySelector('.new-dot') || running || !me) return;
+      const view = tab.dataset.view;
+      // After app.js has switched the pane and rendered it.
+      setTimeout(function () {
+        start({ artist: me, mode: 'new', view: view });
+      }, 350);
+    });
   }
 
   function activeView() {
@@ -623,7 +714,7 @@ window.Tour = (function () {
           actions.appendChild(back);
         }
         const skip = el('button', 'btn btn-quiet', 'Skip');
-        skip.onclick = function () { finish(); };
+        skip.onclick = function () { finish({ skipped: true }); };
         actions.appendChild(skip);
         actions.appendChild(el('span', 'tour-spacer'));
 
@@ -650,7 +741,8 @@ window.Tour = (function () {
 
   function onKey(e) {
     if (!running) return;
-    if (e.key === 'Escape') { finish(); return; }
+    // Escape is a dismissal, same as Skip.
+    if (e.key === 'Escape') { finish({ skipped: true }); return; }
     // Arrow keys only when focus is inside the bubble, so they do not fight
     // the app's own controls.
     if (!ui.bubble.contains(document.activeElement)) return;
@@ -705,27 +797,49 @@ window.Tour = (function () {
     trackStop = setTimeout(endTracking, 140);
   }
 
-  /* Record the ids from THIS run, merged into whatever was already there.
+  /* Record what this run did. Two different things, and conflating them was
+   * a real bug: FINISHING teaches, SKIPPING defers.
    *
-   * Skipping counts. Someone who skipped can restart from the question mark,
-   * and re-ambushing them on every sign-in is not teaching. It only marks the
-   * steps that actually ran, so skipping a two-step "here is what's new" run
-   * does not silently mark the rest of the walkthrough as seen. */
-  async function markSeen() {
+   * Skipping used to mark every step seen, which cleared the tab's dot and
+   * meant a feature waved away once was never explained again. */
+  async function record(skipped) {
     try {
       if (!me || !me.id) return;
       const sb = await window.DashClient.client();
       if (!sb) return;
 
       const ids = steps.map(function (s) { return s.id; }).filter(Boolean);
+      const now = new Date().toISOString();
+
+      if (skipped) {
+        /* SKIPPING IS NOT SEEING. The steps stay unseen, so the dot stays up
+         * and the "?" and the tab still teach them — they just do not ambush
+         * you on the next sign-in.
+         *
+         * tutorial_seen_at IS still stamped, and that matters: it is what
+         * selects "new features only" mode. Leaving it null would replay the
+         * entire walkthrough next time somebody skipped their first run. */
+        const snoozed = snoozedIds().slice();
+        ids.forEach(function (id) { if (snoozed.indexOf(id) === -1) snoozed.push(id); });
+        await sb.from('artists')
+          .update({ tutorial_snoozed: snoozed, tutorial_seen_at: now })
+          .eq('id', me.id);
+        me.tutorial_snoozed = snoozed;
+        me.tutorial_seen_at = now;
+        return;
+      }
+
       const merged = seenIds().slice();
       ids.forEach(function (id) { if (merged.indexOf(id) === -1) merged.push(id); });
+      // Finishing something clears its snooze — it is no longer deferred,
+      // it is done.
+      const snoozed = snoozedIds().filter(function (id) { return ids.indexOf(id) === -1; });
 
-      const now = new Date().toISOString();
       await sb.from('artists')
-        .update({ tutorial_seen: merged, tutorial_seen_at: now })
+        .update({ tutorial_seen: merged, tutorial_snoozed: snoozed, tutorial_seen_at: now })
         .eq('id', me.id);
       me.tutorial_seen = merged;
+      me.tutorial_snoozed = snoozed;
       me.tutorial_seen_at = now;
     } catch (e) {
       // Failing to record it means someone sees a step twice, which is a
@@ -734,8 +848,9 @@ window.Tour = (function () {
     }
   }
 
-  function finish() {
+  function finish(opts) {
     if (!running) return;
+    const skipped = !!(opts && opts.skipped);
     running = false;
     clearTimeout(trackStop);
     if (trackRaf) cancelAnimationFrame(trackRaf);
@@ -749,14 +864,28 @@ window.Tour = (function () {
     if (ui) { ui.veil.remove(); ui.spot.remove(); ui.bubble.remove(); ui = null; }
     const q = document.getElementById('howThisWorks');
     if (q) q.classList.remove('is-touring');
-    markSeen();
+
+    /* Skipping mid-way can leave you standing on a tab the tour walked you
+     * to, which is a strange place to be dropped. Go back to where the run
+     * began — see startedOn in start() — and leave the dot as the way back
+     * to anything that went untaught. */
+    if (skipped && startedOn) {
+      const home = document.querySelector('.tab[data-view="' + startedOn + '"]');
+      if (home && !home.classList.contains('is-active')) home.click();
+    }
+    startedOn = null;
+
+    record(skipped).then(paintDots);
+    paintDots();
   }
 
   /**
    * @param opts.artist  the artists row (needs id, role, name, tutorial_seen)
    * @param opts.mode    'all'    every step, ignoring what has been seen
-   *                     'unseen' only steps this person has never been shown
+   *                     'unseen' new steps they have not waved away (sign-in)
+   *                     'new'    what one tab owes, snoozed or not (the dot)
    *                     'tab'    every step for the tab they are on (the ?)
+   * @param opts.view    for mode 'new': which tab's steps to run
    */
   function start(opts) {
     const artist = (opts && opts.artist) || me;
@@ -768,7 +897,13 @@ window.Tour = (function () {
 
     let script = fullScript(artist);
     if (mode === 'unseen') {
-      script = unseen(script);
+      // Sign-in. Only what is genuinely new AND not already waved away.
+      script = dueNow(script);
+    } else if (mode === 'new') {
+      /* A dotted tab was tapped. Everything that tab owes, snoozed or not —
+       * tapping the dot is asking for it. */
+      const v = (opts && opts.view) || activeView();
+      script = unseen(script).filter(function (s) { return s.view === v; });
     } else if (mode === 'tab') {
       const view = activeView();
       const here = script.filter(function (s) { return s.view === view; });
@@ -777,6 +912,23 @@ window.Tour = (function () {
       script = here.length ? here : script;
     }
     if (!script.length) return;
+
+    /* Where Skip goes back to. Not "the front page" as a fixed destination —
+     * the tab this run STARTED on, which gives the right answer for both
+     * cases without special-casing either.
+     *
+     * Joshua: "if they started at the beginning of a fresh page load for the
+     * first time, they're on the upload screen... that's where it is going
+     * to bounce them back to. [But if] they click over to a tab, they click
+     * the question mark button... and skip the step, it should just exit
+     * right on top. The bubble should go away, and the tab should still be
+     * on the same tab that they started this tutorial on."
+     *
+     * A sign-in run begins on Upload because that is the default tab and the
+     * first thing anyone should be doing, so it lands on Upload. A "?" run
+     * begins wherever they already were, so it lands right back there. Same
+     * line of code. */
+    startedOn = activeView();
 
     steps = resolve(script);
     if (!steps.length) return;      // nothing on screen to point at yet
@@ -820,6 +972,14 @@ window.Tour = (function () {
       q.onclick = function () { start({ artist: me, mode: 'tab' }); };
     }
 
+    /* The dot goes up BEFORE the tour runs and stays up afterwards for
+     * anything still unseen — so a skipped feature is still visibly waiting,
+     * and a feature whose walkthrough cannot run yet (its anchor does not
+     * exist) is still announced. */
+    watchTabs();
+    bindDotTabs();
+    setTimeout(paintDots, 300);
+
     // Never been through it, or Kat reset them: the whole thing.
     // Otherwise: only what has been added since they last looked, which is
     // usually nothing and occasionally one new feature.
@@ -830,7 +990,7 @@ window.Tour = (function () {
   }
 
   return {
-    start, attach, finish,
+    start, attach, finish, paintDots,
     _steps: { artist: ARTIST_STEPS, admin: ADMIN_STEPS, last: LAST_STEP },
     _unseen: unseen,
   };
@@ -867,7 +1027,7 @@ window.Tour = (function () {
       const { data: session } = await sb.auth.getUser();
       if (!session || !session.user) return false;
       const { data, error } = await sb.from('artists')
-        .select('id, name, role, tutorial_seen, tutorial_seen_at, portrait_url, portrait_thumb_url')
+        .select('id, name, role, tutorial_seen, tutorial_snoozed, tutorial_seen_at, portrait_url, portrait_thumb_url')
         .eq('auth_user_id', session.user.id).maybeSingle();
       if (error || !data) return false;
 
