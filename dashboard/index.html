@@ -95,6 +95,9 @@
      which wires it up during sign-in. -->
 <script src="artists-tab.js"></script>
 <script src="app.js"></script>
+<!-- Both of these bind to the document rather than to anything app.js
+     renders, so they load after it and it does not know they exist. -->
+<script src="category-suggest.js"></script>
 <!-- tour.js watches for the top bar unhiding, so it loads last and does not
      need app.js to know it exists. -->
 <script src="tour.js"></script>
