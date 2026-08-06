@@ -42,8 +42,12 @@
   <button class="tab admin-only" data-view="categories" hidden>Categories</button>
   <!-- A flash sale is Kat's to create, never an artist request. Handled by
        flash-sales.js, which takes this tab's click handler after app.js has
-       bound its own — app.js has no renderer for this view. -->
-  <button class="tab admin-only" data-view="flashsales" hidden>Flash Sales</button>
+       bound its own — app.js has no renderer for this view.
+
+       TEMPORARY display:none — staging for the pass-1 tutorial test, so the
+       dashboard reads as it did before this feature existed. Remove the
+       style attribute to restore it. -->
+  <button class="tab admin-only" data-view="flashsales" hidden style="display:none">Flash Sales</button>
   <button class="tab admin-only" data-view="review" hidden>Review</button>
 </nav>
 
@@ -84,9 +88,9 @@
 <div id="toast" class="toast" hidden></div>
 
 <!-- The replay affordance: one small question mark, bottom right, always
-     there. Tap it and the walkthrough starts again at step one. It is
-     deliberately not a menu item and not a text link — somebody who is lost
-     is not going to go looking in a menu. Styled in tour.css. -->
+     there. Tap it and it walks the screen you are on. It is deliberately not
+     a menu item and not a text link — somebody who is lost is not going to go
+     looking in a menu. Styled in tour.css. -->
 <button id="howThisWorks" aria-label="Show me how this works" title="How this works" hidden>?</button>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
