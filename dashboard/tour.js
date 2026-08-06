@@ -67,12 +67,13 @@
  * The bubble's buttons are the only way forward, so anything that can put
  * them off screen is a dead end, not a cosmetic flaw.
  *
- * AND IT MUST NOT JUMP, OR BLINK, OR SNAP. Four causes, every one of them
+ * AND IT MUST NOT JUMP, BLINK, SNAP OR FLASH. Five causes, every one of them
  * timing rather than animation: measuring the anchor before the smooth
  * scroll had finished, measuring it before the tab's pane had finished
  * filling itself from the database, a debounce that froze the bubble
- * mid-drag, and a fade-out that got interrupted by its own fade-in. See
- * settle(), fadeOut() and the tracking block near the bottom.
+ * mid-drag, a fade-out interrupted by its own fade-in, and a veil and
+ * spotlight that appeared at full strength before anything had been placed.
+ * See settle(), fadeOut(), fadeIn() and the tracking block near the bottom.
  */
 window.Tour = (function () {
   'use strict';
@@ -277,8 +278,12 @@ window.Tour = (function () {
     bubble.setAttribute('aria-live', 'polite');
     bubble.setAttribute('aria-label', 'How this works');
     bubble.tabIndex = -1;
-    // Starts transparent. render() fades it in once it is in its final
-    // place, so nothing is ever visible in the wrong position.
+    // All three start transparent — see the CSS. fadeIn() brings them up
+    // together once the first step has actually been placed, so nothing is
+    // ever visible in the wrong position or before there is anything to
+    // look at.
+    veil.classList.remove('is-visible');
+    spot.classList.remove('is-visible');
     bubble.classList.remove('is-visible');
 
     document.body.append(veil, spot, bubble);
@@ -436,8 +441,8 @@ window.Tour = (function () {
     // transitionend does not fire if the element is display:none, if the tab
     // is backgrounded, or if reduced-motion has removed the transition
     // entirely. The tour must never stall waiting for an event that is not
-    // coming.
-    const guard = setTimeout(settled, 260);
+    // coming. Comfortably longer than the 200ms fade-out.
+    const guard = setTimeout(settled, 320);
 
     bubble.classList.remove('is-visible');
   }
@@ -451,7 +456,16 @@ window.Tour = (function () {
     // on at full opacity instead of fading.
     void ui.bubble.offsetHeight;
     requestAnimationFrame(function () {
-      if (running && ui) ui.bubble.classList.add('is-visible');
+      if (!running || !ui) return;
+      /* All three together. The veil and the spotlight are built before
+       * anything has been measured, so they stay invisible until the first
+       * step is actually placed — otherwise the screen darkens a beat early
+       * and the spotlight paints its full-screen shadow from a 0x0 box in
+       * the corner. Idempotent: after the first step these are already on
+       * and the spotlight simply glides to the next anchor. */
+      ui.veil.classList.add('is-visible');
+      ui.spot.classList.add('is-visible');
+      ui.bubble.classList.add('is-visible');
     });
   }
 
