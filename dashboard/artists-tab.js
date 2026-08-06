@@ -17,13 +17,14 @@
  * escalating their own `role` even if they craft the request by hand. This
  * file only decides what to render.
  *
- * PHOTOS ARE THE ONE THING AN ADMIN CANNOT TOUCH. A headshot belongs to the
- * person in it, so `portrait_url` and `portrait_thumb_url` are pinned by the
- * guard trigger unless the row's `auth_user_id` is the caller — and that
- * check runs before the trigger's is_admin() early-out, so being an admin is
- * not a way past it. The `avatars` bucket policies match. There is therefore
- * no photo control on these cards: not hidden, not disabled, absent, because
- * the request behind it would be refused.
+ * TWO THINGS ARE THE ARTIST'S OWN: their photo and their bio. The guard
+ * trigger pins `portrait_url`, `portrait_thumb_url` and `bio` unless the
+ * row's `auth_user_id` is the caller — and that check runs before the
+ * trigger's is_admin() early-out, so being an admin is not a way past it.
+ * Both are therefore SHOWN here and not editable. Not hidden, not disabled:
+ * rendering an input for a value the database will throw away produces a
+ * save that says "Saved" and does nothing, and that is worse than a refusal
+ * because nobody finds out.
  *
  * signInWithOtp() works with the publishable key and needs no service role,
  * which is why onboarding can live in a static page at all.
@@ -192,7 +193,17 @@ window.ArtistsTab = (function () {
     field('Email (this is also their sign-in)', 'email',
           { type: 'email', plain: true, placeholder: 'name@example.com' });
     field('Phone', 'phone', { type: 'tel', placeholder: 'optional' });
-    field('Bio', 'bio');
+
+    /* Bio: read, do not write. Shown as text because Kat needs to know what
+     * a customer reads next to that artist's work — she just does not author
+     * it. An input here would be refused by the guard trigger after
+     * reporting success. */
+    const bioWrap = el('div', 'field');
+    bioWrap.appendChild(el('span', 'muted small', 'Bio'));
+    bioWrap.appendChild(a.bio
+      ? el('div', 'bio-text', a.bio)
+      : el('div', 'muted', 'No bio added yet.'));
+    card.appendChild(bioWrap);
 
     const note = el('div', 'muted small');
     note.textContent = a.email
@@ -210,13 +221,14 @@ window.ArtistsTab = (function () {
       const nextEmail = fields.email.value.trim();
       const emailIsNew = !!nextEmail && !sameEmail(nextEmail, a.email);
 
+      // No `bio` here on purpose — see the note above the bio block. Sending
+      // a value the trigger discards would make every save a half-truth.
       const patch = {
         name: fields.name.value.trim() || a.name,   // never blank out the name
         handle: fields.handle.value.trim() || null,
         instagram_url: handleToUrl(fields.handle.value),
         email: nextEmail || null,
         phone: fields.phone.value.trim() || null,
-        bio: fields.bio.value.trim() || null,
       };
 
       const { error } = await sb.from('artists').update(patch).eq('id', a.id);
@@ -232,7 +244,8 @@ window.ArtistsTab = (function () {
 
       if (!emailIsNew) {
         // Guard against accidental re-sends. Two magic links an hour is the
-        // whole budget; spending one on a bio edit is how she gets locked out.
+        // whole budget; spending one on a phone-number edit is how she gets
+        // locked out.
         toast(nextEmail
           ? 'Saved. Email unchanged, so no new sign-in link was sent.'
           : 'Saved.');
