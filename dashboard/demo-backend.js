@@ -103,11 +103,33 @@
        * fills the roster out. Inline SVG so it needs no network and no asset. */
       a.portrait_url = monogram(a.name);
       a.portrait_thumb_url = a.portrait_url;
-      /* Empty on purpose: this is what makes the walkthrough run on open,
-       * which is the first thing Joshua asked for. */
+      /* PER-TAB DISCOVERY, matching what the real studio rows now carry.
+       *
+       * Joshua: "I would rather people have to go to the thing. They'll see
+       * those dots disappear as they work through and open those new areas
+       * they haven't been to yet."
+       *
+       * Nothing is SEEN, so every tab that owes a step wears its dot — tour.js
+       * computes dots from unseen and deliberately does not filter them by
+       * snooze, "so a feature waved away still shows as waiting".
+       *
+       * seen_at is SET, which puts the first run in 'unseen' mode, where
+       * dueNow() = unseen AND not snoozed. So only the Upload steps and the
+       * avatar step are due on open; the rest wait behind their dots and teach
+       * themselves when a tab is tapped, because 'new' mode deliberately
+       * includes snoozed steps — "tapping the dot is asking for it".
+       *
+       * No code change was needed for any of this. tour.js already supported
+       * it; nothing had ever set the opening state to use it. */
       a.tutorial_seen = [];
-      a.tutorial_snoozed = [];
-      a.tutorial_seen_at = null;
+      a.tutorial_snoozed = [
+        'designs-needs-category', 'designs-tab',
+        'artists-add', 'artists-invite',
+        'requests-review', 'requests-kind',
+        'flashsales-create', 'flashsales-photos',
+        'review-queue', 'help-button',
+      ];
+      a.tutorial_seen_at = new Date(now - 86400000).toISOString();
       a.created_at = ago(120 - i);
     });
 
