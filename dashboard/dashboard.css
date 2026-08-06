@@ -360,3 +360,58 @@ p.muted { line-height: 1.5; margin: 0 0 12px; }
 @media (min-width: 640px) {
   .toast { left: auto; right: 20px; max-width: 460px; }
 }
+
+/* ── USER INPUT RENDERS IN CAPS ──────────────────────────────────────────
+ *
+ * Joshua: "titles, artist name, art category names, all that kind of stuff
+ * I want that to automatically make an uppercase so it looks better and more
+ * consistent on the UI... you can leave info text and everything like that
+ * narrated normally."
+ *
+ * DISPLAY ONLY. Nothing here changes what is stored, and that is deliberate:
+ *   - A name is a person's name. It goes in emails, in the kiosk's alt text
+ *     and next to their face on a wall. Storing MCKENNA loses the capital K
+ *     forever; rendering it in caps loses nothing.
+ *   - Category matching already ignores case — the unique index and
+ *     category-suggest.js both canonicalise to lowercase with the
+ *     punctuation stripped — so storing caps would buy no consistency there
+ *     that does not already exist.
+ *   - It is reversible. A CSS rule can be dropped; a column of shouted names
+ *     cannot be un-shouted.
+ * Say the word if you want it written to the database as well.
+ *
+ * WHAT IS DELIBERATELY LEFT ALONE, because caps would be wrong rather than
+ * merely loud:
+ *   - EMAIL. Addresses are lowercase by convention and the local part is
+ *     technically case-sensitive.
+ *   - INSTAGRAM HANDLES. @kattitude is not @KATTITUDE, and CLAUDE.md ties the
+ *     handle to instagram_url — a mismatch sends customers to a dead profile.
+ *   - PHONE numbers, which have no case.
+ *   - Body copy, hints, error messages, bios, tutorial text. All narration.
+ */
+
+/* Typed values, so the field shows what the UI will show. The :not() chain
+   is the exclusion list above — email and handle both carry
+   autocapitalize="off" from artists-tab.js's `plain` option. */
+.input:not([type="email"]):not([type="tel"]):not([autocapitalize="off"]) {
+  text-transform: uppercase;
+}
+
+/* Placeholders stay sentence case — they are instructions, not data, and
+   "NAME — E.G. FRIDAY THE 13TH" reads as shouting at somebody who has not
+   typed anything yet. */
+.input::placeholder { text-transform: none; }
+
+/* Rendered values. Each of these is something a person typed. */
+#whoName,                       /* who you are signed in as */
+.design-title,                  /* design titles */
+.chip,                          /* category tags, and flash-sale price levels */
+.req-item h3,                   /* a requested category name */
+#view-artists .row > h3,        /* artist name on the roster card */
+#view-flashsales .row > h3 {    /* flash sale name */
+  text-transform: uppercase;
+}
+
+/* The suggestion chip carries its kind as a quiet suffix — "Floral · style".
+   The name shouts, the classification does not. */
+.chip .muted { text-transform: none; }
