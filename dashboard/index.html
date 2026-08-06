@@ -76,45 +76,38 @@
         remember, and nothing for anyone to steal.
       </p>
 
-      <!-- THE FORM IS HERE FOR AUTOFILL, and that is the whole of its job.
-           A lone input with no form, no name and no submit context is the
-           ambiguous case for iOS: Safari flips between the inline QuickType
-           suggestion strip and the full "AutoFill Contact" sheet depending
-           on the load. A form with a labelled, named email field is
-           unambiguously a sign-in field and gets the same treatment every
-           time.
+      <!-- DO NOT WRAP THIS IN A <form>, AND DO NOT GIVE IT name="email".
+           That was tried and reverted. Both are what Safari reads as a LOGIN
+           form, and a login form gets the Passwords/keychain strip — the very
+           thing this page has no use for, since there is no password. What is
+           wanted here is the CONTACT autofill: the work/other addresses off
+           your own card, which is what autocomplete="email" on a standalone
+           field asks for.
 
-           onsubmit="return false" because app.js ALREADY sends on Enter via
-           its own keydown listener. Without this, Enter would request the
-           link AND implicitly submit the form, reloading the page out from
-           under the request. novalidate keeps Safari's native validation
-           bubble away for the same reason.
+           NO inputmode either. It used to say inputmode="email" on top of
+           type="email", which is redundant — and it is where the emoji
+           keyboard came from: iOS remembers the last keyboard for fields it
+           treats as generic text, while the dedicated email keyboard is its
+           own type and does not carry the emoji plane over. type drives the
+           keyboard on its own.
 
-           novalidate and type="button" are load-bearing, not tidiness — see
-           the note on the button below. -->
-      <form id="signinForm" novalidate onsubmit="return false">
-        <label for="email">Email</label>
+           autocapitalize/autocorrect/spellcheck are off so the
+           text-prediction strip cannot take the place of the autofill strip.
 
-        <!-- NO inputmode. It used to say inputmode="email" on top of
-             type="email", which is redundant — and it is where the emoji
-             keyboard came from: iOS remembers the last keyboard for fields
-             it treats as generic text, while the dedicated email keyboard is
-             its own type and does not carry the emoji plane over. type
-             drives the keyboard on its own.
+           app.js sends on Enter via its own keydown listener, so nothing here
+           needs a submit path. -->
+      <label for="email">Email</label>
+      <input id="email" type="email"
+             autocomplete="email"
+             autocapitalize="none" autocorrect="off" spellcheck="false"
+             enterkeyhint="go"
+             placeholder="you@example.com" />
 
-             autocapitalize/autocorrect/spellcheck off so the text-prediction
-             strip cannot take the place of the autofill strip. -->
-        <input id="email" name="email" type="email"
-               autocomplete="email"
-               autocapitalize="none" autocorrect="off" spellcheck="false"
-               enterkeyhint="go"
-               placeholder="you@example.com" />
-
-        <!-- type="button" is REQUIRED now there is a form around it. A
-             <button> with no type defaults to submit, which was harmless
-             while it stood alone and would reload the page here. -->
-        <button id="sendLink" class="btn btn-primary" type="button">Email me a sign-in link</button>
-      </form>
+      <!-- type="button" is not required while there is no form around it, but
+           it is correct, and it disarms the trap for whoever adds one back:
+           a <button> with no type defaults to submit and would reload the
+           page. -->
+      <button id="sendLink" class="btn btn-primary" type="button">Email me a sign-in link</button>
 
       <p id="signinMsg" class="msg"></p>
       <p class="muted small">
