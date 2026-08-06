@@ -39,7 +39,7 @@
   z-index: 15;            /* under the chrome — see LAYER ORDER above */
   pointer-events: none;   /* never block the app */
   background: rgba(20, 20, 20, 0.35);
-  transition: opacity 140ms ease;
+  transition: opacity 260ms ease;
 }
 
 .tour-spot {
@@ -54,7 +54,10 @@
   outline: 3px solid #E91E8C;
   outline-offset: 3px;
   box-shadow: 0 0 0 9999px rgba(20, 20, 20, 0.35);
-  transition: top 160ms ease, left 160ms ease, width 160ms ease, height 160ms ease;
+  transition: top 240ms cubic-bezier(.22, .61, .36, 1),
+              left 240ms cubic-bezier(.22, .61, .36, 1),
+              width 240ms cubic-bezier(.22, .61, .36, 1),
+              height 240ms cubic-bezier(.22, .61, .36, 1);
 }
 
 /* The speech bubble. Joshua asked for thought bubbles; this is one, with a
@@ -69,39 +72,58 @@
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
 
   /* ── THE FADE ──────────────────────────────────────────────────────
-   * Joshua: "when I'm scrolling through the tutorial bubbles, they are a
-   * bit jumpy... I want you to fade them in. Make sure that when you
-   * scroll, that fade is clean."
+   * Joshua: "I want you to fade them in... that fade is clean." Then:
+   * "that fade-in is a little bit too fast. You need to make the
+   * transitions smoother."
    *
    * Hidden by default and revealed by .is-visible, which tour.js adds only
-   * AFTER the anchor has stopped moving and the bubble has been measured
-   * and placed. That ordering is the actual fix. The old code measured the
-   * anchor two animation frames in — about 32ms into a scroll that runs
-   * 300-500ms, and long before a tab's pane had finished loading — so it
-   * read a position the element was only passing through. The jump you saw
-   * was the correction. Fading a wrong position in slowly would only have
-   * made the mistake more visible; the opacity here is what hides the
-   * measurement, not what hides the jump.
+   * once the anchor has stopped moving and the bubble has been measured and
+   * placed. The opacity is what hides the MEASUREMENT — the jump itself was
+   * a timing bug and is fixed in tour.js, not here.
    *
-   * top and left ease too, so a bubble that stays on screen between two
-   * steps glides to the new anchor rather than teleporting. */
+   * ASYMMETRIC ON PURPOSE, and this is the difference between "faded" and
+   * "smooth". Leaving is quick (160ms) because the bubble is on its way to
+   * somewhere else and lingering means you watch it travel. Arriving is slow
+   * (420ms) because that is the part you actually read. One duration for
+   * both would make the exit feel sluggish or the entrance feel snapped —
+   * it was 200ms each way, which managed both at once.
+   *
+   * It also rises 8px as it arrives rather than appearing flat. A bubble
+   * that fades in without moving reads as a layer being switched on; a small
+   * settle reads as something arriving, and it gives the eye a direction to
+   * follow to the tail.
+   *
+   * NOTE WHAT IS NOT TRANSITIONED HERE: top and left. While the bubble is
+   * hidden it must reposition INSTANTLY — it is invisible, so there is
+   * nothing to smooth, and easing it means it is still drifting toward its
+   * anchor as it fades in. The glide belongs to the visible state below,
+   * where it is for small adjustments the reader can actually see. */
   opacity: 0;
-  transition: opacity 200ms ease,
-              top 240ms cubic-bezier(.22, .61, .36, 1),
-              left 240ms cubic-bezier(.22, .61, .36, 1);
+  transform: translateY(8px);
+  transition: opacity 160ms ease-in,
+              transform 160ms ease-in;
 }
 
-.tour-bubble.is-visible { opacity: 1; }
+.tour-bubble.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+  /* The slow arrival, plus a gentle glide for small moves while on screen. */
+  transition: opacity 420ms cubic-bezier(.22, .61, .36, 1),
+              transform 420ms cubic-bezier(.22, .61, .36, 1),
+              top 320ms cubic-bezier(.22, .61, .36, 1),
+              left 320ms cubic-bezier(.22, .61, .36, 1);
+}
 
 /* WHILE A SCROLL OR RESIZE IS ACTUALLY IN PROGRESS, easing the position is
- * exactly wrong. tour.js repositions every frame during a drag, and a 240ms
- * ease on top of per-frame updates means the bubble is permanently chasing
- * the thing it is supposed to be pointing at — it lags behind the thumb and
- * the tail drifts off its anchor. So the class is added on the first reflow
- * and dropped ~140ms after the last one: pinned to the anchor while moving,
- * eased again once still. The opacity transition survives, because nothing
- * about scrolling should make the bubble flicker. */
-.tour-bubble.is-tracking { transition: opacity 200ms ease; }
+ * exactly wrong. tour.js repositions every frame during a drag, and easing
+ * on top of per-frame updates means the bubble is permanently chasing the
+ * thing it is supposed to be pointing at — it lags behind the thumb and the
+ * tail drifts off its anchor. So the class is added on the first reflow and
+ * dropped ~140ms after the last one: pinned to the anchor while moving,
+ * eased again once still. It sits AFTER .is-visible on purpose, so it wins
+ * during a drag. The opacity transition survives, because nothing about
+ * scrolling should make the bubble flicker. */
+.tour-bubble.is-tracking { transition: opacity 420ms cubic-bezier(.22, .61, .36, 1); }
 .tour-spot.is-tracking { transition: none; }
 
 .tour-bubble::after {
@@ -201,13 +223,15 @@
 .tour-bubble:focus { outline: none; }
 
 /* Somebody who has asked their phone not to animate things should not be
- * given a fade and a glide. The bubble still appears — .is-visible still
- * flips opacity — it just arrives at once. */
+ * given a fade and a rise. The bubble still appears — .is-visible still
+ * flips opacity — it just arrives at once, and without the 8px travel. */
 @media (prefers-reduced-motion: reduce) {
   .tour-bubble,
+  .tour-bubble.is-visible,
   .tour-bubble.is-tracking,
   .tour-spot,
   .tour-veil { transition: none; }
+  .tour-bubble { transform: none; }
 }
 
 /* ── The persistent "?" ───────────────────────────────────────────
