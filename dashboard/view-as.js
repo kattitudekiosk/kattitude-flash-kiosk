@@ -144,9 +144,19 @@ window.ViewAs = (function () {
   };
 })();
 
-/* Self-wiring: wait for the top bar to unhide, then read the row, same trick
- * tour.js uses. Runs AFTER tour.js in the markup so the "?" binding this file
- * installs is the one that survives. */
+/* Self-wiring: wait for the dashboard to sign somebody in, same trick tour.js
+ * uses — with one difference learned the hard way.
+ *
+ * IT MUST NOT GIVE UP. The first version set done = true and disconnected the
+ * observer BEFORE awaiting the session, so if localStorage did not have it yet
+ * — which is exactly what happens while app.js is still exchanging a magic
+ * link — this returned and never ran again. The visible result was a signed-in
+ * dashboard with no name, no role pill, no avatar and no admin tabs, because
+ * every self-wiring module bailed at the same instant for the same reason.
+ *
+ * So: only mark done once a row is actually in hand, and keep retrying on a
+ * short timer until then. Bounded, so a genuinely signed-out page stops.
+ */
 (function () {
   'use strict';
 
@@ -154,26 +164,48 @@ window.ViewAs = (function () {
   if (!bar) return;
 
   var done = false;
+  var tries = 0;
+  var MAX = 40;            // ~10s at 250ms, then stop asking
 
-  async function ready() {
-    if (done || bar.hidden) return;
-    done = true;
-    obs.disconnect();
+  async function attempt() {
+    if (done) return true;
+    if (bar.hidden) return false;
     try {
       var sb = await window.DashClient.client();
-      if (!sb) return;
+      if (!sb) return false;
       var got = await sb.auth.getUser();
       var user = got && got.data && got.data.user;
-      if (!user) return;
+      if (!user) return false;
       var res = await sb.from('artists')
         .select('id, name, role, tutorial_seen, tutorial_seen_at')
         .eq('auth_user_id', user.id).maybeSingle();
-      if (res.error || !res.data) return;
+      if (res.error || !res.data) return false;
+
+      done = true;
       window.ViewAs.attach(res.data);
-    } catch (e) { console.warn('view-as: could not start', e); }
+
+      /* app.js has a race of its own: getSession() can resolve before the
+       * magic-link token is exchanged, take its signed-OUT branch, and unhide
+       * the sign-in card on top of a dashboard you are already inside. By the
+       * time we get here a row is in hand, so that card is provably wrong. */
+      var signin = document.getElementById('signin');
+      if (signin && !signin.hidden) signin.hidden = true;
+
+      return true;
+    } catch (e) {
+      console.warn('view-as: could not start', e);
+      return false;
+    }
   }
 
-  var obs = new MutationObserver(ready);
+  function poll() {
+    attempt().then(function (ok) {
+      if (ok || ++tries >= MAX) return;
+      setTimeout(poll, 250);
+    });
+  }
+
+  var obs = new MutationObserver(function () { poll(); });
   obs.observe(bar, { attributes: true, attributeFilter: ['hidden'] });
-  ready();
+  poll();
 })();
