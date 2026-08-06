@@ -40,6 +40,10 @@
   <button class="tab" data-view="requests">Requests</button>
   <button class="tab admin-only" data-view="artists" hidden>Artists</button>
   <button class="tab admin-only" data-view="categories" hidden>Categories</button>
+  <!-- A flash sale is Kat's to create, never an artist request. Handled by
+       flash-sales.js, which takes this tab's click handler after app.js has
+       bound its own — app.js has no renderer for this view. -->
+  <button class="tab admin-only" data-view="flashsales" hidden>Flash Sales</button>
   <button class="tab admin-only" data-view="review" hidden>Review</button>
 </nav>
 
@@ -73,6 +77,7 @@
   <section id="view-requests" class="pane" hidden></section>
   <section id="view-artists" class="pane" hidden></section>
   <section id="view-categories" class="pane" hidden></section>
+  <section id="view-flashsales" class="pane" hidden></section>
   <section id="view-review" class="pane" hidden></section>
 </main>
 
@@ -95,9 +100,10 @@
      which wires it up during sign-in. -->
 <script src="artists-tab.js"></script>
 <script src="app.js"></script>
-<!-- Both of these bind to the document rather than to anything app.js
-     renders, so they load after it and it does not know they exist. -->
+<!-- These three bind to the document, or take over a tab app.js has already
+     bound, so they load AFTER it and it does not know they exist. -->
 <script src="category-suggest.js"></script>
+<script src="flash-sales.js"></script>
 <!-- tour.js watches for the top bar unhiding, so it loads last and does not
      need app.js to know it exists. -->
 <script src="tour.js"></script>
