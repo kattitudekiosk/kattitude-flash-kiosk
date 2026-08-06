@@ -341,6 +341,62 @@
     };
   }
 
+  /* ── The session has to exist in localStorage too ────────────────────
+   * Answering auth.getSession() is not enough. dash-client.js — which is how
+   * tour.js and avatar.js reach the database — does NOT ask the client for the
+   * session. It reads it straight out of localStorage:
+   *
+   *     const raw = key && window.localStorage.getItem(key);
+   *     if (!raw) return null;
+   *
+   * With nothing there it returns null, and every caller is UI code that fails
+   * quietly by design. That is why the demo opened with no walkthrough and no
+   * avatar: not an error anywhere, just two modules deciding nobody was signed
+   * in. Writing the session here puts the demo through the same code path the
+   * real app uses rather than around it.
+   *
+   * The key is derived exactly as dash-client.js derives it, from the same
+   * config value, so the two cannot drift. DASH_CONFIG does not exist yet at
+   * this point in the page — this file loads first, deliberately — so the ref
+   * is taken from the URL the app is built against and asserted against
+   * DASH_CONFIG on the next tick. */
+  var PROJECT_REF = 'tovydesiocfgmasvzjvt';
+
+  function writeSession() {
+    try {
+      window.localStorage.setItem(
+        'sb-' + PROJECT_REF + '-auth-token',
+        JSON.stringify({
+          access_token: SESSION.access_token,
+          refresh_token: SESSION.refresh_token,
+          expires_at: Math.floor(Date.now() / 1000) + 3600,
+          token_type: 'bearer',
+          user: SESSION.user,
+        })
+      );
+    } catch (e) { /* private browsing — the belt-and-braces below still holds */ }
+  }
+  writeSession();
+
+  /* Belt and braces, and the reason is worth stating: if the project ref above
+   * ever stops matching DASH_CONFIG, the key would be wrong and the tour would
+   * go quiet again in exactly the same undebuggable way. dash-client.js has
+   * already defined itself by the time this fires, so replacing it here is
+   * safe, and it removes localStorage from the demo's critical path entirely.
+   * Both mechanisms are kept: this one cannot fail, the one above keeps the
+   * demo exercising the real code path. */
+  document.addEventListener('DOMContentLoaded', function () {
+    var real = window.DASH_CONFIG && window.DASH_CONFIG.supabaseUrl;
+    if (real && real.indexOf(PROJECT_REF) === -1) {
+      try { PROJECT_REF = new URL(real).hostname.split('.')[0]; writeSession(); } catch (e) {}
+    }
+    var shared = createClient();
+    window.DashClient = {
+      client: function () { return Promise.resolve(shared); },
+      raw: shared,
+    };
+  });
+
   window.supabase = { createClient: createClient };
   window.KATTITUDE_DEMO = { reset: function () { DB = seed(); window.location.reload(); } };
 })();
