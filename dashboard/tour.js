@@ -28,8 +28,13 @@
  *    localStorage. An artist who does the tour on her phone should not get
  *    it again on the shop iPad, and Kat needs to be able to clear it for
  *    someone who asks for a refresher.
- * 6. The copy is short and plain. These are tattoo artists on phones. No
- *    "row-level security", no "derivative", no "canonical key".
+ * 6. NAME THE THING, SAY WHAT TO DO, STOP. Short and plain — these are
+ *    tattoo artists on phones. No "row-level security", no "derivative", no
+ *    "canonical key". And no commentary: not who is not allowed to do
+ *    something, not why the rule exists, not a defence of a design decision.
+ *    Nobody tapping Next asked. A rule that matters shows up as a refusal at
+ *    the moment somebody hits it, in the error message, where it is an
+ *    answer rather than an unprompted argument.
  *
  * NOTHING HERE SENDS EMAIL. The tour reads the roster and writes one
  * timestamp. It never calls signInWithOtp and never touches an artist's
@@ -70,8 +75,7 @@ window.Tour = (function () {
       title: 'Sizes are strict',
       body: 'A single design has to be 2048×2048. A full sheet has to be ' +
             '2160×3840. Anything else is refused, and the message tells you ' +
-            'the size it needs. We will not resize or crop your art to make ' +
-            'it fit — that is your drawing, not ours to cut into.',
+            'the size it needs.',
     },
     {
       view: 'upload', sel: '#view-upload .req-panel',
@@ -82,16 +86,15 @@ window.Tour = (function () {
     {
       view: 'upload', sel: '#view-upload .req-panel .input',
       title: 'Missing a category?',
-      body: 'Type what you want here and send it. Kat says yes or points you ' +
-            'at one we already have, so the shop does not end up with three ' +
-            'spellings of the same thing.',
+      body: 'Type what you want here and send it. Kat approves it before it ' +
+            'shows up on the kiosk.',
     },
     {
       view: 'designs', sel: '#view-designs',
       title: 'A design needs a category',
-      body: 'Nothing goes on the kiosk untagged. If you are not ready to tag ' +
-            'something, save it as a draft — drafts are private and you ' +
-            'can publish them later.',
+      body: 'Nothing goes on the kiosk untagged. Not ready to tag something? ' +
+            'Save it as a draft — drafts are private, and you can publish ' +
+            'them later.',
     },
     {
       view: 'designs', sel: '.tab[data-view="designs"]',
@@ -102,9 +105,8 @@ window.Tour = (function () {
     {
       sel: '#myAvatar',
       title: 'Your photo',
-      body: 'Tap your circle to change your headshot. This is the picture ' +
-            'customers see next to your flash on the wall. It is yours — ' +
-            'nobody else can change it for you, not even an admin.',
+      body: 'Tap your circle to upload or change your headshot. It shows ' +
+            'next to your flash on the kiosk.',
     },
   ];
 
@@ -125,9 +127,7 @@ window.Tour = (function () {
       view: 'requests', sel: '#view-requests .req-item',
       title: 'Category requests',
       body: 'Approve to create it. Merge if they meant one we already have. ' +
-            'Reject with a note so they know why. The “did you mean” ' +
-            'suggestions are guesses about spelling — similar is not the ' +
-            'same, so nothing merges on its own.',
+            'Reject with a note so they know why.',
     },
     {
       view: 'requests', sel: '#view-requests .req-actions select',
@@ -139,9 +139,8 @@ window.Tour = (function () {
     {
       view: 'review', sel: '#view-review',
       title: 'The approval queue',
-      body: 'Anything waiting on your yes lands here. Right now artists ' +
-            'publish straight to the kiosk, so this is usually empty — ' +
-            'it is here for the day you want to check work first.',
+      body: 'Anything waiting on your yes lands here. Artists publish ' +
+            'straight to the kiosk right now, so it is usually empty.',
     },
   ];
 
@@ -149,7 +148,7 @@ window.Tour = (function () {
     sel: '#howThisWorks',
     title: 'Lost? Tap the question mark',
     body: 'It is always down here. One tap and this walkthrough starts again ' +
-          'from the beginning. Nothing to remember.',
+          'from the beginning.',
   };
 
   /* ── Engine ─────────────────────────────────────────────────────────── */
