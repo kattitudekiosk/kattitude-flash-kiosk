@@ -5,20 +5,45 @@
  * the highlight is drawn with an outline rather than a cut-out overlay. If
  * the tour breaks, the dashboard still works; if an artist ignores it, she
  * can just carry on.
+ *
+ * LAYER ORDER, and it is the whole reason these numbers look odd:
+ *
+ *     #topbar        20     the header. Always on top of the tour.
+ *     .tour-spot     19     the highlight
+ *     #tabs          19     tied on purpose - see below
+ *     .tour-veil     15     the dimming
+ *     (page content)  -     under everything
+ *     .tour-bubble  802     except this, which sits above the lot
+ *
+ * The spotlight used to sit at 801, forty layers above the chrome, and drew
+ * straight across the header whenever it traced a card taller than the
+ * screen — because such a card's top scrolls UNDER the sticky header while
+ * the outline carried on over it. It belongs between the page and the
+ * header, not on top of both.
+ *
+ * The tie at 19 is deliberate rather than sloppy. Two steps point at tabs,
+ * and #tabs has an opaque white background, so a spotlight underneath it
+ * would simply not be visible. Equal z-index means DOM order decides, and
+ * the spot is appended to <body> long after #tabs — so it paints over the
+ * tab bar and still loses to #topbar at 20.
+ *
+ * The bubble stays on top of everything. It carries Next, Back and Skip;
+ * those are the only way through a step, so it can never be the thing that
+ * gets covered.
  */
 
 .tour-veil {
   position: fixed;
   inset: 0;
-  z-index: 800;
-  pointer-events: none;   /* never block the app — see above */
+  z-index: 15;            /* under the chrome — see LAYER ORDER above */
+  pointer-events: none;   /* never block the app */
   background: rgba(20, 20, 20, 0.35);
   transition: opacity 140ms ease;
 }
 
 .tour-spot {
   position: absolute;
-  z-index: 801;
+  z-index: 19;            /* ties #tabs, loses to #topbar, beats the page */
   pointer-events: none;
   outline: 3px solid #E91E8C;
   outline-offset: 3px;
