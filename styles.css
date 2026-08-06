@@ -6,19 +6,35 @@
   --bg:        #ffffff;
   --surface:   #f7f7f7;
   --pink:      #E91E8C;
-  --gold:      #B8860B;
+
+  /* Same hue, one step deeper. Used where pink is a large FILL carrying text:
+     #E91E8C gives white only 4.18:1, which is thin for a wall panel read from
+     a metre away. This clears 5.78:1 for white and 4.51:1 for the logo yellow. */
+  --pink-card: #C2156F;
+
+  /* The logo's yellow, sampled from assets/brand/kattitude-logo.png. */
+  --yellow:    #FDE446;
+  --gold:      #FDE446;
+
+  /* Same hue held, value dropped until it reads as type. Not currently used —
+     kept here because #FDE446 scores 1.28:1 on white, so any label that has
+     to be legible on a light surface needs either this or a dark pill behind
+     it. */
+  --gold-ink:  #8A790D;
+
   --text:      #1a1a1a;
   --text-dim:  rgba(26,26,26,0.4);
   --pink-dim:  rgba(233,30,140,0.35);
+  --yellow-dim: rgba(253,228,70,0.45);
 }
 
 /* ─── Reset & base ──────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body {
-  width: 100vw;
+  width: 100%;
   height: 100vh;
-  height: 100dvh; /* actual visible viewport on mobile — vh can include space hidden behind a collapsed address bar */
+  height: 100dvh;
   overflow: hidden;
   background: var(--bg);
   color: var(--text);
@@ -26,17 +42,42 @@ html, body {
   -webkit-tap-highlight-color: transparent;
   touch-action: none;
   user-select: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* ─── Fixed design canvas ────────────────────────────────────────────────
+ * Everything is authored at the kiosk's exact 1080x1920 and scaled to fit.
+ * `transform` also makes this the containing block for position:fixed
+ * descendants, so the splash, the gallery and the QR badge all pin to the
+ * canvas rather than the browser viewport — which is what keeps them in the
+ * composition instead of escaping it on a phone.
+ *
+ * --app-scale is set by script.js. It is the only viewport-derived number
+ * in the entire app. */
+#kioskCanvas {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  margin-left: -540px;
+  width: 1080px;
+  height: 1920px;
+  transform-origin: top center;
+  transform: scale(var(--app-scale, 1));
   display: flex;
   flex-direction: column;
+  background: var(--bg);
+  overflow: hidden;
 }
 
 /* ─── Splash screen (white brand background, logo top-centered) ─────────── */
 #splash {
-  position: fixed;
+  /* absolute, not fixed: it fills the 1080x1920 canvas. vw/vh units would
+     measure the real viewport and break out of the composition. */
+  position: absolute;
   inset: 0;
-  width: 100vw;
-  height: 100vh;
-  height: 100dvh; /* actual visible viewport on mobile — see html/body above */
+  width: 100%;
+  height: 100%;
   z-index: 1000;
   background: var(--bg);
   display: flex;
@@ -64,7 +105,7 @@ html, body {
 }
 
 .splash-logo {
-  width: clamp(220px, 62vw, 480px);
+  width: 620px;
   height: auto;
   animation: logo-breathe 4s ease-in-out infinite;
 }
@@ -84,7 +125,7 @@ html, body {
 .splash-enter {
   font-family: 'Inter', sans-serif;
   font-weight: 300;
-  font-size: clamp(11px, 2.2vw, 16px);
+  font-size: 20px;
   color: var(--text);
   letter-spacing: 0.3em;
   text-transform: uppercase;
@@ -104,7 +145,6 @@ html, body {
   flex: 0 0 auto;
   padding: 12px 20px 10px;
   background: var(--surface);
-  border-bottom: 2px solid var(--pink);
   touch-action: none;
 }
 
@@ -126,7 +166,6 @@ html, body {
   flex: 0 0 auto;
   padding: 10px 20px 14px;
   background: var(--surface);
-  border-top: 2px solid var(--pink);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -154,7 +193,7 @@ html, body {
 
 .header-logo {
   flex: 0 0 auto;
-  height: clamp(34px, 5.5vw, 56px);
+  height: 56px;
   width: auto;
   object-fit: contain;
   display: block;
@@ -168,8 +207,8 @@ html, body {
   width: 38px;
   height: 38px;
   background: transparent;
-  border: 1px solid rgba(26,26,26,0.2);
-  border-radius: 5px;
+  border: none;
+  border-radius: 0;
   color: var(--text-dim);
   cursor: pointer;
   flex-shrink: 0;
@@ -180,7 +219,6 @@ html, body {
 
 .fs-exit-btn:active {
   color: var(--pink);
-  border-color: var(--pink);
 }
 
 body.in-fullscreen .fs-exit-btn { display: flex; }
@@ -196,7 +234,7 @@ body.screensaver .nav-btn {
 .sheet-label {
   font-family: 'Inter', sans-serif;
   font-weight: 600;
-  font-size: clamp(11px, 1.6vw, 16px);
+  font-size: 16px;
   color: var(--gold);
   letter-spacing: 0.12em;
   white-space: nowrap;
@@ -278,8 +316,8 @@ body.screensaver .nav-btn {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: rgba(26,26,26,0.12);
-  border: 1.5px solid rgba(26,26,26,0.28);
+  background: rgba(26,26,26,0.22);
+  border: none;
   transition: background 0.2s, transform 0.2s, border-color 0.2s;
   cursor: pointer;
   padding: 0;
@@ -287,14 +325,13 @@ body.screensaver .nav-btn {
 
 .dot.active {
   background: var(--pink);
-  border-color: var(--pink);
   transform: scale(1.35);
 }
 
 .footer-hint {
   font-family: 'Inter', sans-serif;
   font-weight: 300;
-  font-size: clamp(11px, 1.3vw, 14px);
+  font-size: 14px;
   color: var(--text-dim);
   letter-spacing: 0.05em;
   text-align: center;
@@ -311,8 +348,8 @@ body.screensaver .nav-btn {
   font-size: 13px;
   color: #f5f5f5;
   background: rgba(20,20,20,0.82);
-  border: 1px solid var(--pink-dim);
-  border-radius: 4px;
+  border: none;
+  border-radius: 0;
   padding: 3px 9px;
   pointer-events: none;
   opacity: 0;
@@ -323,15 +360,25 @@ body.screensaver .nav-btn {
 
 /* ─── QR badge — subtle, fixed to the screen's bottom-left corner ───────── */
 .qr-badge {
-  position: fixed;
+  position: absolute;
   left: 16px;
-  bottom: 16px;
+  bottom: 26px;   /* clears the caption beneath it */
   z-index: 40;
   width: 138px;
   height: 138px;
-  padding: 10px;
+  /* 15px = a 4-module quiet zone (108px code, 3.7px module). The SVG is the
+     bare 29x29 matrix with no margin of its own, so this padding is the only
+     quiet zone the code has; at the old 10px it was 2.5 modules, under spec. */
+  padding: 15px;
   background: #ffffff;
-  border: 2px solid var(--pink-dim);
+  border: none;
+  /* The one deliberate exception to the no-rounded-corners rule, and it is
+     the CONTAINER only — the white tile the code sits on. The code's own
+     modules stay hard-edged squares. Rounding the tile cannot affect
+     decoding: with a 15px (4-module) quiet zone the code's corner sits well
+     inside the arc, which only starts eating the code once the radius
+     exceeds about 3.4x the padding. Rounding the MODULES is a different and
+     riskier thing — see the note at .g-card-qr in gallery.css. */
   border-radius: 12px;
   display: flex;
   align-items: center;
@@ -346,15 +393,25 @@ body.screensaver .nav-btn {
   display: block;
 }
 
-/* QR badge is only useful on the kiosk (1080px wide) so people can scan it
-   to browse on their own phone — pointless and visually obstructive on a
-   phone that's already looking at this same page, so hide it there. */
-@media (max-width: 768px) {
-  .qr-badge,
-  #qrBadge {
-    display: none !important;
-  }
-}
+/* DELETED: @media (max-width: 768px) { .qr-badge, #qrBadge { display: none } }
+ *
+ * This is the rule that kept "losing" the artist QR. Three things were wrong
+ * with it:
+ *
+ *   1. It matched `.qr-badge` as a CLASS, so it caught the artist's inline
+ *      Instagram code in the Follow panel, not just the studio badge it was
+ *      written for. `!important` meant nothing downstream could put it back.
+ *   2. Media queries measure the REAL viewport, never the 1080x1920 canvas.
+ *      So it fired on a phone and not on the kiosk — the code was present on
+ *      the wall and absent on Joshua's phone at the same time, which is
+ *      exactly why it kept looking fixed and then broken again.
+ *   3. Its premise expired. It was written when the only QR was "scan to
+ *      browse this same gallery on your phone", which is indeed pointless on
+ *      a phone. The QR is now a per-artist Instagram link — useful on any
+ *      screen — and the canvas rule says one composition everywhere.
+ *
+ * Do not reintroduce a viewport-width rule for QR visibility. If a QR ever
+ * needs hiding, hide it by ID for a specific mode. */
 
 /* ─── Sheet-flip transitions ─────────────────────────────────────────────── */
 .stage-inner.slide-out-left  { transition: transform 0.45s ease-in;  transform: translate(calc(-100% - 40px), 0) !important; }
@@ -362,3 +419,46 @@ body.screensaver .nav-btn {
 .stage-inner.slide-in-right  { transition: none;                     transform: translate(calc( 100% + 40px), 0) !important; }
 .stage-inner.slide-in-left   { transition: none;                     transform: translate(calc(-100% - 40px), 0) !important; }
 .stage-inner.slide-center    { transition: transform 0.45s ease-out; transform: translate(0, 0) !important; }
+
+
+/* ─── Attract loop (video + flash reel) ──────────────────────────────────── */
+.attract-stage {
+  position: absolute;
+  inset: 0;
+  z-index: 900;
+  background: #fff;
+  display: none;
+  pointer-events: none;   /* any touch falls through to the global dismiss */
+}
+
+body.attract .attract-stage { display: block; }
+
+/* Two stacked layers so a new item can be painted BEFORE the old one is torn
+   down. Removing first is what produces the black flash between items, and on
+   a wall panel a black flash reads as a fault rather than a transition. */
+.attract-layer {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+}
+
+.attract-layer.is-front { opacity: 1; }
+
+.attract-media {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;   /* never crop someone's flash to fill the panel */
+  display: block;
+}
+
+/* While the reel is running the legacy sheet viewer stays out of the way. */
+body.attract #header,
+body.attract #footer,
+body.attract .nav-btn,
+body.attract .qr-badge,
+body.attract .qr-caption { display: none !important; }

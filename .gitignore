@@ -5,3 +5,9 @@ node_modules/
 dist/
 build/
 .DS_Store
+
+# Generated placeholder content — rebuild with tools/generate-seed.py.
+# Never committed: it is disposable, it is large, and real artist names sit
+# beside machine-drawn art in it.
+assets/seed/
+seed/

@@ -1,0 +1,417 @@
+/* Kattitude Flash Dashboard — styles
+ *
+ * Mobile-first, ordinary responsive layout. This is a WORKING TOOL that
+ * artists use on a phone between clients, not the wall kiosk. The kiosk's
+ * fixed 1080x1920 canvas exists because that panel is a fixed physical
+ * object; applying it here would give a phone user 6px labels. Deliberately
+ * a different approach for a different job.
+ */
+
+:root {
+  --bg: #ffffff;
+  --surface: #f6f6f7;
+  --line: #e6e6e9;
+  --text: #17171a;
+  --muted: #6b6b74;
+  --pink: #E91E8C;
+  --pink-deep: #C2156F;
+  --ok: #0f7b4f;
+  --warn: #8a6d00;
+  --danger: #b3261e;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  color: var(--text);
+  background: var(--surface);
+  -webkit-text-size-adjust: 100%;
+}
+
+/* ── Chrome ─────────────────────────────────────────────────────────────── */
+
+/* The header is a two-column flex row and it must NEVER be taller than one
+ * line of it. It went wrong because both columns were free to size
+ * themselves: .who kept gaining controls — avatar, name, role pill, Sign
+ * out, View as artist — and on a 390px phone the row could not hold them, so
+ * "View as artist" wrapped to three lines and "Sign out" ran off the edge
+ * where nothing could reach it.
+ *
+ * The fix is in two halves. Here: min-width: 0 on both columns, because a
+ * flex item defaults to min-width: auto and refuses to shrink below its
+ * content — that default is what let .who push past the screen instead of
+ * compressing. In topbar-menu.js: every ACTION folds behind one button, so
+ * the bar carries identity only and stops growing altogether. */
+#topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--text);
+  color: #fff;
+}
+
+.brand {
+  flex: 0 1 auto;
+  min-width: 0;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 22px;
+  letter-spacing: 0.08em;
+  line-height: 1;
+}
+
+.brand span {
+  display: block;
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+  margin-top: 3px;
+}
+
+/* position: relative because the overflow panel hangs off it. */
+.who {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 13px;
+}
+
+/* A long name shortens rather than shoving the menu button off-screen. */
+#whoName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Top bar overflow menu ──────────────────────────────────────────────── */
+
+/* The "..." button. Round, 40px, and the three dots are elements rather than
+ * an ellipsis character — a text "…" inherits Inter's baseline and sits low
+ * in a circle instead of centred in it. */
+.who-menu-toggle {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.who-menu-toggle i {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #fff;
+}
+
+.who-menu-toggle.is-on { background: var(--pink); border-color: var(--pink); }
+.who-menu-toggle:active { transform: scale(0.94); }
+.who-menu-toggle:focus { outline: none; }
+.who-menu-toggle:focus-visible { outline: 3px solid var(--pink); outline-offset: 2px; }
+
+/* The panel. Anchored to the right edge of .who so it never runs off screen,
+ * and capped so it cannot grow wider than the phone.
+ *
+ * z-index 30: above #topbar's own 20 and #tabs' 19, because it hangs below
+ * the bar and would otherwise be drawn behind the tab strip. Still far under
+ * the tour bubble at 802 — a walkthrough step has to stay readable even with
+ * this open. */
+.who-menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: max-content;
+  min-width: 180px;
+  max-width: calc(100vw - 32px);
+  padding: 8px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
+}
+
+.who-menu[hidden] { display: none; }
+
+/* Full-width rows, left aligned, and NOWRAP is the point of the whole
+ * exercise: "View as artist" broke onto three lines in the bar because it
+ * was being squeezed. Here it has the width to say itself on one. */
+.who-menu .btn {
+  width: 100%;
+  margin: 0;
+  text-align: left;
+  white-space: nowrap;
+}
+
+/* Sign out stays last no matter what order things arrive in. view-as.js
+ * appends its toggle whenever sign-in resolves — sometimes before Sign out
+ * has been adopted, sometimes after — and the destructive control should
+ * never land above the harmless one by accident of timing. */
+.who-menu #signOut {
+  order: 99;
+  color: var(--danger);
+  border-color: #f0c9c6;
+}
+
+#tabs {
+  position: sticky;
+  top: 57px;
+  z-index: 19;
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+  padding: 0 8px;
+  scrollbar-width: none;
+}
+
+#tabs::-webkit-scrollbar { display: none; }
+
+.tab {
+  flex: 0 0 auto;
+  border: 0;
+  background: none;
+  padding: 14px 12px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+  /* 44px minimum target — this gets used one-handed on a phone. */
+  min-height: 48px;
+}
+
+.tab.is-active { color: var(--pink); border-bottom-color: var(--pink); }
+
+#app { padding: 12px; max-width: 900px; margin: 0 auto; }
+
+/* ── Cards ──────────────────────────────────────────────────────────────── */
+.card {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+h1 { font-size: 22px; margin: 0 0 8px; }
+h2 { font-size: 18px; margin: 0 0 8px; }
+h3 { font-size: 15px; margin: 0 0 8px; }
+
+.muted { color: var(--muted); }
+.small { font-size: 12px; }
+p.muted { line-height: 1.5; margin: 0 0 12px; }
+
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
+.field { display: block; margin-bottom: 10px; }
+.field span { display: block; margin-bottom: 4px; }
+
+/* ── Controls ───────────────────────────────────────────────────────────── */
+.input, input[type="text"], input[type="email"], input[type="number"], select {
+  width: 100%;
+  padding: 12px;
+  margin: 6px 0;
+  font: inherit;
+  font-size: 16px;              /* 16px stops iOS zooming the page on focus */
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  min-height: 48px;
+}
+
+.input.ord { width: 90px; min-width: 90px; }
+
+.btn {
+  padding: 12px 16px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  min-height: 48px;
+}
+
+.btn-primary { background: var(--pink); color: #fff; }
+.btn-primary:active { background: var(--pink-deep); }
+.btn-quiet { background: var(--bg); color: var(--text); border-color: var(--line); }
+.btn-danger { background: var(--bg); color: var(--danger); border-color: #f0c9c6; }
+.btn:disabled { opacity: 0.5; }
+
+.pill {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.pill.ok { color: var(--ok); border-color: #b9e3cd; background: #eef8f2; }
+.pill.draft { color: var(--muted); }
+.pill.warn { color: var(--warn); border-color: #ecdca6; background: #fbf6e6; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+
+.chip {
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 13px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  min-height: 40px;
+}
+
+.chip.is-on { background: var(--pink); border-color: var(--pink); color: #fff; }
+
+/* ── Sign in ────────────────────────────────────────────────────────────── */
+.signin-card { max-width: 420px; margin: 40px auto; }
+.msg { min-height: 20px; font-size: 13px; color: var(--pink); }
+
+/* ── Upload ─────────────────────────────────────────────────────────────── */
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 28px 16px;
+  border: 2px dashed var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  cursor: pointer;
+  text-align: center;
+}
+
+.dropzone.is-over { border-color: var(--pink); background: #fdf2f8; }
+.dropzone span { color: var(--muted); font-size: 13px; }
+
+.item { display: flex; gap: 12px; align-items: flex-start; }
+.item.is-bad { border-color: #f0c9c6; background: #fdf5f5; }
+.item-thumb {
+  width: 84px; height: 84px; flex: 0 0 auto;
+  object-fit: contain; background: var(--surface); border-radius: 6px;
+}
+.item-body { flex: 1 1 auto; min-width: 0; }
+
+.error { color: var(--danger); font-size: 13px; line-height: 1.45; margin-bottom: 6px; }
+
+/* ── Designs ────────────────────────────────────────────────────────────── */
+.dgrid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+
+@media (min-width: 640px) {
+  .dgrid { grid-template-columns: 1fr 1fr; }
+}
+
+.design { display: flex; gap: 12px; align-items: flex-start; }
+.design-thumb {
+  width: 96px; height: 96px; flex: 0 0 auto;
+  object-fit: cover; background: var(--surface); border-radius: 6px;
+}
+.design-title { font-weight: 600; margin-bottom: 2px; }
+.status { margin-top: 6px; }
+
+/* ── Toast ──────────────────────────────────────────────────────────────── */
+.toast {
+  position: fixed;
+  left: 12px; right: 12px; bottom: 12px;
+  z-index: 50;
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: var(--text);
+  color: #fff;
+  font-size: 14px;
+  line-height: 1.45;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.22);
+}
+
+.toast-error { background: var(--danger); }
+
+@media (min-width: 640px) {
+  .toast { left: auto; right: 20px; max-width: 460px; }
+}
+
+/* ── USER INPUT RENDERS IN CAPS ──────────────────────────────────────────
+ *
+ * Joshua: "titles, artist name, art category names, all that kind of stuff
+ * I want that to automatically make an uppercase so it looks better and more
+ * consistent on the UI... you can leave info text and everything like that
+ * narrated normally."
+ *
+ * DISPLAY ONLY. Nothing here changes what is stored, and that is deliberate:
+ *   - A name is a person's name. It goes in emails, in the kiosk's alt text
+ *     and next to their face on a wall. Storing MCKENNA loses the capital K
+ *     forever; rendering it in caps loses nothing.
+ *   - Category matching already ignores case — the unique index and
+ *     category-suggest.js both canonicalise to lowercase with the
+ *     punctuation stripped — so storing caps would buy no consistency there
+ *     that does not already exist.
+ *   - It is reversible. A CSS rule can be dropped; a column of shouted names
+ *     cannot be un-shouted.
+ * Say the word if you want it written to the database as well.
+ *
+ * WHAT IS DELIBERATELY LEFT ALONE, because caps would be wrong rather than
+ * merely loud:
+ *   - EMAIL. Addresses are lowercase by convention and the local part is
+ *     technically case-sensitive.
+ *   - INSTAGRAM HANDLES. @kattitude is not @KATTITUDE, and CLAUDE.md ties the
+ *     handle to instagram_url — a mismatch sends customers to a dead profile.
+ *   - PHONE numbers, which have no case.
+ *   - Body copy, hints, error messages, bios, tutorial text. All narration.
+ */
+
+/* Typed values, so the field shows what the UI will show. The :not() chain
+   is the exclusion list above — email and handle both carry
+   autocapitalize="off" from artists-tab.js's `plain` option. */
+.input:not([type="email"]):not([type="tel"]):not([autocapitalize="off"]) {
+  text-transform: uppercase;
+}
+
+/* Placeholders stay sentence case — they are instructions, not data, and
+   "NAME — E.G. FRIDAY THE 13TH" reads as shouting at somebody who has not
+   typed anything yet. */
+.input::placeholder { text-transform: none; }
+
+/* Rendered values. Each of these is something a person typed. */
+#whoName,                       /* who you are signed in as */
+.design-title,                  /* design titles */
+.chip,                          /* category tags, and flash-sale price levels */
+.req-item h3,                   /* a requested category name */
+#view-artists .row > h3,        /* artist name on the roster card */
+#view-flashsales .row > h3 {    /* flash sale name */
+  text-transform: uppercase;
+}
+
+/* The suggestion chip carries its kind as a quiet suffix — "Floral · style".
+   The name shouts, the classification does not. */
+.chip .muted { text-transform: none; }

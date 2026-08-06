@@ -1,0 +1,334 @@
+/* Guided tutorial — coach marks.
+ *
+ * THE RULE THIS FILE OBEYS: the tour may never be a wall. The backdrop is
+ * `pointer-events: none` so every tap still reaches the app underneath, and
+ * the highlight is drawn with an outline rather than a cut-out overlay. If
+ * the tour breaks, the dashboard still works; if an artist ignores it, she
+ * can just carry on.
+ *
+ * LAYER ORDER, and it is the whole reason these numbers look odd:
+ *
+ *     #topbar        20     the header. Always on top of the tour.
+ *     .who-menu      30     the header's own overflow panel
+ *     .tour-spot     19     the highlight
+ *     #tabs          19     tied on purpose - see below
+ *     .tour-veil     15     the dimming
+ *     (page content)  -     under everything
+ *     .tour-bubble  802     except this, which sits above the lot
+ *
+ * The spotlight used to sit at 801, forty layers above the chrome, and drew
+ * straight across the header whenever it traced a card taller than the
+ * screen — because such a card's top scrolls UNDER the sticky header while
+ * the outline carried on over it. It belongs between the page and the
+ * header, not on top of both.
+ *
+ * The tie at 19 is deliberate rather than sloppy. Two steps point at tabs,
+ * and #tabs has an opaque white background, so a spotlight underneath it
+ * would simply not be visible. Equal z-index means DOM order decides, and
+ * the spot is appended to <body> long after #tabs — so it paints over the
+ * tab bar and still loses to #topbar at 20.
+ *
+ * The bubble stays on top of everything. It carries Next, Back and Skip;
+ * those are the only way through a step, so it can never be the thing that
+ * gets covered.
+ *
+ * NOTHING APPEARS UNTIL IT HAS BEEN PLACED. All three parts start at
+ * opacity 0 and are brought up together by fadeIn() in tour.js, once the
+ * first anchor has actually been measured. See the note on .tour-spot.
+ */
+
+.tour-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 15;            /* under the chrome — see LAYER ORDER above */
+  pointer-events: none;   /* never block the app */
+  background: rgba(20, 20, 20, 0.35);
+
+  /* Starts invisible. The veil and the spotlight used to appear at full
+     strength the instant the tour started — before anything had been
+     measured — so the screen went dark a beat before there was anything to
+     look at. That was the flash on load. */
+  opacity: 0;
+  transition: opacity 320ms ease;
+}
+
+.tour-veil.is-visible { opacity: 1; }
+
+.tour-spot {
+  /* fixed, not absolute. Both of these are positioned in viewport
+     coordinates now — see place() in tour.js. Absolute positioning meant the
+     spotlight and the bubble were laid out against the document, so one
+     placed low on a short pane made the document taller and the page lurched
+     as a scrollbar appeared. Fixed elements cannot grow the document. */
+  position: fixed;
+  z-index: 19;            /* ties #tabs, loses to #topbar, beats the page */
+  pointer-events: none;
+  outline: 3px solid #E91E8C;
+  outline-offset: 3px;
+  box-shadow: 0 0 0 9999px rgba(20, 20, 20, 0.35);
+
+  /* THE LOAD FLASH LIVED HERE. A freshly built spotlight has no position
+     yet, so it is 0x0 in the top corner — but that box-shadow means even a
+     zero-size element paints a full-screen dark wash, stacked on top of the
+     veil's own. Measured: four frames at opacity 1, size 0x0, before the
+     first anchor was measured. Double darkness, then a snap.
+
+     So it starts invisible too, and — just as important — it gets NO
+     positional easing while hidden. Otherwise it would still be gliding in
+     from the corner as it faded up, which is the same flash with a longer
+     tail on it. */
+  opacity: 0;
+  transition: opacity 320ms ease;
+}
+
+/* Placed and visible: now the glide is worth having, because it shows the
+   reader where attention is moving between steps. */
+.tour-spot.is-visible {
+  opacity: 1;
+  transition: opacity 320ms ease,
+              top 300ms cubic-bezier(.22, .61, .36, 1),
+              left 300ms cubic-bezier(.22, .61, .36, 1),
+              width 300ms cubic-bezier(.22, .61, .36, 1),
+              height 300ms cubic-bezier(.22, .61, .36, 1);
+}
+
+/* The speech bubble. Joshua asked for thought bubbles; this is one, with a
+ * tail that points at whatever is being described. */
+.tour-bubble {
+  position: fixed;
+  z-index: 802;
+  pointer-events: auto;
+  width: min(320px, calc(100vw - 24px));
+  background: #fff;
+  padding: 16px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+
+  /* ── THE FADE ──────────────────────────────────────────────────────
+   * Joshua: "I want you to fade them in... that fade is clean." Then:
+   * "that fade-in is a little bit too fast. You need to make the
+   * transitions smoother." Then, slower again.
+   *
+   * Hidden by default and revealed by .is-visible, which tour.js adds only
+   * once the anchor has stopped moving and the bubble has been measured and
+   * placed. The opacity is what hides the MEASUREMENT — the jump itself was
+   * a timing bug and is fixed in tour.js, not here.
+   *
+   * ASYMMETRIC ON PURPOSE, and this is the difference between "faded" and
+   * "smooth". Leaving is quick (200ms) because the bubble is on its way to
+   * somewhere else and lingering means you watch it travel. Arriving is slow
+   * (520ms) because that is the part you actually read. One duration for
+   * both would make the exit feel sluggish or the entrance feel snapped —
+   * it was 200ms each way to begin with, which managed both at once.
+   *
+   * It also rises 8px as it arrives rather than appearing flat. A bubble
+   * that fades in without moving reads as a layer being switched on; a small
+   * settle reads as something arriving, and it gives the eye a direction to
+   * follow to the tail.
+   *
+   * NOTE WHAT IS NOT TRANSITIONED HERE: top and left. While the bubble is
+   * hidden it must reposition INSTANTLY — it is invisible, so there is
+   * nothing to smooth, and easing it means it is still drifting toward its
+   * anchor as it fades in. The glide belongs to the visible state below,
+   * where it is for small adjustments the reader can actually see. */
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 200ms ease-in,
+              transform 200ms ease-in;
+}
+
+.tour-bubble.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+  /* The slow arrival, plus a gentle glide for small moves while on screen. */
+  transition: opacity 520ms cubic-bezier(.22, .61, .36, 1),
+              transform 520ms cubic-bezier(.22, .61, .36, 1),
+              top 380ms cubic-bezier(.22, .61, .36, 1),
+              left 380ms cubic-bezier(.22, .61, .36, 1);
+}
+
+/* WHILE A SCROLL OR RESIZE IS ACTUALLY IN PROGRESS, easing the position is
+ * exactly wrong. tour.js repositions every frame during a drag, and easing
+ * on top of per-frame updates means the bubble is permanently chasing the
+ * thing it is supposed to be pointing at — it lags behind the thumb and the
+ * tail drifts off its anchor. So the class is added on the first reflow and
+ * dropped ~140ms after the last one: pinned to the anchor while moving,
+ * eased again once still. It sits AFTER .is-visible on purpose, so it wins
+ * during a drag. The opacity transition survives, because nothing about
+ * scrolling should make the bubble flicker. */
+.tour-bubble.is-tracking { transition: opacity 520ms cubic-bezier(.22, .61, .36, 1); }
+.tour-spot.is-tracking { transition: none; }
+
+.tour-bubble::after {
+  content: '';
+  position: absolute;
+  width: 0;
+  height: 0;
+  border: 10px solid transparent;
+}
+.tour-bubble.is-below::after {
+  top: -20px;
+  left: var(--tail, 24px);
+  border-bottom-color: #fff;
+}
+.tour-bubble.is-above::after {
+  bottom: -20px;
+  left: var(--tail, 24px);
+  border-top-color: #fff;
+}
+
+/* ── Progress ─────────────────────────────────────────────────────
+ * "2 of 6" plus a dot strip. Two ways of saying the same thing on purpose:
+ * the number tells you where you are, the dots tell you at a glance that
+ * this ends soon. Somebody who does not know how long a walkthrough is will
+ * bail out of it. */
+.tour-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.tour-count {
+  font-family: 'Bebas Neue', Inter, sans-serif;
+  font-size: 15px;
+  letter-spacing: 0.08em;
+  color: #C2156F;
+  white-space: nowrap;
+}
+
+.tour-dots { display: flex; gap: 4px; flex-wrap: wrap; }
+
+.tour-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;      /* progress dots — dots are round or they are dashes */
+  background: #d9d9d9;
+}
+.tour-dot.is-done { background: #E91E8C; }
+.tour-dot.is-now  { background: #C2156F; transform: scale(1.5); }
+
+.tour-title {
+  font-family: 'Bebas Neue', Inter, sans-serif;
+  font-size: 22px;
+  letter-spacing: 0.02em;
+  margin: 2px 0 6px;
+  color: #1a1a1a;
+}
+
+.tour-body {
+  font-size: 15px;
+  line-height: 1.45;
+  color: #1a1a1a;
+  margin: 0 0 14px;
+}
+
+.tour-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* 44px minimum on every control: this is used one-handed, on a phone, by
+ * someone who is between clients. */
+.tour-actions .btn { min-height: 44px; }
+.tour-actions .tour-spacer { flex: 1 1 auto; }
+
+/* render() focuses Next on every step so a keyboard user is not stranded
+ * somewhere behind the bubble. Chrome answers that with its own blue ring,
+ * which lands on the primary button of a pink-and-white card every single
+ * step and reads as a browser artefact rather than design.
+ *
+ * :focus-visible, not :focus — a tap or a click never draws it, a keyboard
+ * still does, in the spotlight's own pink. Same pattern avatar.css uses on
+ * the tappable headshot. Dropping the outline entirely would take the ring
+ * off the only control that advances the tour, for precisely the people who
+ * cannot otherwise tell where focus went. */
+.tour-actions .btn:focus { outline: none; }
+.tour-actions .btn:focus-visible {
+  outline: 3px solid #E91E8C;
+  outline-offset: 2px;
+}
+
+/* Same for the bubble itself: it takes tabIndex="-1" so it can be announced,
+ * and a dialog outline around the whole card is pure noise. */
+.tour-bubble:focus { outline: none; }
+
+/* Somebody who has asked their phone not to animate things should not be
+ * given a fade and a rise. Everything still appears — .is-visible still
+ * flips opacity — it just arrives at once, and without the 8px travel. */
+@media (prefers-reduced-motion: reduce) {
+  .tour-bubble,
+  .tour-bubble.is-visible,
+  .tour-bubble.is-tracking,
+  .tour-spot,
+  .tour-spot.is-visible,
+  .tour-veil { transition: none; }
+  .tour-bubble { transform: none; }
+}
+
+/* ── The new-feature dot ──────────────────────────────────────────
+ * Joshua: "put in the notification dot, the same dot that we used on the
+ * request... If they hit skip, then it bounces them back to the front page,
+ * and the notification dot goes above in the tab."
+ *
+ * Same pink as the Requests count badge (.tab .count in requests.css), minus
+ * the number — this answers "is there something here I have not seen", and a
+ * count would be answering a question nobody asked.
+ *
+ * Positioned rather than inline so it does not shove the tab label sideways
+ * and change the width of the tab strip when it appears and disappears. .tab
+ * gets position: relative here; dashboard.css owns everything else about it.
+ */
+.tab { position: relative; }
+
+.tab .new-dot {
+  position: absolute;
+  top: 9px;
+  right: 5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--pink, #E91E8C);
+  /* A ring in the tab-strip's own background, so the dot reads as sitting
+     ON the tab rather than being part of the label. */
+  box-shadow: 0 0 0 2px var(--bg, #fff);
+}
+
+/* ── The persistent "?" ───────────────────────────────────────────
+ * Bottom corner, always there, never dismissed. One tap walks the screen you
+ * are on — no menu, no submenu, nothing to find.
+ *
+ * Round, and that is the third rounded thing in this product. It is on the
+ * DASHBOARD, which CLAUDE.md exempts from the no-rounded-corners rule
+ * outright ("it is a phone tool, not wall furniture"), so it needs no
+ * exception of its own. A help affordance that is not a circle reads as a
+ * form control. */
+#howThisWorks {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 700;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: none;
+  padding: 0;
+  background: #E91E8C;
+  color: #fff;
+  font-family: 'Bebas Neue', Inter, sans-serif;
+  font-size: 30px;
+  line-height: 52px;
+  text-align: center;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#howThisWorks:active { transform: scale(0.94); }
+#howThisWorks:focus { outline: none; }
+#howThisWorks:focus-visible { outline: 3px solid #1a1a1a; outline-offset: 3px; }
+
+/* While the tour is running it would only be in the way, and it is one of the
+ * things the tour points at. */
+#howThisWorks.is-touring { opacity: 0.35; }

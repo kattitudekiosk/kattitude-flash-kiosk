@@ -8,8 +8,24 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="gallery.css" />
+  <!-- Circular artist headshots. Loaded after gallery.css because it
+       overrides the square portrait well defined there. See the note at the
+       top of the file: this is a recorded exception to the no-rounded-corners
+       rule, alongside the QR container tiles. -->
+  <link rel="stylesheet" href="avatars.css" />
 </head>
 <body>
+<!-- FIXED DESIGN CANVAS ───────────────────────────────────────────
+     The whole app is laid out at exactly 1080x1920 — the kiosk panel — and
+     this wrapper is CSS-scaled to fit whatever screen it lands on. A phone
+     therefore shows a literally identical composition, just smaller.
+
+     This is what makes "same on mobile as the kiosk" true by construction:
+     every layout decision inside reads clientWidth 1080, so nothing can
+     branch on the real viewport. The ONLY code allowed to look at the
+     viewport is the scale factor calculation in script.js. -->
+<div id="kioskCanvas">
 
   <!-- SPLASH SCREEN -->
   <div id="splash" role="button" aria-label="Enter gallery">
@@ -31,6 +47,13 @@
             <line x1="10" y1="14" x2="3" y2="21"/>
             <line x1="21" y1="3" x2="14" y2="10"/>
           </svg>
+        </button>
+        <!-- Shown only when a sheet was opened from a gallery grid tile. -->
+        <button id="sheetBackBtn" class="g-back" aria-label="Back to gallery">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6"/>
+          </svg>
+          <span>Back</span>
         </button>
       </div>
       <img class="header-logo" src="assets/brand/kattitude-logo.png" alt="Kattitude Tattoo Studio" />
@@ -64,14 +87,34 @@
   <!-- FOOTER -->
   <footer id="footer">
     <div class="dots" id="dots"></div>
-    <p class="footer-hint">Tap to zoom &bull; Swipe to browse</p>
+    <!-- Invariant 1: arrow buttons are the navigation. The touch driver turns
+         HID into MOUSE events, so touchstart/touchmove may never fire and a
+         swipe can simply do nothing. Telling a customer to swipe on this
+         hardware is instructing them to use a control that might not exist. -->
+    <p class="footer-hint">Tap to zoom &bull; Use the arrows to browse</p>
   </footer>
 
   <!-- QR CODE — links to the online gallery -->
   <div class="qr-badge" id="qrBadge" role="img" aria-label="QR code linking to the online Kattitude Tattoo flash gallery"></div>
 
+  <!-- GALLERY (home / grid / detail). Stays empty and hidden when the catalog
+       has no individual designs, which is the studio's state today — the
+       kiosk then runs the linear sheet viewer above, unchanged. -->
+  <div id="gallery"></div>
+
+</div><!-- /#kioskCanvas -->
+
   <script src="assets/lib/qrcode.js"></script>
+  <script src="config.js"></script>
   <script src="data.js"></script>
+  <script src="seed/seed-data.js"></script>
+  <script src="catalog.js"></script>
+  <script src="screensaver.js"></script>
+  <script src="gallery.js"></script>
+  <!-- Adds the artist's headshot to the Follow panel. Purely additive: it
+       watches for the panel and decorates it, and every failure path inside
+       is swallowed, so a fault here cannot take the gallery down with it. -->
+  <script src="avatars.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
