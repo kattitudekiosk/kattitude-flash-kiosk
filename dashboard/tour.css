@@ -114,9 +114,29 @@
 .tour-actions .btn { min-height: 44px; }
 .tour-actions .tour-spacer { flex: 1 1 auto; }
 
+/* render() focuses Next on every step so a keyboard user is not stranded
+ * somewhere behind the bubble. Chrome answers that with its own blue ring,
+ * which lands on the primary button of a pink-and-white card every single
+ * step and reads as a browser artefact rather than design.
+ *
+ * :focus-visible, not :focus — a tap or a click never draws it, a keyboard
+ * still does, in the spotlight's own pink. Same pattern avatar.css uses on
+ * the tappable headshot. Dropping the outline entirely would take the ring
+ * off the only control that advances the tour, for precisely the people who
+ * cannot otherwise tell where focus went. */
+.tour-actions .btn:focus { outline: none; }
+.tour-actions .btn:focus-visible {
+  outline: 3px solid #E91E8C;
+  outline-offset: 2px;
+}
+
+/* Same for the bubble itself: it takes tabIndex="-1" so it can be announced,
+ * and a dialog outline around the whole card is pure noise. */
+.tour-bubble:focus { outline: none; }
+
 /* ── The persistent "?" ───────────────────────────────────────────
- * Bottom corner, always there, never dismissed. One tap restarts the whole
- * walkthrough from step one — no menu, no submenu, nothing to find.
+ * Bottom corner, always there, never dismissed. One tap walks the screen you
+ * are on — no menu, no submenu, nothing to find.
  *
  * Round, and that is the third rounded thing in this product. It is on the
  * DASHBOARD, which CLAUDE.md exempts from the no-rounded-corners rule
@@ -145,6 +165,7 @@
 }
 
 #howThisWorks:active { transform: scale(0.94); }
+#howThisWorks:focus { outline: none; }
 #howThisWorks:focus-visible { outline: 3px solid #1a1a1a; outline-offset: 3px; }
 
 /* While the tour is running it would only be in the way, and it is one of the
