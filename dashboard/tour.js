@@ -221,12 +221,32 @@ window.Tour = (function () {
     catch (e) { return null; }
   }
 
+  /* Is this actually on screen? Not "does the element exist" — an element
+   * can exist and be unreachable.
+   *
+   * THIS IS WHY A STAGED FEATURE STILL GOT TAUGHT. The Flash Sales tab was
+   * held back for a test with an inline display:none, and the tour walked
+   * straight into it anyway: the check below used to be `!tab.hidden`, and
+   * app.js REMOVES the hidden attribute for admins, so the tab read as
+   * available while being invisible on screen. The tour clicked it, the pane
+   * rendered, the anchor resolved, and the step was marked seen — so the
+   * follow-up run had nothing left to show.
+   *
+   * offsetWidth/offsetHeight/getClientRects covers every way of being
+   * invisible at once: the hidden attribute, display:none on the element or
+   * any ancestor, and a detached node. */
+  function onScreen(node) {
+    return !!(node && (node.offsetWidth || node.offsetHeight ||
+                       node.getClientRects().length));
+  }
+
   function switchView(view) {
     if (!view) return;
     const tab = document.querySelector('.tab[data-view="' + view + '"]');
-    // Hidden means this role does not have the tab; the step is then dropped
-    // when its anchor fails to resolve.
-    if (tab && !tab.hidden) tab.click();
+    // Not on screen means this person does not have the tab — either their
+    // role never gets it, or it is being deliberately withheld. Either way
+    // the step is dropped when its anchor fails to resolve.
+    if (onScreen(tab)) tab.click();
   }
 
   function fullScript(artist) {
