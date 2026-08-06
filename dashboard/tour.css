@@ -31,6 +31,10 @@
  * The bubble stays on top of everything. It carries Next, Back and Skip;
  * those are the only way through a step, so it can never be the thing that
  * gets covered.
+ *
+ * NOTHING APPEARS UNTIL IT HAS BEEN PLACED. All three parts start at
+ * opacity 0 and are brought up together by fadeIn() in tour.js, once the
+ * first anchor has actually been measured. See the note on .tour-spot.
  */
 
 .tour-veil {
@@ -39,8 +43,16 @@
   z-index: 15;            /* under the chrome — see LAYER ORDER above */
   pointer-events: none;   /* never block the app */
   background: rgba(20, 20, 20, 0.35);
-  transition: opacity 260ms ease;
+
+  /* Starts invisible. The veil and the spotlight used to appear at full
+     strength the instant the tour started — before anything had been
+     measured — so the screen went dark a beat before there was anything to
+     look at. That was the flash on load. */
+  opacity: 0;
+  transition: opacity 320ms ease;
 }
+
+.tour-veil.is-visible { opacity: 1; }
 
 .tour-spot {
   /* fixed, not absolute. Both of these are positioned in viewport
@@ -54,10 +66,30 @@
   outline: 3px solid #E91E8C;
   outline-offset: 3px;
   box-shadow: 0 0 0 9999px rgba(20, 20, 20, 0.35);
-  transition: top 240ms cubic-bezier(.22, .61, .36, 1),
-              left 240ms cubic-bezier(.22, .61, .36, 1),
-              width 240ms cubic-bezier(.22, .61, .36, 1),
-              height 240ms cubic-bezier(.22, .61, .36, 1);
+
+  /* THE LOAD FLASH LIVED HERE. A freshly built spotlight has no position
+     yet, so it is 0x0 in the top corner — but that box-shadow means even a
+     zero-size element paints a full-screen dark wash, stacked on top of the
+     veil's own. Measured: four frames at opacity 1, size 0x0, before the
+     first anchor was measured. Double darkness, then a snap.
+
+     So it starts invisible too, and — just as important — it gets NO
+     positional easing while hidden. Otherwise it would still be gliding in
+     from the corner as it faded up, which is the same flash with a longer
+     tail on it. */
+  opacity: 0;
+  transition: opacity 320ms ease;
+}
+
+/* Placed and visible: now the glide is worth having, because it shows the
+   reader where attention is moving between steps. */
+.tour-spot.is-visible {
+  opacity: 1;
+  transition: opacity 320ms ease,
+              top 300ms cubic-bezier(.22, .61, .36, 1),
+              left 300ms cubic-bezier(.22, .61, .36, 1),
+              width 300ms cubic-bezier(.22, .61, .36, 1),
+              height 300ms cubic-bezier(.22, .61, .36, 1);
 }
 
 /* The speech bubble. Joshua asked for thought bubbles; this is one, with a
@@ -74,7 +106,7 @@
   /* ── THE FADE ──────────────────────────────────────────────────────
    * Joshua: "I want you to fade them in... that fade is clean." Then:
    * "that fade-in is a little bit too fast. You need to make the
-   * transitions smoother."
+   * transitions smoother." Then, slower again.
    *
    * Hidden by default and revealed by .is-visible, which tour.js adds only
    * once the anchor has stopped moving and the bubble has been measured and
@@ -82,11 +114,11 @@
    * a timing bug and is fixed in tour.js, not here.
    *
    * ASYMMETRIC ON PURPOSE, and this is the difference between "faded" and
-   * "smooth". Leaving is quick (160ms) because the bubble is on its way to
+   * "smooth". Leaving is quick (200ms) because the bubble is on its way to
    * somewhere else and lingering means you watch it travel. Arriving is slow
-   * (420ms) because that is the part you actually read. One duration for
+   * (520ms) because that is the part you actually read. One duration for
    * both would make the exit feel sluggish or the entrance feel snapped —
-   * it was 200ms each way, which managed both at once.
+   * it was 200ms each way to begin with, which managed both at once.
    *
    * It also rises 8px as it arrives rather than appearing flat. A bubble
    * that fades in without moving reads as a layer being switched on; a small
@@ -100,18 +132,18 @@
    * where it is for small adjustments the reader can actually see. */
   opacity: 0;
   transform: translateY(8px);
-  transition: opacity 160ms ease-in,
-              transform 160ms ease-in;
+  transition: opacity 200ms ease-in,
+              transform 200ms ease-in;
 }
 
 .tour-bubble.is-visible {
   opacity: 1;
   transform: translateY(0);
   /* The slow arrival, plus a gentle glide for small moves while on screen. */
-  transition: opacity 420ms cubic-bezier(.22, .61, .36, 1),
-              transform 420ms cubic-bezier(.22, .61, .36, 1),
-              top 320ms cubic-bezier(.22, .61, .36, 1),
-              left 320ms cubic-bezier(.22, .61, .36, 1);
+  transition: opacity 520ms cubic-bezier(.22, .61, .36, 1),
+              transform 520ms cubic-bezier(.22, .61, .36, 1),
+              top 380ms cubic-bezier(.22, .61, .36, 1),
+              left 380ms cubic-bezier(.22, .61, .36, 1);
 }
 
 /* WHILE A SCROLL OR RESIZE IS ACTUALLY IN PROGRESS, easing the position is
@@ -123,7 +155,7 @@
  * eased again once still. It sits AFTER .is-visible on purpose, so it wins
  * during a drag. The opacity transition survives, because nothing about
  * scrolling should make the bubble flicker. */
-.tour-bubble.is-tracking { transition: opacity 420ms cubic-bezier(.22, .61, .36, 1); }
+.tour-bubble.is-tracking { transition: opacity 520ms cubic-bezier(.22, .61, .36, 1); }
 .tour-spot.is-tracking { transition: none; }
 
 .tour-bubble::after {
@@ -223,13 +255,14 @@
 .tour-bubble:focus { outline: none; }
 
 /* Somebody who has asked their phone not to animate things should not be
- * given a fade and a rise. The bubble still appears — .is-visible still
+ * given a fade and a rise. Everything still appears — .is-visible still
  * flips opacity — it just arrives at once, and without the 8px travel. */
 @media (prefers-reduced-motion: reduce) {
   .tour-bubble,
   .tour-bubble.is-visible,
   .tour-bubble.is-tracking,
   .tour-spot,
+  .tour-spot.is-visible,
   .tour-veil { transition: none; }
   .tour-bubble { transform: none; }
 }
