@@ -66,6 +66,11 @@
  *     anchor ended up.
  * The bubble's buttons are the only way forward, so anything that can put
  * them off screen is a dead end, not a cosmetic flaw.
+ *
+ * AND IT MUST NOT JUMP. Two things caused that, both timing rather than
+ * animation: measuring the anchor before the smooth scroll had finished, and
+ * a debounce that froze the bubble mid-drag. See afterScroll() and the
+ * tracking block near the bottom.
  */
 window.Tour = (function () {
   'use strict';
@@ -270,6 +275,9 @@ window.Tour = (function () {
     bubble.setAttribute('aria-live', 'polite');
     bubble.setAttribute('aria-label', 'How this works');
     bubble.tabIndex = -1;
+    // Starts transparent. render() fades it in once it is in its final
+    // place, so nothing is ever visible in the wrong position.
+    bubble.classList.remove('is-visible');
 
     document.body.append(veil, spot, bubble);
     return { veil, spot, bubble };
@@ -318,6 +326,32 @@ window.Tour = (function () {
     return row;
   }
 
+  /* Wait for a smooth scroll to actually finish.
+   *
+   * scrollIntoView({behavior:'smooth'}) resolves nothing and fires no event
+   * anywhere near universally — `scrollend` is still missing on iOS Safari,
+   * which is most of this audience. Two animation frames, which is what this
+   * used to wait, is ~32ms against a scroll that runs 300–500ms: the anchor
+   * was measured mid-flight, the bubble was placed where the element was
+   * PASSING THROUGH, and it sat there stale until a scroll event dragged it
+   * somewhere else. That is the jump.
+   *
+   * So: watch scrollY until it stops changing for three consecutive frames,
+   * with a hard cap so a scroll that never settles cannot hang the tour. */
+  function afterScroll(cb) {
+    var last = window.scrollY;
+    var still = 0;
+    var frames = 0;
+    (function tick() {
+      if (!running) return;
+      var y = window.scrollY;
+      if (Math.abs(y - last) < 0.5) { still++; } else { still = 0; }
+      last = y;
+      if (still >= 3 || ++frames > 60) { cb(); return; }   // ~1s cap at 60fps
+      requestAnimationFrame(tick);
+    })();
+  }
+
   /* Move the spotlight and the bubble onto wherever the anchor is NOW.
    * Deliberately does no scrolling and rebuilds nothing, so it is safe to
    * call from a scroll handler. */
@@ -354,10 +388,15 @@ window.Tour = (function () {
     // middle at the middle, which pushes the bottom — and the bubble pinned
     // under it — off the screen. Align such an anchor to the top instead.
     const tall = node.getBoundingClientRect().height > window.innerHeight * 0.7;
+
+    // Fade out BEFORE moving. A bubble that travels across the screen while
+    // fully opaque is the thing that reads as jumpy; one that is already gone
+    // can be repositioned for free.
+    ui.bubble.classList.remove('is-visible');
     node.scrollIntoView({ block: tall ? 'start' : 'center', behavior: 'smooth' });
 
-    // One frame for the smooth scroll to settle before measuring.
-    requestAnimationFrame(function () { requestAnimationFrame(function () {
+    // Measure only once the scroll has genuinely stopped — see afterScroll.
+    afterScroll(function () {
       if (!running) return;
       const r = node.getBoundingClientRect();
 
@@ -391,11 +430,17 @@ window.Tour = (function () {
       actions.appendChild(next);
       ui.bubble.appendChild(actions);
 
+      // Place while still invisible, then fade in on the next frame so the
+      // browser has a painted "before" state to transition from.
       place(ui.bubble, r);
+      requestAnimationFrame(function () {
+        if (running) ui.bubble.classList.add('is-visible');
+      });
+
       // preventScroll: focusing a button the browser thinks is out of view
       // scrolls to it, which is another way back into the loop above.
       next.focus({ preventScroll: true });
-    }); });
+    });
   }
 
   function onKey(e) {
@@ -408,13 +453,48 @@ window.Tour = (function () {
     if (e.key === 'ArrowLeft' && i > 0) { e.preventDefault(); i--; render(); }
   }
 
-  let reflow = null;
+  /* Following the page while it scrolls.
+   *
+   * reposition(), NOT render(). render() calls scrollIntoView, scrolling
+   * fires this handler, and the page would fight every attempt to scroll —
+   * the reader gets yanked back and can never reach the bottom of a long step.
+   *
+   * A 120ms debounce used to sit here, and it was the second source of
+   * jumpiness: the bubble stayed frozen while you dragged and then snapped
+   * to its new home a beat later. It now follows every frame while a scroll
+   * is in progress, with the CSS easing switched OFF via .is-tracking —
+   * easing a position that is already changing 60 times a second just adds
+   * lag behind your thumb. The easing comes back when you stop. */
+  let tracking = false;
+  let trackRaf = null;
+  let trackStop = null;
+
+  function trackFrame() {
+    reposition();
+    if (tracking) trackRaf = requestAnimationFrame(trackFrame);
+  }
+
+  function endTracking() {
+    tracking = false;
+    if (trackRaf) cancelAnimationFrame(trackRaf);
+    trackRaf = null;
+    if (ui) {
+      ui.spot.classList.remove('is-tracking');
+      ui.bubble.classList.remove('is-tracking');
+    }
+    reposition();
+  }
+
   function onReflow() {
-    clearTimeout(reflow);
-    // reposition(), NOT render(). render() calls scrollIntoView, scrolling
-    // fires this handler, and the page fights every attempt to scroll — the
-    // reader gets yanked back and can never reach the bottom of a long step.
-    reflow = setTimeout(reposition, 120);
+    if (!running || !ui) return;
+    if (!tracking) {
+      tracking = true;
+      ui.spot.classList.add('is-tracking');
+      ui.bubble.classList.add('is-tracking');
+      trackFrame();
+    }
+    clearTimeout(trackStop);
+    trackStop = setTimeout(endTracking, 140);
   }
 
   /* Record the ids from THIS run, merged into whatever was already there.
@@ -449,7 +529,9 @@ window.Tour = (function () {
   function finish() {
     if (!running) return;
     running = false;
-    clearTimeout(reflow);
+    clearTimeout(trackStop);
+    if (trackRaf) cancelAnimationFrame(trackRaf);
+    tracking = false;
     document.removeEventListener('keydown', onKey, true);
     window.removeEventListener('resize', onReflow);
     window.removeEventListener('scroll', onReflow, true);
@@ -533,9 +615,11 @@ window.Tour = (function () {
  * for the dashboard signing someone in (the top bar unhides), then reads the
  * artist row itself.
  *
- * The cost of that choice is honest: this is a DOM observation rather than a
- * function call, so if #topbar is ever renamed the tour stops appearing. It
- * fails by doing nothing, which is the right direction to fail in.
+ * IT MUST NOT GIVE UP. An earlier version set done = true before awaiting the
+ * session, so when localStorage did not have it yet — exactly what happens
+ * while app.js is still exchanging a magic link — it returned and never ran
+ * again, and the tour simply never appeared. Only mark done once a row is in
+ * hand, and retry on a short timer until then.
  */
 (function () {
   'use strict';
@@ -544,26 +628,40 @@ window.Tour = (function () {
   if (!bar) return;
 
   let done = false;
+  let tries = 0;
+  const MAX = 40;            // ~10s at 250ms, then stop asking
 
-  async function ready() {
-    if (done || bar.hidden) return;
-    done = true;
-    obs.disconnect();
+  async function attempt() {
+    if (done) return true;
+    if (bar.hidden) return false;
     try {
       const sb = await window.DashClient.client();
-      if (!sb) return;
+      if (!sb) return false;
       const { data: session } = await sb.auth.getUser();
-      if (!session || !session.user) return;
+      if (!session || !session.user) return false;
       const { data, error } = await sb.from('artists')
         .select('id, name, role, tutorial_seen, tutorial_seen_at, portrait_url, portrait_thumb_url')
         .eq('auth_user_id', session.user.id).maybeSingle();
-      if (error || !data) return;
+      if (error || !data) return false;
+
+      done = true;
       window.Tour.attach(data);
       if (window.MyAvatar) window.MyAvatar.attach(data);
-    } catch (e) { console.warn('tour: could not start', e); }
+      return true;
+    } catch (e) {
+      console.warn('tour: could not start', e);
+      return false;
+    }
   }
 
-  const obs = new MutationObserver(ready);
+  function poll() {
+    attempt().then(function (ok) {
+      if (ok || ++tries >= MAX) return;
+      setTimeout(poll, 250);
+    });
+  }
+
+  const obs = new MutationObserver(function () { poll(); });
   obs.observe(bar, { attributes: true, attributeFilter: ['hidden'] });
-  ready();
+  poll();
 })();
