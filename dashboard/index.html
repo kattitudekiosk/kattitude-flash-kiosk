@@ -28,6 +28,8 @@
     <button id="myAvatar" class="avatar-btn" hidden></button>
     <span id="whoName"></span>
     <span id="whoRole" class="pill"></span>
+    <!-- view-as.js inserts its "View as artist" toggle here, before Sign out,
+         and only for admins. -->
     <button id="signOut" class="btn btn-quiet">Sign out</button>
   </div>
 </header>
@@ -42,12 +44,8 @@
   <button class="tab admin-only" data-view="categories" hidden>Categories</button>
   <!-- A flash sale is Kat's to create, never an artist request. Handled by
        flash-sales.js, which takes this tab's click handler after app.js has
-       bound its own — app.js has no renderer for this view.
-
-       TEMPORARY display:none — staging for the pass-1 tutorial test, so the
-       dashboard reads as it did before this feature existed. Remove the
-       style attribute to restore it. -->
-  <button class="tab admin-only" data-view="flashsales" hidden style="display:none">Flash Sales</button>
+       bound its own — app.js has no renderer for this view. -->
+  <button class="tab admin-only" data-view="flashsales" hidden>Flash Sales</button>
   <button class="tab admin-only" data-view="review" hidden>Review</button>
 </nav>
 
@@ -104,12 +102,15 @@
      which wires it up during sign-in. -->
 <script src="artists-tab.js"></script>
 <script src="app.js"></script>
-<!-- These three bind to the document, or take over a tab app.js has already
-     bound, so they load AFTER it and it does not know they exist. -->
+<!-- These bind to the document, or take over a tab app.js has already bound,
+     so they load AFTER it and it does not know they exist. -->
 <script src="category-suggest.js"></script>
 <script src="flash-sales.js"></script>
-<!-- tour.js watches for the top bar unhiding, so it loads last and does not
+<!-- tour.js watches for the top bar unhiding, so it loads late and does not
      need app.js to know it exists. -->
 <script src="tour.js"></script>
+<!-- view-as.js LAST: it rebinds the "?" so help answers with whichever script
+     the current view calls for, and the last binding is the one that wins. -->
+<script src="view-as.js"></script>
 </body>
 </html>
