@@ -43,7 +43,12 @@
 }
 
 .tour-spot {
-  position: absolute;
+  /* fixed, not absolute. Both of these are positioned in viewport
+     coordinates now — see place() in tour.js. Absolute positioning meant the
+     spotlight and the bubble were laid out against the document, so one
+     placed low on a short pane made the document taller and the page lurched
+     as a scrollbar appeared. Fixed elements cannot grow the document. */
+  position: fixed;
   z-index: 19;            /* ties #tabs, loses to #topbar, beats the page */
   pointer-events: none;
   outline: 3px solid #E91E8C;
@@ -55,7 +60,7 @@
 /* The speech bubble. Joshua asked for thought bubbles; this is one, with a
  * tail that points at whatever is being described. */
 .tour-bubble {
-  position: absolute;
+  position: fixed;
   z-index: 802;
   pointer-events: auto;
   width: min(320px, calc(100vw - 24px));
@@ -69,14 +74,14 @@
    * scroll, that fade is clean."
    *
    * Hidden by default and revealed by .is-visible, which tour.js adds only
-   * AFTER the smooth scroll has finished and the bubble has been measured
+   * AFTER the anchor has stopped moving and the bubble has been measured
    * and placed. That ordering is the actual fix. The old code measured the
    * anchor two animation frames in — about 32ms into a scroll that runs
-   * 300-500ms — so it read the element's position mid-flight and pinned the
-   * bubble to where the card USED to be. The jump you saw was the
-   * correction. Fading a wrong position in slowly would only have made the
-   * mistake more visible; the opacity here is what hides the measurement,
-   * not what hides the jump.
+   * 300-500ms, and long before a tab's pane had finished loading — so it
+   * read a position the element was only passing through. The jump you saw
+   * was the correction. Fading a wrong position in slowly would only have
+   * made the mistake more visible; the opacity here is what hides the
+   * measurement, not what hides the jump.
    *
    * top and left ease too, so a bubble that stays on screen between two
    * steps glides to the new anchor rather than teleporting. */
