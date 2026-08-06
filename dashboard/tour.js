@@ -67,11 +67,12 @@
  * The bubble's buttons are the only way forward, so anything that can put
  * them off screen is a dead end, not a cosmetic flaw.
  *
- * AND IT MUST NOT JUMP. Three things caused that, all of them timing rather
- * than animation: measuring the anchor before the smooth scroll had
- * finished, measuring it before the tab's pane had finished filling itself
- * from the database, and a debounce that froze the bubble mid-drag. See
- * settle() and the tracking block near the bottom.
+ * AND IT MUST NOT JUMP, OR BLINK, OR SNAP. Four causes, every one of them
+ * timing rather than animation: measuring the anchor before the smooth
+ * scroll had finished, measuring it before the tab's pane had finished
+ * filling itself from the database, a debounce that froze the bubble
+ * mid-drag, and a fade-out that got interrupted by its own fade-in. See
+ * settle(), fadeOut() and the tracking block near the bottom.
  */
 window.Tour = (function () {
   'use strict';
@@ -390,6 +391,70 @@ window.Tour = (function () {
     })();
   }
 
+  /* ── ONE FADE, THE SAME EVERY TIME ─────────────────────────────────
+   * Joshua: "some are blinking, some just snap on, and some have a fade.
+   * There are just different behaviors happening for each one."
+   *
+   * He was right, and the CSS was never the problem — there is one bubble
+   * element, so every step shares the same rules. The variation came from
+   * here. render() removed .is-visible and then added it back after settle(),
+   * with NOTHING guaranteeing the fade-out had finished in between. settle()
+   * takes as long as the anchor takes to stop moving: a step that scrolls
+   * gives it 400ms and you see a real fade, a step whose anchor is already
+   * still returns in four frames — so the fade-out was interrupted about 60ms
+   * in, at roughly 77% opacity, and reversed. That dip is the blink, and its
+   * depth varied per step, which is why no two looked alike.
+   *
+   * Measured on the deployed build across an eight-step run: six blinks that
+   * never faded below 0.77, and two genuine fades.
+   *
+   * So visibility is now a sequence rather than two class changes that race:
+   * fade fully OUT, and only then move, rebuild and fade back IN. Every step
+   * goes through it, including a re-home. */
+  function fadeOut(cb) {
+    if (!ui) return;
+    const bubble = ui.bubble;
+
+    // Already hidden — the first step, or a step that follows a dropped one.
+    // Nothing to wait for, and waiting would add a pause before the tour
+    // even appears.
+    if (!bubble.classList.contains('is-visible')) { cb(); return; }
+
+    let done = false;
+    function settled() {
+      if (done) return;
+      done = true;
+      bubble.removeEventListener('transitionend', onEnd);
+      clearTimeout(guard);
+      cb();
+    }
+    // Only opacity. The transform finishes alongside it and would fire this
+    // twice.
+    function onEnd(e) { if (e.propertyName === 'opacity') settled(); }
+
+    bubble.addEventListener('transitionend', onEnd);
+    // transitionend does not fire if the element is display:none, if the tab
+    // is backgrounded, or if reduced-motion has removed the transition
+    // entirely. The tour must never stall waiting for an event that is not
+    // coming.
+    const guard = setTimeout(settled, 260);
+
+    bubble.classList.remove('is-visible');
+  }
+
+  function fadeIn() {
+    if (!running || !ui) return;
+    // Flush the layout so the browser has actually painted the bubble at its
+    // NEW position while still transparent. Without this the position change
+    // and the opacity change are batched into one style recalculation, the
+    // browser sees no "before" state to animate from, and the bubble snaps
+    // on at full opacity instead of fading.
+    void ui.bubble.offsetHeight;
+    requestAnimationFrame(function () {
+      if (running && ui) ui.bubble.classList.add('is-visible');
+    });
+  }
+
   /* Move the spotlight and the bubble onto wherever the anchor is NOW.
    * Deliberately does no scrolling and rebuilds nothing, so it is safe to
    * call from a scroll handler. */
@@ -434,21 +499,24 @@ window.Tour = (function () {
         Math.abs(r.top - homeRect.top) < 24 &&
         Math.abs(r.left - homeRect.left) < 24) return;
 
-    ui.bubble.classList.remove('is-visible');
     const tall = r.height > window.innerHeight * 0.7;
-    node.scrollIntoView({ block: tall ? 'start' : 'center', behavior: 'smooth' });
 
-    settle(step, function (live) {
-      if (!running || !ui || !live) return;
-      const rr = live.getBoundingClientRect();
-      ui.spot.style.top = rr.top + 'px';
-      ui.spot.style.left = rr.left + 'px';
-      ui.spot.style.width = rr.width + 'px';
-      ui.spot.style.height = rr.height + 'px';
-      place(ui.bubble, rr);
-      homeRect = { top: rr.top, left: rr.left };
-      requestAnimationFrame(function () {
-        if (running && ui) ui.bubble.classList.add('is-visible');
+    // Exactly the same sequence render() uses, so a content shift is
+    // indistinguishable from arriving at the step.
+    fadeOut(function () {
+      if (!running || !ui) return;
+      node.scrollIntoView({ block: tall ? 'start' : 'center', behavior: 'smooth' });
+
+      settle(step, function (live) {
+        if (!running || !ui || !live) return;
+        const rr = live.getBoundingClientRect();
+        ui.spot.style.top = rr.top + 'px';
+        ui.spot.style.left = rr.left + 'px';
+        ui.spot.style.width = rr.width + 'px';
+        ui.spot.style.height = rr.height + 'px';
+        place(ui.bubble, rr);
+        homeRect = { top: rr.top, left: rr.left };
+        fadeIn();
       });
     });
   }
@@ -480,68 +548,69 @@ window.Tour = (function () {
     // under it — off the screen. Align such an anchor to the top instead.
     const tall = node.getBoundingClientRect().height > window.innerHeight * 0.7;
 
-    // Fade out BEFORE moving. A bubble that travels across the screen while
-    // fully opaque is the thing that reads as jumpy; one that is already gone
-    // can be repositioned for free.
-    ui.bubble.classList.remove('is-visible');
-    node.scrollIntoView({ block: tall ? 'start' : 'center', behavior: 'smooth' });
+    /* Fade out COMPLETELY before anything moves. The scroll is deliberately
+     * inside the callback: a bubble that travels across the screen while
+     * still partly opaque is the thing that reads as jumpy, and starting the
+     * scroll alongside the fade meant the two overlapped by however long the
+     * fade happened to take. */
+    fadeOut(function () {
+      if (!running || !ui) return;
+      node.scrollIntoView({ block: tall ? 'start' : 'center', behavior: 'smooth' });
 
-    /* Measure only once the ANCHOR has stopped moving — see settle(). It
-     * hands back the anchor as it exists at that moment, which is not
-     * necessarily the element we scrolled to: switching tabs makes app.js
-     * rebuild the pane, so `node` above is often detached by now. Using the
-     * stale reference is how the bubble ended up measuring a rectangle of
-     * zeros and pinning itself to the corner. */
-    settle(step, function (live) {
-      if (!running) return;
+      /* Measure only once the ANCHOR has stopped moving — see settle(). It
+       * hands back the anchor as it exists at that moment, which is not
+       * necessarily the element we scrolled to: switching tabs makes app.js
+       * rebuild the pane, so `node` above is often detached by now. Using the
+       * stale reference is how the bubble ended up measuring a rectangle of
+       * zeros and pinning itself to the corner. */
+      settle(step, function (live) {
+        if (!running) return;
 
-      // The anchor never came back — the pane no longer contains it. Drop the
-      // step rather than pointing at nothing.
-      if (!live) { steps.splice(i, 1); render(); return; }
+        // The anchor never came back — the pane no longer contains it. Drop
+        // the step rather than pointing at nothing.
+        if (!live) { steps.splice(i, 1); render(); return; }
 
-      const r = live.getBoundingClientRect();
+        const r = live.getBoundingClientRect();
 
-      ui.spot.style.top = r.top + 'px';
-      ui.spot.style.left = r.left + 'px';
-      ui.spot.style.width = r.width + 'px';
-      ui.spot.style.height = r.height + 'px';
+        ui.spot.style.top = r.top + 'px';
+        ui.spot.style.left = r.left + 'px';
+        ui.spot.style.width = r.width + 'px';
+        ui.spot.style.height = r.height + 'px';
 
-      ui.bubble.innerHTML = '';
-      ui.bubble.appendChild(progressRow());
-      ui.bubble.appendChild(el('div', 'tour-title', step.title));
-      ui.bubble.appendChild(el('p', 'tour-body', step.body));
+        ui.bubble.innerHTML = '';
+        ui.bubble.appendChild(progressRow());
+        ui.bubble.appendChild(el('div', 'tour-title', step.title));
+        ui.bubble.appendChild(el('p', 'tour-body', step.body));
 
-      const actions = el('div', 'tour-actions');
-      if (i > 0) {
-        const back = el('button', 'btn btn-quiet', 'Back');
-        back.onclick = function () { i--; render(); };
-        actions.appendChild(back);
-      }
-      const skip = el('button', 'btn btn-quiet', 'Skip');
-      skip.onclick = function () { finish(); };
-      actions.appendChild(skip);
-      actions.appendChild(el('span', 'tour-spacer'));
+        const actions = el('div', 'tour-actions');
+        if (i > 0) {
+          const back = el('button', 'btn btn-quiet', 'Back');
+          back.onclick = function () { i--; render(); };
+          actions.appendChild(back);
+        }
+        const skip = el('button', 'btn btn-quiet', 'Skip');
+        skip.onclick = function () { finish(); };
+        actions.appendChild(skip);
+        actions.appendChild(el('span', 'tour-spacer'));
 
-      const next = el('button', 'btn btn-primary',
-        i === steps.length - 1 ? 'Done' : 'Next');
-      next.onclick = function () {
-        if (i === steps.length - 1) return finish();
-        i++; render();
-      };
-      actions.appendChild(next);
-      ui.bubble.appendChild(actions);
+        const next = el('button', 'btn btn-primary',
+          i === steps.length - 1 ? 'Done' : 'Next');
+        next.onclick = function () {
+          if (i === steps.length - 1) return finish();
+          i++; render();
+        };
+        actions.appendChild(next);
+        ui.bubble.appendChild(actions);
 
-      // Place while still invisible, then fade in on the next frame so the
-      // browser has a painted "before" state to transition from.
-      place(ui.bubble, r);
-      homeRect = { top: r.top, left: r.left };
-      requestAnimationFrame(function () {
-        if (running) ui.bubble.classList.add('is-visible');
+        // Placed while still fully invisible, so the move is never seen.
+        place(ui.bubble, r);
+        homeRect = { top: r.top, left: r.left };
+        fadeIn();
+
+        // preventScroll: focusing a button the browser thinks is out of view
+        // scrolls to it, which is another way back into the loop above.
+        next.focus({ preventScroll: true });
       });
-
-      // preventScroll: focusing a button the browser thinks is out of view
-      // scrolls to it, which is another way back into the loop above.
-      next.focus({ preventScroll: true });
     });
   }
 
@@ -694,7 +763,7 @@ window.Tour = (function () {
      * at where the anchor used to be until something incidental jogged it.
      *
      * Observing #app catches exactly that, and it is cheap — one callback
-     * when a pane changes size, feeding the re-home path below. */
+     * when a pane changes size, feeding the re-home path above. */
     if (window.ResizeObserver) {
       reflowObs = new ResizeObserver(function () { onContentReflow(); });
       const app = document.getElementById('app');
