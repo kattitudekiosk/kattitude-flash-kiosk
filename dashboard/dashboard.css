@@ -360,6 +360,45 @@ p.muted { line-height: 1.5; margin: 0 0 12px; }
 .design-title { font-weight: 600; margin-bottom: 2px; }
 .status { margin-top: 6px; }
 
+/* ── Flash sale event photos ────────────────────────────────────────────
+ *
+ * flash-sales.js builds .sale-media / .media-strip / .media-item /
+ * .media-thumb / .tier-x, and NONE of them had a rule anywhere. An
+ * <img class="media-thumb"> therefore rendered at its natural size — a
+ * 1320x1615 photo grew the card straight off the side of the screen.
+ *
+ * Not a demo-only problem: the first real photo Kat added to a sale would
+ * have done the same thing.
+ *
+ * 96px to match .design-thumb, which is already this app's answer to "how big
+ * is a thumbnail". Fixed px rather than a percentage, because a percentage of
+ * a flex row gives one answer for a single photo and a different one for six,
+ * and a strip of thumbnails should not resize itself as it fills up. */
+.media-strip { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+
+/* relative so the remove button can sit ON the image; line-height 0 so the
+ * inline image leaves no descender gap beneath itself. */
+.media-item { position: relative; flex: 0 0 auto; line-height: 0; }
+
+.media-thumb {
+  display: block;
+  width: 96px; height: 96px;
+  object-fit: cover;
+  background: var(--surface);
+  border-radius: 0;
+}
+
+/* A "×" was inheriting .btn's 48px minimum and 12px/16px padding — a primary
+ * action's touch target wrapped around a delete affordance. */
+.tier-x {
+  min-height: 0;
+  padding: 4px 9px;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.media-item .tier-x { position: absolute; top: 4px; right: 4px; }
+
 /* ── Toast ──────────────────────────────────────────────────────────────── */
 .toast {
   position: fixed;
