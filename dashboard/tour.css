@@ -9,6 +9,7 @@
  * LAYER ORDER, and it is the whole reason these numbers look odd:
  *
  *     #topbar        20     the header. Always on top of the tour.
+ *     .who-menu      30     the header's own overflow panel
  *     .tour-spot     19     the highlight
  *     #tabs          19     tied on purpose - see below
  *     .tour-veil     15     the dimming
@@ -61,7 +62,42 @@
   background: #fff;
   padding: 16px;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+
+  /* ── THE FADE ──────────────────────────────────────────────────────
+   * Joshua: "when I'm scrolling through the tutorial bubbles, they are a
+   * bit jumpy... I want you to fade them in. Make sure that when you
+   * scroll, that fade is clean."
+   *
+   * Hidden by default and revealed by .is-visible, which tour.js adds only
+   * AFTER the smooth scroll has finished and the bubble has been measured
+   * and placed. That ordering is the actual fix. The old code measured the
+   * anchor two animation frames in — about 32ms into a scroll that runs
+   * 300-500ms — so it read the element's position mid-flight and pinned the
+   * bubble to where the card USED to be. The jump you saw was the
+   * correction. Fading a wrong position in slowly would only have made the
+   * mistake more visible; the opacity here is what hides the measurement,
+   * not what hides the jump.
+   *
+   * top and left ease too, so a bubble that stays on screen between two
+   * steps glides to the new anchor rather than teleporting. */
+  opacity: 0;
+  transition: opacity 200ms ease,
+              top 240ms cubic-bezier(.22, .61, .36, 1),
+              left 240ms cubic-bezier(.22, .61, .36, 1);
 }
+
+.tour-bubble.is-visible { opacity: 1; }
+
+/* WHILE A SCROLL OR RESIZE IS ACTUALLY IN PROGRESS, easing the position is
+ * exactly wrong. tour.js repositions every frame during a drag, and a 240ms
+ * ease on top of per-frame updates means the bubble is permanently chasing
+ * the thing it is supposed to be pointing at — it lags behind the thumb and
+ * the tail drifts off its anchor. So the class is added on the first reflow
+ * and dropped ~140ms after the last one: pinned to the anchor while moving,
+ * eased again once still. The opacity transition survives, because nothing
+ * about scrolling should make the bubble flicker. */
+.tour-bubble.is-tracking { transition: opacity 200ms ease; }
+.tour-spot.is-tracking { transition: none; }
 
 .tour-bubble::after {
   content: '';
@@ -158,6 +194,16 @@
 /* Same for the bubble itself: it takes tabIndex="-1" so it can be announced,
  * and a dialog outline around the whole card is pure noise. */
 .tour-bubble:focus { outline: none; }
+
+/* Somebody who has asked their phone not to animate things should not be
+ * given a fade and a glide. The bubble still appears — .is-visible still
+ * flips opacity — it just arrives at once. */
+@media (prefers-reduced-motion: reduce) {
+  .tour-bubble,
+  .tour-bubble.is-tracking,
+  .tour-spot,
+  .tour-veil { transition: none; }
+}
 
 /* ── The persistent "?" ───────────────────────────────────────────
  * Bottom corner, always there, never dismissed. One tap walks the screen you
