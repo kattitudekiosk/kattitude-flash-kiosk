@@ -230,6 +230,41 @@
     return this.filters.every(function (f) { return r[f[0]] === f[1]; });
   };
 
+  /* ── Identity swap behind "View as artist" ─────────────────────────────
+   * Joshua wanted the toggle to actually become an artist — Kat as admin,
+   * Barbie as artist — rather than showing the owner's own dashboard with the
+   * admin tabs hidden, which is all view-as.js does on its own.
+   *
+   * DEMO ONLY. It is done here, in the fake backend, precisely so that
+   * view-as.js — which the studio depends on — is not touched.
+   *
+   * ROLE STAYS 'admin', AND THAT IS NOT A MISTAKE. view-as.js paints its own
+   * button with `btn.hidden = !isAdmin()`, and isAdmin() reads this row's
+   * role. Hand it an artist and the toggle hides itself the moment you use
+   * it, with no way back short of clearing storage. So the row keeps the
+   * admin role — which is what keeps the button on screen — and view-as.js
+   * goes on forcing role:'artist' onto its own copy for the tour, exactly as
+   * it does in production. Everything else about the identity is Barbie's,
+   * including the id, which is what makes My Designs show her work. */
+  var VIEW_AS_KEY = 'kt-view-as-artist';
+  var ARTIST_PERSONA_ID = 'a-2';   // Barbie
+
+  function viewingAsArtist() {
+    try { return window.localStorage.getItem(VIEW_AS_KEY) === '1'; }
+    catch (e) { return false; }
+  }
+
+  function personaFor(row) {
+    if (!viewingAsArtist()) return row;
+    var persona = null;
+    (DB.artists || []).forEach(function (a) { if (a.id === ARTIST_PERSONA_ID) persona = a; });
+    if (!persona) return row;
+    var out = clone(persona);
+    out.auth_user_id = row.auth_user_id;   // still the signed-in session
+    out.role = 'admin';                    // see the note above — load-bearing
+    return out;
+  }
+
   Query.prototype._run = function () {
     var self = this;
     DB[this.t] = DB[this.t] || [];
@@ -258,6 +293,14 @@
     } else {
       out = table.filter(function (r) { return self._match(r); })
                  .map(function (r) { return attach(clone(r), self.t, self.sel); });
+      /* "Who am I" is the only query the persona applies to — an artists
+       * lookup filtered by auth_user_id. The roster query is untouched, so the
+       * Artists tab still lists everybody exactly once and Barbie does not
+       * appear twice. */
+      if (self.t === 'artists' &&
+          self.filters.some(function (f) { return f[0] === 'auth_user_id'; })) {
+        out = out.map(personaFor);
+      }
       if (this.ord) {
         var c = this.ord.col, asc = this.ord.asc;
         out.sort(function (a, b) {
@@ -325,6 +368,12 @@
     user: { id: DEMO_USER_ID, email: 'demo@demo.invalid', aud: 'authenticated', role: 'authenticated' },
   };
 
+  /* Both restart paths clear the persona too. Starting a fresh demo halfway
+   * into somebody else's identity would be a confusing first impression. */
+  function clearPersona() {
+    try { window.localStorage.removeItem(VIEW_AS_KEY); } catch (e) {}
+  }
+
   var auth = {
     getSession: function () { return Promise.resolve({ data: { session: SESSION }, error: null }); },
     getUser: function () { return Promise.resolve({ data: { user: SESSION.user }, error: null }); },
@@ -336,6 +385,7 @@
       /* Signing out of a demo means starting it over, not stranding somebody
        * on a login screen they cannot pass. */
       DB = seed();
+      clearPersona();
       setTimeout(function () { window.location.reload(); }, 50);
       return Promise.resolve({ error: null });
     },
@@ -409,6 +459,25 @@
     if (real && real.indexOf(PROJECT_REF) === -1) {
       try { PROJECT_REF = new URL(real).hostname.split('.')[0]; writeSession(); } catch (e) {}
     }
+
+    /* view-as.js flips its flag and re-paints in place — it never reloads,
+     * because in production nothing about WHO you are has changed. Here it
+     * has, and `me` was read once at sign-in, so without a reload the header
+     * would still say Kat while the tabs behaved like Barbie's. Reloading is
+     * the honest way to re-read identity, and it costs nothing: the demo's
+     * whole database is rebuilt in a millisecond.
+     *
+     * Matched on the button's own text rather than an id or class, so a
+     * change to view-as.js's markup cannot silently break this. */
+    document.addEventListener('click', function (e) {
+      var el = e.target && e.target.closest && e.target.closest('button');
+      if (!el) return;
+      var t = (el.textContent || '').trim().toLowerCase();
+      if (t === 'view as artist' || t === 'back to admin view') {
+        setTimeout(function () { window.location.reload(); }, 60);
+      }
+    }, true);
+
     var shared = createClient();
     window.DashClient = {
       client: function () { return Promise.resolve(shared); },
@@ -417,5 +486,7 @@
   });
 
   window.supabase = { createClient: createClient };
-  window.KATTITUDE_DEMO = { reset: function () { DB = seed(); window.location.reload(); } };
+  window.KATTITUDE_DEMO = {
+    reset: function () { clearPersona(); DB = seed(); window.location.reload(); },
+  };
 })();
