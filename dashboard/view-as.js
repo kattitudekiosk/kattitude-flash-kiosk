@@ -120,9 +120,18 @@ window.ViewAs = (function () {
     btn.className = 'btn btn-quiet viewas';
     btn.hidden = true;
     btn.onclick = function () { set(!asArtist, { announce: true }); };
-    // Before Sign out, so the destructive control stays last.
-    var out = document.getElementById('signOut');
-    if (out) who.insertBefore(btn, out); else who.appendChild(btn);
+
+    /* Append, never insertBefore(signOut). topbar-menu.js folds the header's
+     * controls into an overflow panel, so by the time this runs Sign out is
+     * usually no longer a child of .who — and insertBefore with a reference
+     * node that is not a child throws NotFoundError, which would kill this
+     * whole function and take the toggle with it.
+     *
+     * Appending here puts the button in .who; the menu's observer sees it and
+     * moves it into the panel on the next tick. Sign out still comes last —
+     * #signOut carries `order: 99` in dashboard.css, so the destructive
+     * control stays at the bottom regardless of what order things arrive in. */
+    who.appendChild(btn);
   }
 
   /** Called once the dashboard has signed someone in. */
