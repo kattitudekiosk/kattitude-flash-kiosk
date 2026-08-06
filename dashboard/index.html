@@ -52,16 +52,13 @@
        flash-sales.js, which takes this tab's click handler after app.js has
        bound its own — app.js has no renderer for this view.
 
-       ── STAGE 1 SCAFFOLDING. Removed for stage 2. Do not build on this. ──
-       The dashboard reads as it did before flash sales existed, so the
-       feature can then "arrive" and trigger its own short walkthrough.
-
-       This works ONLY because tour.js checks whether a tab is genuinely on
-       screen before walking into it. The first attempt at this staging did
-       nothing: switchView() checked tab.hidden, app.js removes that
-       attribute for admins, and the tour clicked the invisible tab and
-       taught the step during the very run meant to withhold it. -->
-  <button class="tab admin-only" data-view="flashsales" hidden style="display:none">Flash Sales</button>
+       HOW TO WITHHOLD A FEATURE FOR A TUTORIAL TEST, since the obvious way
+       used not to work: add an inline display:none here. That hides the tab
+       from the tour as well as from the eye, but ONLY because tour.js now
+       checks whether a tab is genuinely on screen before walking into it.
+       Before that fix it clicked straight through and taught the step during
+       the very run meant to withhold it. -->
+  <button class="tab admin-only" data-view="flashsales" hidden>Flash Sales</button>
   <button class="tab admin-only" data-view="review" hidden>Review</button>
 </nav>
 
