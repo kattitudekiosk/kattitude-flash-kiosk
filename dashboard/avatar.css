@@ -25,12 +25,26 @@
   user-select: none;
 }
 
+/* NO PINK RIM AROUND A PHOTO.
+ * The monogram background is what makes the initials legible, but it sits
+ * directly behind the image. A 50% radius is antialiased, so the outermost
+ * sub-pixel ring of .avatar-img is partly transparent and the pink shows
+ * through as a hairline outline — read as a border, and it isn't one.
+ * When a photo is present there are no initials to make legible, so the
+ * bright fill has no job left to do. */
+.avatar:has(.avatar-img) { background: #111111; }
+
 .avatar-sm { width: 36px;  height: 36px;  font-size: 15px; }
 .avatar-md { width: 56px;  height: 56px;  font-size: 22px; }
 .avatar-lg { width: 104px; height: 104px; font-size: 40px; }
 
 /* The image sits ON TOP of the initials rather than replacing them, so a
- * failed load uncovers the monogram instead of leaving a hole. */
+ * failed load uncovers the monogram instead of leaving a hole.
+ *
+ * The scale is the belt to :has()'s braces — it pushes the antialiased edge
+ * of the image outside the circular clip, so no rim can show even where
+ * :has() is unsupported. Cover cropping means the extra fraction of a
+ * percent is never noticed. */
 .avatar-img {
   position: absolute;
   inset: 0;
@@ -38,6 +52,7 @@
   height: 100%;
   object-fit: cover;
   display: block;
+  transform: scale(1.03);
 }
 
 .avatar-initials { pointer-events: none; }
