@@ -42,6 +42,10 @@
 
 <nav id="tabs" hidden>
   <button class="tab is-active" data-view="upload">Upload</button>
+  <!-- Label is rewritten to "All Designs" for admins by all-designs-label.js.
+       The pane itself has always shown every artist's work to an admin — the
+       query carries no artist filter and RLS decides the rows — so this is a
+       labelling fix, not a new view. -->
   <button class="tab" data-view="designs">My Designs</button>
   <!-- Deliberately NOT admin-only: artists use this tab to ask, admins use
        the same tab to answer. -->
@@ -158,8 +162,13 @@
      view-as.js anyway, so the panel exists by the time that button arrives
      and the toggle never flashes in the bar first. -->
 <script src="topbar-menu.js"></script>
-<!-- view-as.js LAST: it rebinds the "?" so help answers with whichever script
-     the current view calls for, and the last binding is the one that wins. -->
+<!-- view-as.js LAST among the behavioural scripts: it rebinds the "?" so help
+     answers with whichever script the current view calls for, and the last
+     binding is the one that wins. -->
 <script src="view-as.js"></script>
+<!-- Label-only, and it reads the role pill that view-as.js rewrites, so it
+     goes after it — that way the tab is right on first paint rather than
+     corrected a frame later. -->
+<script src="all-designs-label.js"></script>
 </body>
 </html>
