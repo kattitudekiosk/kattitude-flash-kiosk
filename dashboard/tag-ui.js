@@ -15,6 +15,16 @@
  * So they are separated. The bar says what the design is. The icon opens what
  * it could be.
  *
+ * TAGGING IS OPTIONAL. This file used to tell an untagged design "Add one
+ * before it can go on the kiosk", which was true of a Postgres trigger that
+ * has since been dropped — it was stopping artists uploading at all. Joshua:
+ * "they shouldn't be forced to do that. They should be able to just upload
+ * the designs, and they can add categories or remove the categories later."
+ * The "Not tagged yet" marker stays, because somebody has to be able to spot
+ * an untagged design and tag it later. What is gone is the claim that it is
+ * blocking anything: an untagged design appears under See All on the kiosk
+ * exactly like any other, it simply matches no category filter until tagged.
+ *
  * THE PATTERN IS BORROWED, NOT INVENTED. This is the Platform Console Tray
  * from canyouseeus/thelostandunfounds — .claude/skills/bento-design/SKILL.md:
  *
@@ -240,22 +250,20 @@
       }
       toggle.setAttribute('aria-label', 'Change categories');
     } else {
-      /* NOT AN ERROR. A design with no categories is the ordinary state of
-       * something uploaded thirty seconds ago. An empty row would read as
-       * broken, so it says what is missing and what to do — and stops, which
-       * is tour.js's rule 7: "Name the thing, say what to do, stop." The
-       * reason a published design cannot lose its last category is left to
-       * the refusal that fires at the moment somebody hits it, in app.js's
-       * own toast, where it is an answer rather than an unprompted argument.
-       * That refusal is real and it is not this client's: CLAUDE.md, DATABASE
-       * RULE — "the 'cannot publish without a category' gate is a Postgres
-       * trigger, not a UI check." */
+      /* NOT AN ERROR, AND NOT A BLOCKER. A design with no categories is the
+       * ordinary state of something uploaded thirty seconds ago, and it is a
+       * perfectly valid state to leave it in — it publishes, and it shows on
+       * the kiosk under See All. The marker exists so an untagged design is
+       * findable by whoever tags it later, not to nag the person who made it.
+       * So it names the state, says what a category would BUY them, and
+       * stops, which is tour.js's rule 7: "Name the thing, say what to do,
+       * stop." */
       var prompt = el('button', 'tagbar-empty');
       prompt.type = 'button';
       prompt.appendChild(el('span', 'tagbar-empty-lead', 'Not tagged yet'));
       prompt.appendChild(el('span', 'tagbar-empty-note', isDesign
-        ? 'Add one before it can go on the kiosk.'
-        : 'Tag it, or save it as a draft.'));
+        ? 'It still shows under See All. A category helps people find it.'
+        : 'Tag it now, or later — either way it uploads.'));
       prompt.onclick = function () { toggle.click(); };
       bar.appendChild(prompt);
       toggle.setAttribute('aria-label', 'Add a category');
@@ -273,11 +281,11 @@
      * and "Request a new category…" all keep working untouched. */
     panel.appendChild(groups);
 
-    if (isDesign && applied.length === 1 && card.querySelector('.pill.ok')) {
-      panel.appendChild(el('div', 'tagpanel-note',
-        'This one is published, so it has to keep at least one category. ' +
-        'Add another before you take this one off.'));
-    }
+    /* There used to be a note here warning that a published design had to
+     * keep its last category. It does not: the trigger that enforced that is
+     * gone and app.js no longer refuses the removal, so the note would be
+     * describing a rule that no longer exists. Taking every category off a
+     * published design is allowed, and leaves it showing under See All. */
 
     var foot = el('div', 'tagpanel-foot');
     var done = el('button', 'btn btn-quiet', 'Done');
@@ -328,26 +336,49 @@
     closeAll(null);
   });
 
-  /* One tutorial step describes the control this file just replaced:
-   * upload-tagging said "Tap the chips on a file to tag it". The id is
-   * deliberately left alone — tour.js: "IDS ARE PERMANENT. Renaming one makes
-   * the step unseen for the entire shop and everybody gets taught it again.
-   * Change the copy freely; leave the id." Only the copy moves.
+  /* Two tutorial steps describe categories, and both were written against a
+   * control or a rule this file has since changed:
    *
-   * It is patched through Tour._steps from here rather than edited in
-   * tour.js, for the same reason everything else in this file is a bolt-on.
-   * If you are already in tour.js for another reason, move it inline and
-   * delete this. */
+   *   upload-tagging          said "Tap the chips on a file to tag it" — the
+   *                           chips moved behind the tag button.
+   *   designs-needs-category  said "A design needs a category / Nothing goes
+   *                           on the kiosk untagged" — no longer true. The
+   *                           trigger enforcing it was dropped on 17 Aug 2026
+   *                           and app.js no longer refuses an untagged
+   *                           publish. Teaching a rule that is gone is worse
+   *                           than teaching nothing: tour.js, "A STEP IS A
+   *                           PROMISE. Only teach what the database will
+   *                           actually allow."
+   *
+   * The ids are deliberately left alone — tour.js: "IDS ARE PERMANENT.
+   * Renaming one makes the step unseen for the entire shop and everybody gets
+   * taught it again. Change the copy freely; leave the id." Only the copy
+   * moves.
+   *
+   * Patched through Tour._steps from here rather than edited in tour.js, for
+   * the same reason everything else in this file is a bolt-on. THE STRINGS IN
+   * tour.js ARE STILL THE OLD ONES — if you are already in tour.js for another
+   * reason, move both of these inline, delete this function, and the source
+   * stops disagreeing with what people actually read. */
   function fixTourCopy() {
     var steps = window.Tour && window.Tour._steps && window.Tour._steps.artist;
     if (!steps) return false;
     var hit = false;
     steps.forEach(function (s) {
-      if (s.id !== 'upload-tagging') return;
-      s.body = 'Categories are how a customer finds you. Tap the tag button ' +
-        'on a file to open the list and pick what fits — or tag the whole ' +
-        'batch at once from the top.';
-      hit = true;
+      if (s.id === 'upload-tagging') {
+        s.body = 'Categories are how a customer finds you. Tap the tag button ' +
+          'on a file to open the list and pick what fits — or tag the whole ' +
+          'batch at once from the top. You can also skip it and tag later.';
+        hit = true;
+      }
+      if (s.id === 'designs-needs-category') {
+        s.title = 'Tag it whenever you like';
+        s.body = 'Categories are not required. Upload first and tag later if ' +
+          'that is easier — an untagged design still shows under See All on ' +
+          'the kiosk. A category just puts it in front of somebody browsing ' +
+          'for that kind of thing.';
+        hit = true;
+      }
     });
     return hit;
   }
