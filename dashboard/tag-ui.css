@@ -1,0 +1,262 @@
+/* Category tagging — the collapsed bar and the expandable picker card.
+ *
+ * Additive, and kept in its own file so the whole thing can be reverted by
+ * deleting two <link> lines and one <script> line. Nothing here overrides
+ * layout in dashboard.css; the one thing it does reach back for is the
+ * selected-chip fill, and that is a contrast fix explained where it happens.
+ *
+ * CONSTRUCTION IS THE LOST+UNFOUNDS'. COLOUR IS KATTITUDE'S.
+ * Joshua: "It should be matching The Lost And Unfounds' design style, but
+ * with the Kattitude branding... I'm not talking about the black background.
+ * I'm saying it's not noir style. I'm just talking about the components, the
+ * way the components are built."
+ *
+ * So what crosses over from canyouseeus/thelostandunfounds is structure:
+ *
+ *   - SEPARATION BY SURFACE TONE, NEVER BY AN OUTLINE. no-border-design:
+ *     "Use these alternatives for visual separation: bg-white/5 or bg-white/10
+ *     background differences; spacing." The picker card is a different tone
+ *     from the card it sits in, and that is the whole of its edge.
+ *   - NO SHADOWS. bento-design: "Shadows: None. Never use shadow-* ... Hover
+ *     feedback is -translate-y-0.5 / scale-[1.01] / a surface-tone change."
+ *   - AN INVERTED ACTIVE STATE, NOT A RING. bento-design's tray icon button:
+ *     "Active state inverts to solid white + scales up 110% — never a border,
+ *     underline, or ring." Here it inverts to Kattitude deep pink.
+ *   - 10px / 0.2em MICRO-LABELS. bento-design: "Small labels/metadata should
+ *     use text-[10px] with wide tracking (tracking-[0.2em])."
+ *   - LEFT ALIGNED, ALWAYS. noir-design: "All body text MUST be text-left."
+ *   - THE ENTER ANIMATION, VERBATIM. bento-design's tray card is
+ *     opacity 0 → 1, y 8px → 0, 150ms. Those exact numbers are below.
+ *
+ * And the surface ladder, translated out of black and into this palette:
+ *
+ *   | L+U            | here                    | used for                |
+ *   |----------------|-------------------------|-------------------------|
+ *   | bg-black       | #ffffff  --bg           | the card                |
+ *   | bg-white/5     | #f6f6f7  --surface      | the picker card, the    |
+ *   |                |                         | icon button at rest     |
+ *   | bg-white/10    | #ececef  --raised       | hover                   |
+ *   | bg-white/black | #C2156F  --pink-deep    | applied, and open       |
+ *
+ * CONTRAST, stated as CLAUDE.md requires:
+ *   white on #C2156F .................... 5.78:1   applied chip, open icon
+ *   #17171a on #f6f6f7 .................. 16.56:1  picker body text
+ *   #6b6b74 on #ffffff .................. 5.28:1   the "not tagged yet" prompt
+ *   #6b6b74 on #f6f6f7 .................. 4.88:1   micro-labels in the picker
+ *   #17171a on #ffffff .................. 17.89:1  icon at rest
+ * No new colour is introduced. Every value above is already in the palette
+ * table in CLAUDE.md or in dashboard.css's :root.
+ *
+ * NO ROUNDED CORNERS ANYWHERE IN THIS FILE, including the icon button. See
+ * square.css — the dashboard's corners are square as of 17 Aug 2026 and the
+ * only survivors are circles.
+ */
+
+:root {
+  /* One step above --surface, for hover. The rest of the ladder already
+     exists in dashboard.css. */
+  --raised: #ececef;
+}
+
+/* ── The field ──────────────────────────────────────────────────────────── */
+
+.tagfield { margin: 12px 0 0; }
+
+.tagbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ── What this design IS ────────────────────────────────────────────────
+ * Shown, not offered — a span, not a button. The one control in the bar is
+ * the icon, so there is nothing here that looks tappable and is not.
+ *
+ * Deliberately NOT .chip: that class carries a 40px minimum height for a
+ * touch target it does not need, and at eleven categories those 40px rows
+ * are most of what made the old list tall. */
+.chip-applied,
+.chip-more {
+  display: inline-block;
+  padding: 5px 9px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 0;
+}
+
+.chip-applied {
+  background: var(--pink-deep);
+  color: #fff;                  /* 5.78:1 */
+}
+
+.chip-more {
+  background: var(--surface);
+  color: var(--muted);          /* 4.88:1 */
+  cursor: pointer;
+}
+
+.chip-more:hover { background: var(--raised); }
+.chip-more:focus { outline: none; }
+.chip-more:focus-visible { outline: 3px solid var(--pink); outline-offset: 2px; }
+
+/* ── Nothing applied yet ────────────────────────────────────────────────
+ * A quiet prompt in place of the empty row, so a fresh upload does not read
+ * as broken. It is a button, because the sentence tells you to tap. */
+.tagbar-empty {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);          /* 5.28:1 on the card */
+  text-align: left;
+  cursor: pointer;
+}
+
+.tagbar-empty-lead {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.tagbar-empty-note { display: block; margin-top: 2px; }
+
+.tagbar-empty:focus { outline: none; }
+.tagbar-empty:focus-visible { outline: 3px solid var(--pink); outline-offset: 2px; }
+
+/* ── The icon ───────────────────────────────────────────────────────────
+ * The whole of the ask: "it should just be an icon that you can open up".
+ * 44px because this is used one-handed on a phone between clients, which is
+ * the same reason .tab and .btn carry minimums. */
+.tagtoggle {
+  flex: 0 0 auto;
+  margin-left: auto;            /* always the last thing on the row */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  background: var(--surface);
+  color: var(--text);           /* 17.89:1 at rest */
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 300ms ease-out,
+              color 300ms ease-out,
+              transform 300ms ease-out;
+}
+
+/* Hover and press are a tone change plus a lift — never a shadow. */
+.tagtoggle:hover { background: var(--raised); transform: translateY(-1px); }
+.tagtoggle:active { transform: scale(0.96); }
+
+/* Open inverts and scales up, which is the tray's own active state. */
+.tagtoggle.is-on {
+  background: var(--pink-deep);
+  color: #fff;                  /* 5.78:1 */
+  transform: scale(1.1);
+}
+
+.tagtoggle:focus { outline: none; }
+.tagtoggle:focus-visible { outline: 3px solid var(--pink); outline-offset: 2px; }
+
+/* ── The expandable card ────────────────────────────────────────────────
+ * Collapsed by default — that is the point — and it opens in place, directly
+ * under the bar it belongs to, rather than as a modal. A modal would be a
+ * second surface to dismiss and would hide the artwork you are tagging.
+ *
+ * max-height plus its own scroll is not a nicety: the list of categories
+ * grows every time an artist asks for a theme, and this is the thing that
+ * stops it ever pushing the page around again.
+ *
+ * hidden, not a height animation, for the closed state. A collapsed element
+ * that is merely 0px tall still holds tabbable buttons, so a keyboard user
+ * walks into a picker they cannot see. display:none does not. */
+.tagpanel {
+  margin-top: 8px;
+  padding: 16px;
+  background: var(--surface);
+  max-height: 70vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  text-align: left;
+}
+
+.tagpanel[hidden] { display: none; }
+
+/* opacity 0 → 1, y 8px → 0, 150ms — bento-design's tray card, unchanged. */
+.tagpanel-in { animation: tagpanel-in 150ms ease-out; }
+
+@keyframes tagpanel-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.tagpanel-head { margin-bottom: 12px; }
+
+.tagpanel-title,
+.tagpanel .kindlabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* The picker itself is app.js's own .kindgroups markup, moved in here whole.
+   Only its rhythm is restated. */
+.tagpanel .kindgroups { display: block; }
+.tagpanel .kindgroup { margin: 0 0 16px; }
+.tagpanel .kindgroup:last-of-type { margin-bottom: 0; }
+.tagpanel .chips { margin: 6px 0 0; }
+
+.tagpanel-note {
+  margin-top: 12px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.tagpanel-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.tagpanel-foot .btn { flex: 1 1 auto; }
+
+/* ── One contrast fix, reaching back into dashboard.css ─────────────────
+ * .chip.is-on ships as white on --pink #E91E8C, which measures 4.18:1 —
+ * under AA for 13px text, and CLAUDE.md says so itself: "White on primary
+ * pink is 4.18:1 — too thin for a large fill." --pink-deep is the token that
+ * exists for exactly this job: "Deep pink #C2156F — card fills behind white
+ * text (5.78:1)". Same shape, same behaviour, legible.
+ *
+ * This also keeps a selected chip inside the picker and an applied chip in
+ * the bar the same colour, which is the point — they are the same fact. */
+.chip.is-on {
+  background: var(--pink-deep);
+  border-color: var(--pink-deep);
+}
+
+/* Somebody who has asked their phone not to animate things gets the card,
+   just without the rise. */
+@media (prefers-reduced-motion: reduce) {
+  .tagpanel-in { animation: none; }
+  .tagtoggle { transition: none; }
+  .tagtoggle:hover { transform: none; }
+}

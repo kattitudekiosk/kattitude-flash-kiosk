@@ -11,6 +11,13 @@
 <link rel="stylesheet" href="requests.css" />
 <link rel="stylesheet" href="avatar.css" />
 <link rel="stylesheet" href="tour.css" />
+<!-- The collapsed tag bar and its expandable picker. Additive; deleting this
+     line and the tag-ui.js script below restores the old chip list. -->
+<link rel="stylesheet" href="tag-ui.css" />
+<!-- LAST ON PURPOSE. square.css is the one place corner radius is decided
+     for this app — a blanket reset plus an explicit list of the things that
+     stay circular. Moving it earlier lets a later !important win. -->
+<link rel="stylesheet" href="square.css" />
 </head>
 <body>
 
@@ -156,6 +163,13 @@
 <!-- tour.js watches for the top bar unhiding, so it loads late and does not
      need app.js to know it exists. -->
 <script src="tour.js"></script>
+<!-- tag-ui.js collapses the category chips behind one icon and moves the
+     picker into an expandable card. It watches #app for the panes app.js
+     renders, so app.js does not know it exists either — same arrangement as
+     everything else in this block. It must load AFTER tour.js: it rewrites
+     the copy of one tutorial step through Tour._steps, and that object has to
+     exist first. -->
+<script src="tag-ui.js"></script>
 <!-- topbar-menu.js folds the header's controls into an overflow panel. It
      watches .who rather than assuming it runs last, so it does not care that
      view-as.js adds its button after sign-in — but it is placed before
