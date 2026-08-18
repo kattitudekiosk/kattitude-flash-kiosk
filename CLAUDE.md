@@ -78,6 +78,8 @@ Live URLs live in `LINKS.md`. Keep it current.
 | **Dashboard** Supabase URL, key, image spec | `dashboard/config.js` |
 | Dashboard headshot upload + crop confirm | `dashboard/avatar.js`, `dashboard/my-avatar.js` |
 | Dashboard guided tutorial (per role) | `dashboard/tour.js`, `dashboard/tour.css` |
+| Dashboard category tagging (collapsed chips + picker) | `dashboard/tag-ui.js`, `dashboard/tag-ui.css` |
+| Dashboard corner radius — the only place it is decided | `dashboard/square.css` |
 | Seed/placeholder content | `seed/`, `assets/seed/` (gitignored — never commit) |
 | Deploy helper | `tools/deploy-preview.sh` |
 
@@ -376,8 +378,10 @@ State the ratio when you commit a colour. **[CORRECTED]** ink on logo yellow is
 
 ### No rounded corners — and the two exceptions, both measured
 
-Corners are square. There are exactly **two** recorded exceptions, and they are
-recorded precisely so that neither becomes a precedent for a third:
+Corners are square. There are exactly **two** recorded exceptions on the kiosk,
+and exactly two on the dashboard — see the re-sweep note below for the
+dashboard's pair. They are recorded precisely so that none of them becomes a
+precedent for a fifth:
 
 1. **QR container tiles.** Rounded because Joshua asked, and because rounding
    the white *container* cannot affect decoding — only rounding the finder
@@ -396,12 +400,90 @@ recorded precisely so that neither becomes a precedent for a third:
    see what is being kept because the mask *is* the crop.
 
    **Scope: avatars and nothing else.** This is not licence to round buttons,
-   tiles, chips or cards. If a third exception is ever wanted, it goes in this
-   list with its reason, or it does not happen.
+   tiles, chips or cards. If a further exception is ever wanted, it goes in
+   this list with its reason, or it does not happen.
 
-**The dashboard is exempt from the kiosk canvas** and from the no-borders and
-no-rounded-corners rules. It is a phone tool, not wall furniture. Never apply
-invariant 2 to `dashboard/`.
+#### Re-swept 17 Aug 2026 — the dashboard is no longer exempt
+
+**[CORRECTED 17 Aug 2026]** The paragraph below used to exempt `dashboard/`
+from this rule outright, and the dashboard drifted accordingly: cards at 10px,
+buttons and inputs at 8px, thumbnails at 6px, pills and chips at 999px, the
+toast and the overflow menu at 10px. Joshua: *"get rid of all the rounded
+corners... we're not supposed to have rounded corners on this website at all,
+except for the profile pictures and the question mark for the helper. I'm
+talking about the squares on the site... if there are circles, leave those
+alone."*
+
+So the exception list is **exactly two items per surface**:
+
+| Surface | Exception 1 | Exception 2 |
+|---|---|---|
+| Kiosk | QR container tiles | artist headshots |
+| Dashboard | artist headshots | the round `?` help button |
+
+Plus one clause, which is not an exception: **a circle stays a circle.** The
+tour's progress dots, the new-feature dot on a tab, and the top bar's `...`
+overflow button are round because they are dots and a round button — not
+because a rectangle was softened. Each is listed by name in
+`dashboard/square.css` so the list is arguable rather than accidental. A pill
+is **not** a circle: `.pill` and `.chip` shipped at `border-radius: 999px` and
+are now square, which is the most visible change on the screen.
+
+**`dashboard/square.css` is now the only place corner radius is decided** for
+the dashboard — a blanket `border-radius: 0 !important` plus that named
+allowlist, loaded last in `dashboard/index.html`. It is a reset rather than a
+per-declaration edit for two reasons: radius can also arrive inline from
+JavaScript, where no stylesheet edit can reach it, and a per-declaration sweep
+drifts back the moment somebody adds a component. The consequence, written down
+so nobody is confused later: the `border-radius` declarations still sitting in
+`dashboard.css`, `requests.css`, `avatar.css` and `tour.css` are **dead
+letters**. Delete them when you are next in those files for another reason; do
+not try to fix what is on screen by editing them. `tour.css`'s comment on
+`#howThisWorks` also still says the dashboard is exempt from this rule
+outright — that is now wrong, and the button is a recorded exception in its
+own right.
+
+**The kiosk was not touched by this sweep and has not been re-audited.**
+
+**The dashboard is exempt from the kiosk canvas, and from the no-borders rule
+only.** It is a phone tool, not wall furniture — so it keeps its 1px `--line`
+separators, and invariant 2 must never be applied to `dashboard/`. It is
+**not** exempt from no-rounded-corners; see the sweep above. **[CORRECTED
+17 Aug 2026]** — this paragraph previously granted both exemptions in one
+breath, which is how the drift started.
+
+### Component construction follows THE LOST+UNFOUNDS — construction only
+
+Joshua, 17 Aug 2026: *"It should be matching The Lost And Unfounds' design
+style, but with the Kattitude branding"*, and then, which is the important
+half: *"I'm not talking about the black background. I'm saying it's not noir
+style. I'm just talking about the components, the way the components are
+built."*
+
+So the reference is `canyouseeus/thelostandunfounds`, specifically
+`.claude/skills/bento-design`, `.claude/skills/no-border-design` and
+`.claude/skills/noir-design` — and what crosses over is **structure, not
+palette**. Kattitude keeps black, white, pink and yellow. Do not import the
+monochrome ladder, `bg-white/5`, or a black page ground.
+
+What to bring across:
+
+- **Separation by surface tone and spacing, not by an outline or a shadow.**
+- **Icon-only tool trays.** "A console tray is icon-only, never a row of
+  always-visible controls. Each icon expands its own focused card on tap."
+  `dashboard/tag-ui.js` is the worked example.
+- **An inverted active state, never a ring.** In L+U that is solid white plus
+  `scale-110`; here it is deep pink plus `scale-110`.
+- **10px micro-labels at `0.2em` tracking**, uppercase, left aligned.
+- **The expandable-card enter animation, verbatim:** opacity 0 → 1,
+  y 8px → 0, 150ms.
+- **No shadows on new components.** Hover is a tone change plus a 1px lift.
+
+One live tension, unresolved and deliberately not acted on: `no-border-design`
+is the *authority* in L+U and would retire every `1px solid var(--line)` in the
+dashboard. That is a much bigger visual change than has been asked for, and
+this file still exempts the dashboard from the no-borders rule. **Do not
+retire the dashboard's borders without Joshua saying so in those words.**
 
 ## ONBOARDING AND HELP
 
@@ -596,3 +678,6 @@ are settled:
   separate from `designs` so this stays open
 - Whether the Follow panel should show the artist's face at all, or whether the
   QR alone is cleaner at 1080 wide — defaulted to showing it, at 160px
+- Whether the dashboard's `1px solid var(--line)` borders should be retired to
+  match `no-border-design` — **unanswered**, and not to be acted on without
+  Joshua saying so; see DESIGN RULES
