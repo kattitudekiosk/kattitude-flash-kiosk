@@ -80,6 +80,7 @@ Live URLs live in `LINKS.md`. Keep it current.
 | Dashboard guided tutorial (per role) | `dashboard/tour.js`, `dashboard/tour.css` |
 | Dashboard category tagging (collapsed chips + picker) | `dashboard/tag-ui.js`, `dashboard/tag-ui.css` |
 | Dashboard corner radius — the only place it is decided | `dashboard/square.css` |
+| Dashboard palette — the only place it is decided | `dashboard/dashboard.css`, and the PALETTE RULE below |
 | Seed/placeholder content | `seed/`, `assets/seed/` (gitignored — never commit) |
 | Deploy helper | `tools/deploy-preview.sh` |
 
@@ -337,6 +338,12 @@ while after a push. Checking it too early shows the old file and looks exactly
 like a fix that did not work. The per-deployment URL is always the build you
 mean.
 
+**ONE BUILD AT A TIME, AND SAY WHICH.** Joshua on a branch preview and an
+artist on the stable dashboard URL are looking at different code, and every
+inconsistency between them gets reported as a bug in the code rather than a
+difference between deployments. When work lands, say plainly which URL now
+serves it and which does not yet.
+
 ## ALWAYS SHIP A LINK RULE
 
 Every deployment, build, or deliverable is reported **with its URL**, every
@@ -358,6 +365,43 @@ time, without being asked. No exceptions.
   what you are giving.**
 
 ## DESIGN RULES
+
+### THE PALETTE RULE — white ground, black type, pink accent, yellow sparingly
+
+**[ADDED 17 Aug 2026, after the third time of asking.]** This was never
+written down, so it kept being a matter of interpretation, and the dashboard
+drifted back to a dark header three separate times. It is a rule now.
+
+Joshua, verbatim: *"Why do you keep adding this black background and dark gray
+at the top? That's not the brand colors or styling. It needs to look more
+consistent with the sign-in link for the magic link. I told you it should be
+predominantly a white background. Black is just for the text. It's a minimal
+highlight."*
+
+- **WHITE / near-white is the ground and every surface.** The page, the cards,
+  the header, the tab strip, the menus, the toast.
+- **BLACK is TYPE.** It is not a background. There is no black slab anywhere:
+  no masthead, no dark grey identity strip, no black tab bar. If a region of
+  the screen reads as predominantly dark, it is wrong.
+- **PINK is the accent, small and deliberate.** The active tab and its
+  underline, primary buttons, the eyebrow label, the role pill. `#E91E8C`
+  for accents; `#C2156F` under white text, because white on `#E91E8C` is
+  4.18:1 and too thin for a fill.
+- **YELLOW is a highlight, sparingly.** Never a heading colour, never a fill
+  behind a slab.
+
+**THE REFERENCE SCREEN IS THE DASHBOARD'S SIGN-IN CARD** — white card, black
+type, a pink eyebrow, one pink button. It has always been right. Every other
+surface is that card repeated. Before changing any colour in `dashboard/`, go
+and look at the sign-in screen, and make the thing you are building look like
+it belongs on the same page.
+
+**This is not licence to retire the dashboard's borders**, which is a separate
+and still-open question — see the end of this section.
+
+**Scope:** `dashboard/` above all, because that is where it keeps drifting.
+The kiosk's ground is already `--paper` white and must stay that way; the
+one dark surface in the whole product is the attract loop, which is video.
 
 | Token | Value | Use |
 |---|---|---|
@@ -448,7 +492,8 @@ own right.
 **The dashboard is exempt from the kiosk canvas, and from the no-borders rule
 only.** It is a phone tool, not wall furniture — so it keeps its 1px `--line`
 separators, and invariant 2 must never be applied to `dashboard/`. It is
-**not** exempt from no-rounded-corners; see the sweep above. **[CORRECTED
+**not** exempt from no-rounded-corners; see the sweep above. It is **not**
+exempt from the palette rule; see above that. **[CORRECTED
 17 Aug 2026]** — this paragraph previously granted both exemptions in one
 breath, which is how the drift started.
 
@@ -464,7 +509,9 @@ So the reference is `canyouseeus/thelostandunfounds`, specifically
 `.claude/skills/bento-design`, `.claude/skills/no-border-design` and
 `.claude/skills/noir-design` — and what crosses over is **structure, not
 palette**. Kattitude keeps black, white, pink and yellow. Do not import the
-monochrome ladder, `bg-white/5`, or a black page ground.
+monochrome ladder, `bg-white/5`, or a black page ground. That last one is not
+a style preference, it is the PALETTE RULE above, and it has cost three
+rounds of rework already.
 
 What to bring across:
 
@@ -514,6 +561,12 @@ a loop that undid every attempt to scroll; and centring an anchor taller than
 the viewport, which puts its bottom edge, and the bubble pinned under it,
 below the fold. Reposition on scroll, never re-render; align tall anchors to
 the top; clamp the bubble inside the viewport.
+
+**A step is a promise, and a dropped rule makes a liar of it.** When a
+business rule changes, the tutorial copy that taught it is part of the change.
+`designs-needs-category` went on saying "Nothing goes on the kiosk untagged"
+after the trigger enforcing that was dropped — and because ids are permanent,
+the fix is to rewrite the copy under the same id, never to rename it.
 
 **A pane that starts visible will flash.** `dashboard/index.html` hides every
 pane and lets `app.js` reveal the right one. The sign-in pane once shipped
@@ -568,6 +621,11 @@ The draft quoted PRD numbers rather than the code. Actual geometry at 1080:
 Sparse states: singles-only renders a plain grid; sheets-only follows
 invariant 4.
 
+**An untagged design is not a hidden design.** It appears under See All like
+any other published design; it simply matches no category filter until
+somebody tags it. Say that plainly in any copy that mentions tagging — the
+dashboard spent a fortnight implying the opposite.
+
 ## ATTRACT LOOP
 
 One reel of video clips and flash stills **woven together** — not two modes
@@ -598,8 +656,25 @@ hand-written SQL files and never SQL for Joshua to paste.
 3. **Query the result back** to verify it landed.
 4. Run `get_advisors` after DDL and fix what it flags.
 
-Business rules belong in the database where a client cannot bypass them — the
-"cannot publish without a category" gate is a Postgres trigger, not a UI check.
+Business rules belong in the database where a client cannot bypass them.
+
+**[CORRECTED 17 Aug 2026]** This section used to give "the 'cannot publish
+without a category' gate is a Postgres trigger, not a UI check" as the worked
+example. **That gate is gone.** `designs_publish_gate` and
+`designs_require_category_to_publish()` were dropped because they were
+stopping artists uploading at all — five had signed in and the only designs in
+the database were Joshua's two test files. Joshua: *"they shouldn't be forced
+to do that. They should be able to just upload the designs, and they can add
+categories or remove the categories later."* **Do not re-add it.** Tagging is
+optional, at upload and afterwards, and an untagged design publishes fine.
+
+The principle survives; the example is replaced with `artists_guard`, which is
+real and still there. And the lesson worth keeping is the one this file's own
+staleness taught: **a rule that has been dropped from the database has to be
+dropped from the copy in the same change.** `dashboard/tag-ui.js` quoted the
+sentence above verbatim to justify telling artists "Add one before it can go
+on the kiosk", so a trigger that no longer existed went on being enforced in
+prose. When you drop a constraint, grep for what taught it.
 
 **Triggers can silently cancel each other.** `claim_artist_row()` ran during
 signup, tripped `artists_guard`, and the guard reset the very column the claim
@@ -640,6 +715,12 @@ leaves every other column alone — so `portrait_url`, `portrait_thumb_url` and
   be connected; check rather than assume. You can confirm markup, endpoints,
   bytes and decoded output; you cannot confirm that a page paints. When the
   last mile needs eyes, say so plainly.
+- **npm is reachable, so DOM logic is testable without a browser.** `jsdom`
+  installs and runs the dashboard's bolt-on scripts against the DOM `app.js`
+  builds, which is how the tag picker's collapse is checked on both a staged
+  file and a saved design. It proves structure and copy, never pixels — and a
+  harness like that needs a negative control that fails with the script
+  removed, or it is asserting nothing.
 - **Terminal on the Mac is off the table.** Joshua is usually not at the shop.
   Prefer paths that need no Terminal.
 
@@ -681,3 +762,6 @@ are settled:
 - Whether the dashboard's `1px solid var(--line)` borders should be retired to
   match `no-border-design` — **unanswered**, and not to be acted on without
   Joshua saying so; see DESIGN RULES
+- Whether a logo mark belongs in the dashboard header next to the KATTITUDE
+  wordmark — Joshua has asked for it; **no asset path exists** under
+  `dashboard/`, so it is waiting on the file rather than on a decision
