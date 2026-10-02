@@ -5,11 +5,10 @@
  * catching the direct uploads to the desktop folder?" Until now only the
  * dashboard could add designs. This makes the folder itself an upload route:
  *
- *   KIOSK MEDIA/<Artist>/Designs/<file>   shape decides: a square at least
- *                                         2048 wide is a single, anything
- *                                         else at least 1080 wide a sheet
- *   KIOSK MEDIA/<Artist>/Sheets/<file>    always a flash sheet (for square
- *                                         sheets, which would read as singles)
+ *   KIOSK MEDIA/<Artist>/Flash/<file>     exactly 2048×2048 → a single;
+ *                                         anything else → a flash sheet
+ *   (the old Designs/ and Sheets/ folders are migrated into Flash/ — see
+ *   migrateLegacy below)
  *
  * Same rules as dashboard uploads (CLAUDE.md invariant 3): the file Joshua
  * dropped is the original and is NEVER modified or moved; the wall shows a
@@ -48,10 +47,15 @@ function dims(file) {
 }
 
 /* Same decision the dashboard makes (classify() in dashboard/app.js). */
-function classify(w, h, forceSheet) {
-  if (forceSheet) return w >= MIN_SHEET_W || h >= MIN_SHEET_W ? 'sheet' : null;
-  if (w === h) return w >= SPEC.design.w ? 'design' : null;
-  return w >= MIN_SHEET_W ? 'sheet' : null;
+/* [CHANGED 2 Oct 2026 — Joshua approved: one drop folder per artist.]
+ * A file in <Artist>/Flash is a SINGLE only if it is exactly 2048×2048 — the
+ * size the spec demands of singles. Anything else is a FLASH SHEET, as long
+ * as its long side is at least 1080 (the wall's width); smaller is skipped.
+ * A square sheet can no longer turn into a single by being in the wrong
+ * folder — which is what happened to Sheet IV in Miranda/Designs. */
+function classify(w, h) {
+  if (w === SPEC.design.w && h === SPEC.design.h) return 'design';
+  return Math.max(w, h) >= MIN_SHEET_W ? 'sheet' : null;
 }
 
 function sips(args) { execFileSync('/usr/bin/sips', args, { stdio: 'ignore' }); }
@@ -82,11 +86,11 @@ function titleOf(name) {
   return name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-/* Every loose image under <Artist>/Designs and <Artist>/Sheets. */
+/* Every loose image in <Artist>/Flash (subfolders are dashboard uploads and _kiosk copies). */
 function scanFiles(media, artistsByFolder) {
   const found = [];
   for (const [folder, artist] of Object.entries(artistsByFolder)) {
-    for (const [sub, forceSheet] of [['Designs', false], ['Sheets', true]]) {
+    for (const sub of ['Flash']) {
       const dir = path.join(media, folder, sub);
       let entries = [];
       try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (e) { continue; }
@@ -94,7 +98,7 @@ function scanFiles(media, artistsByFolder) {
         if (!e.isFile() || e.name.startsWith('.') || !EXT.test(e.name)) continue;
         const full = path.join(dir, e.name);
         const st = fs.statSync(full);
-        found.push({ artist, folder, sub, name: e.name, full, forceSheet,
+        found.push({ artist, folder, sub, name: e.name, full,
                      rel: path.join(folder, sub, e.name).split(path.sep).join('/'),
                      sig: `${st.size}-${Math.floor(st.mtimeMs)}`, mtimeMs: st.mtimeMs });
       }
@@ -103,27 +107,87 @@ function scanFiles(media, artistsByFolder) {
   return found;
 }
 
-function kioskDir(media, f) { return path.join(media, f.folder, f.sub, '_kiosk', slug(f.name)); }
-
+/* The storage route for the flash bucket maps <artist id>/<rest> onto
+ * KIOSK MEDIA/<Artist>/Flash/<rest>, so the wall's copy of Flash/<file> is
+ * Flash/_kiosk/<file>/kiosk.jpg. */
 function urlFor(f, file) {
-  /* The storage route for the flash bucket maps <artist id>/<rest> onto
-   * KIOSK MEDIA/<Artist>/Designs/<rest>. Sheets/ sits beside Designs/, so
-   * its copies are reached through Designs/../Sheets — safePath would refuse
-   * '..', so Sheets copies are written under Designs/_kiosk-sheets instead. */
-  const sub = f.sub === 'Designs' ? '_kiosk' : '_kiosk-sheets';
-  return `/storage/v1/object/public/flash/${f.artist.id}/${sub}/${slug(f.name)}/${file}`;
+  return `/storage/v1/object/public/flash/${f.artist.id}/_kiosk/${slug(f.name)}/${file}`;
 }
-function outDir(media, f) {
-  return f.sub === 'Designs' ? kioskDir(media, f)
-    : path.join(media, f.folder, 'Designs', '_kiosk-sheets', slug(f.name));
+function outDir(media, f) { return path.join(media, f.folder, 'Flash', '_kiosk', slug(f.name)); }
+
+/* ── Migration from the old Designs/ + Sheets/ layout ────────────────────
+ * Run before every scan, so it also catches a file somebody drops into a
+ * re-created old folder. Moves EVERYTHING into Flash/ — loose originals and
+ * dashboard-upload subfolders alike (their URLs are flash/<id>/<upload>/…,
+ * which now resolve under Flash/, so they keep working). Nothing is deleted
+ * except the old generated _kiosk copies, which are rebuilt from the
+ * originals, and an exact duplicate. A different file with a taken name is
+ * kept under a new name, never overwritten. A moved original's database row
+ * is re-pointed (same design id) and re-imported. */
+const LEGACY = ['Designs', 'Sheets'];
+
+function sameFile(a, b) {
+  const sa = fs.statSync(a), sb = fs.statSync(b);
+  if (sa.size !== sb.size) return false;
+  return fs.readFileSync(a).equals(fs.readFileSync(b));
+}
+function freeName(dir, name, tag) {
+  const ext = path.extname(name), base = name.slice(0, name.length - ext.length);
+  let n = `${base} (from ${tag})${ext}`, i = 2;
+  while (fs.existsSync(path.join(dir, n))) n = `${base} (from ${tag} ${i++})${ext}`;
+  return n;
+}
+
+function migrateLegacy(conn, media, byFolder) {
+  const moved = [];
+  const now = Date.now();
+  for (const folder of Object.keys(byFolder)) {
+    const flash = path.join(media, folder, 'Flash');
+    for (const old of LEGACY) {
+      const dir = path.join(media, folder, old);
+      let entries;
+      try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (e) { continue; }
+      fs.mkdirSync(flash, { recursive: true });
+      for (const e of entries) {
+        const from = path.join(dir, e.name);
+        if (e.name === '.DS_Store') { fs.rmSync(from, { force: true }); continue; }
+        if (e.isDirectory() && /^_kiosk/.test(e.name)) {          // generated: rebuilt from originals
+          fs.rmSync(from, { recursive: true, force: true }); continue;
+        }
+        if (e.isFile() && now - fs.statSync(from).mtimeMs < SETTLE_MS) continue;   // still copying
+        let name = e.name;
+        let to = path.join(flash, name);
+        if (fs.existsSync(to)) {
+          if (e.isFile() && fs.statSync(to).isFile() && sameFile(from, to)) {
+            fs.rmSync(from, { force: true });                     // exact duplicate
+            log(`removed duplicate ${folder}/${old}/${e.name} (identical copy already in Flash/)`);
+            continue;
+          }
+          name = freeName(flash, e.name, old);
+          to = path.join(flash, name);
+        }
+        fs.renameSync(from, to);
+        const oldRel = `${folder}/${old}/${e.name}`, newRel = `${folder}/Flash/${name}`;
+        if (e.isFile()) {
+          conn.prepare('UPDATE designs SET source_file = ?, source_sig = NULL WHERE source_file = ?').run(newRel, oldRel);
+        }
+        log(`moved ${oldRel} → ${newRel}`);
+        moved.push([oldRel, newRel]);
+      }
+      try {
+        if (!fs.readdirSync(dir).length) fs.rmdirSync(dir);
+      } catch (e) { /* not empty yet (a file still copying); next pass */ }
+    }
+  }
+  return moved;
 }
 
 function importOne(conn, media, f) {
   const { w, h } = dims(f.full);
-  const type = classify(w, h, f.forceSheet);
+  const type = classify(w, h);
   if (!type) {
     log(`skipped ${f.rel}: ${w}×${h} is too small for the wall ` +
-        `(singles need a square at least 2048 wide; sheets at least ${MIN_SHEET_W} wide)`);
+        `(a single must be exactly 2048×2048; a sheet at least ${MIN_SHEET_W} on its long side)`);
     return null;
   }
   const dir = outDir(media, f);
@@ -158,6 +222,7 @@ function syncOnce(conn) {
     const artists = db.all(conn, 'artists');
     const byFolder = {};
     artists.forEach(a => { const f = storage.folderName(a.name); if (f) byFolder[f] = a; });
+    result.moved = migrateLegacy(conn, media, byFolder);
     const files = scanFiles(media, byFolder);
     const now = Date.now();
     const present = new Set(files.map(f => f.rel));

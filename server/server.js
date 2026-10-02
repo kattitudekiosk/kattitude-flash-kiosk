@@ -3,7 +3,7 @@
  *
  * One Node process, no npm dependencies, holding:
  *   - the database   (SQLite, <data>/kattitude.db)
- *   - every photo    (~/Desktop/KIOSK MEDIA/<Artist>/Designs|Headshots)
+ *   - every photo    (~/Desktop/KIOSK MEDIA/<Artist>/Flash|Headshots)
  *   - sign-in        (one-time links → long-lived sessions)
  *   - the kiosk and the dashboard themselves, served from this repo
  *

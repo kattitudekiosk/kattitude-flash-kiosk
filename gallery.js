@@ -227,6 +227,12 @@ window.KIOSK_ROUTER = (function () {
    * Three or four large targets read faster from across a room than a dozen
    * small ones, and it keeps the cover fixed regardless of roster size. */
   function renderCover() {
+    /* Read the LIVE catalog every time the cover is drawn — the same source
+     * the Artists page counts from. It used to draw from `snap`, the copy
+     * taken at the last refresh callback, so a catalog reloaded any other way
+     * left the cover a refresh behind the Artists page (Joshua, 2 Oct 2026:
+     * "it's right on the artist page but the cover page is wrong"). */
+    if (window.Catalog && window.Catalog.snapshot) snap = window.Catalog.snapshot();
     view.name = 'cover';
     view.artistId = null;
     view.categories = [];

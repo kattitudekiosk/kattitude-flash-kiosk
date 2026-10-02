@@ -1,0 +1,23 @@
+HOW TO PUT FLASH ON THE WALL
+============================
+
+Drop the picture into the artist's  Flash  folder:
+
+    KIOSK MEDIA / <Artist name> / Flash /
+
+That's it. It shows on the wall within about a minute, under that artist
+and in View All.
+
+  - Exactly 2048 x 2048 pixels  ->  a single design
+  - Anything else               ->  a flash sheet
+  - Very small pictures (under 1080 pixels on the long side) are skipped.
+
+Your file is never changed. The wall uses a resized copy that lives in the
+_kiosk folder next to it - leave _kiosk alone.
+
+To take something off the wall, delete (or move out) the file.
+
+Headshots go in  <Artist name> / Headshots  (set from the dashboard).
+
+The old "Designs" and "Sheets" folders are gone. Anything put in a folder
+with one of those names is moved into Flash automatically.

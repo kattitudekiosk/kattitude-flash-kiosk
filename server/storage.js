@@ -1,6 +1,6 @@
 /* Studio server — file storage on the Mac mini's disk
  *
- *   ~/Desktop/KIOSK MEDIA/<Artist>/Designs|Headshots/…  (see init() below)
+ *   ~/Desktop/KIOSK MEDIA/<Artist>/Flash|Headshots/…  (see init() below)
  *
  * Same URL shape as Supabase Storage, so the dashboard's upload / list /
  * remove / getPublicUrl calls need no change:
@@ -31,7 +31,7 @@ const { storageWrite, BUCKETS } = require('./policy');
  * "KIOSK MEDIA", one subfolder per artist, so the studio can see and back up
  * its own work in Finder:
  *
- *   ~/Desktop/KIOSK MEDIA/<Artist name>/Designs/…     flash bucket
+ *   ~/Desktop/KIOSK MEDIA/<Artist name>/Flash/…       flash bucket (was Designs/)
  *   ~/Desktop/KIOSK MEDIA/<Artist name>/Headshots/…   avatars bucket
  *   ~/Desktop/KIOSK MEDIA/Flash Sales/…               sale-media bucket
  *
@@ -40,7 +40,7 @@ const { storageWrite, BUCKETS } = require('./policy');
  * renames their folder (renameArtistFolder) so nothing is orphaned. */
 let MEDIA = null;
 let artistName = () => null;
-const SUB = { flash: 'Designs', avatars: 'Headshots' };
+const SUB = { flash: 'Flash', avatars: 'Headshots' };   // Flash/ was Designs/ until 2 Oct 2026
 
 function folderName(name) {
   return String(name || '').replace(/[\/:\0]/g, '-').replace(/^\.+/, '').trim() || null;
@@ -60,7 +60,7 @@ function ensureArtistFolders(names) {
   for (const n of names) {
     const f = folderName(n);
     if (!f) continue;
-    for (const s of Object.values(SUB).concat(['Sheets'])) fs.mkdirSync(path.join(MEDIA, f, s), { recursive: true });
+    for (const s of Object.values(SUB)) fs.mkdirSync(path.join(MEDIA, f, s), { recursive: true });
   }
 }
 
@@ -95,7 +95,7 @@ function safePath(bucket, p) {
       segs.some(s => !s || s === '.' || s === '..' || s.startsWith('.') || !/^[A-Za-z0-9._-]+$/.test(s))) {
     throw httpError(400, 'Invalid file path', 'InvalidKey');
   }
-  /* flash/<artist_id>/rest → KIOSK MEDIA/<Name>/Designs/rest; sale-media keeps
+  /* flash/<artist_id>/rest → KIOSK MEDIA/<Name>/Flash/rest; sale-media keeps
    * its sale-id folder inside Flash Sales. */
   const base = bucketDir(bucket, segs[0]);
   const rest = bucket === 'sale-media' ? segs : segs.slice(1);
