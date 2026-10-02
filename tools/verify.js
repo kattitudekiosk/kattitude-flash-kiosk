@@ -62,7 +62,7 @@ async function boot(configOverride, mutateCatalog) {
 
   const order = [
     'assets/lib/qrcode.js', 'config.js', 'data.js', 'seed/seed-data.js',
-    'catalog.js', 'gallery.js', 'script.js',
+    'catalog.js', 'screensaver.js', 'gallery.js', 'script.js',
   ];
 
   // One eval, not one per file. Top-level `const` inside an eval is scoped to
@@ -199,6 +199,72 @@ function tap(window, node) {
     check('index.html loads no seed script', !/seed\/seed-data\.js/.test(html));
     const vi = fs.readFileSync(path.join(ROOT, '.vercelignore'), 'utf8');
     check('seed/ does not ship to Vercel', /^seed\/$/m.test(vi) && /^assets\/seed\/$/m.test(vi));
+  }
+
+  /* ══ 1e. ATTRACT LOOP: fair, resumable, reshuffled on change ═════════════
+   * Joshua, 2 Oct 2026: resume where the loop was; reshuffle and restart when
+   * designs change; "always equal for artists to get their work seen". */
+  console.log('\nattract loop: fair across artists, resumes, reshuffles on change');
+  {
+    const fairOK = (list) => {
+      // every artist once per round, never the same artist twice running
+      const artists = [...new Set(list.map(i => i.artistId))];
+      const n = artists.length;
+      if (list.length % n) return false;
+      for (let r = 0; r < list.length / n; r++) {
+        const round = list.slice(r * n, r * n + n).map(i => i.artistId);
+        if (new Set(round).size !== n) return false;
+      }
+      return list.every((i, k) => k === 0 || i.artistId !== list[k - 1].artistId);
+    };
+    const items = [];
+    for (let k = 0; k < 5; k++) items.push({ artistId: 'A', image: 'a' + k });
+    items.push({ artistId: 'B', image: 'b0' });
+    for (let k = 0; k < 2; k++) items.push({ artistId: 'C', image: 'c' + k });
+
+    const w = await boot({ catalogSource: 'seed' });
+    const order = w.Screensaver._fairOrder(items, 12345);
+    const count = id => order.filter(i => i.artistId === id).length;
+    check('every artist gets the same number of turns', count('A') === 5 && count('B') === 5 && count('C') === 5,
+      ['A', 'B', 'C'].map(count).join('/'));
+    check('one turn per artist per round, never back to back', fairOK(order));
+    check('...and that check fails on a plain artist-by-artist list (it can fail)', !fairOK(items));
+    check('every design of the biggest portfolio is shown each loop',
+      new Set(order.filter(i => i.artistId === 'A').map(i => i.image)).size === 5);
+    check('same seed gives the same order (needed to resume)',
+      JSON.stringify(w.Screensaver._fairOrder(items, 12345)) === JSON.stringify(order));
+    check('a different seed gives a different order (a real reshuffle)',
+      JSON.stringify(w.Screensaver._fairOrder(items, 999)) !== JSON.stringify(order));
+
+    const pl = w.Screensaver._playlist();
+    check('with no video clips the reel still plays every artist\'s work', pl.length > 0 && pl.every(p => p.kind === 'still'),
+      pl.length + ' items');
+    const st = w.Screensaver._loop();
+    check('loop state saved to localStorage', !!w.localStorage.getItem('kt-attract-v1') && st && st.pos === 0);
+
+    // "Reload": a fresh page that finds the saved state for the same catalog.
+    const saved = JSON.parse(w.localStorage.getItem('kt-attract-v1'));
+    saved.pos = 7;
+    const w2 = await boot({ catalogSource: 'seed' }, (cat, win) => {
+      win.localStorage.setItem('kt-attract-v1', JSON.stringify(saved));
+    });
+    w2.Screensaver._playlist();
+    check('after a reload the loop resumes at the saved position', w2.Screensaver._loop().pos === 7 &&
+      w2.Screensaver._loop().seed === saved.seed, JSON.stringify(w2.Screensaver._loop()).slice(0, 80));
+    w2.Screensaver.start(w2.document.body);
+    check('starting the screensaver begins at that position, not at 0', w2.Screensaver._pos() === 7,
+      'pos ' + w2.Screensaver._pos());
+    w2.Screensaver.stop();
+
+    // A catalog change (the stored fingerprint no longer matches).
+    const stale = Object.assign({}, saved, { fp: 'a different set of designs', seed: 1, pos: 7 });
+    const w3 = await boot({ catalogSource: 'seed' }, (cat, win) => {
+      win.localStorage.setItem('kt-attract-v1', JSON.stringify(stale));
+    });
+    w3.Screensaver._playlist();
+    const s3 = w3.Screensaver._loop();
+    check('when the designs change, the loop reshuffles and restarts at 0', s3.pos === 0 && s3.seed !== 1,
+      JSON.stringify(s3).slice(0, 80));
   }
 
   /* ══ 2. SEED — full hybrid experience ═══════════════════════════════════ */

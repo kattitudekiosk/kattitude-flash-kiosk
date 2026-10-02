@@ -777,7 +777,19 @@ that alternate. Configured in `config.js` under `screensaver`.
   pointed at a URL may re-request its media; on an idle kiosk that is the
   difference between ~2.7 GB/month and ~540 GB/month of egress, silently.
   `Screensaver.netFetches()` exists so a test can assert it never climbs.
-- **Zero clips = today's sheet slideshow, on the original code path.**
+- **[CHANGED 2 Oct 2026 — Joshua: "picks up from the last position ... continuous
+  loop ... whenever new designs are added I want you to shuffle the playlist and
+  restart the loop ... always equal for artists to get their work seen."]**
+  Zero clips now plays a STILLS-ONLY reel of every published design and sheet
+  (the old 4-sheet cycle never showed artists' work at all). The order is
+  **equal turns per artist**: built in rounds, one slot per artist per round
+  (studio sheets count as one more), shuffled from a seed, never the same
+  artist twice running. Seed, position and a catalog fingerprint live in
+  `localStorage` (`kt-attract-v1`): the loop resumes where it stopped across
+  idles, reloads and server restarts, and reshuffles from 0 when the set of
+  designs changes. `tools/verify.js` section 1e, with negative controls.
+- (history) Zero clips = today's sheet slideshow, on the original code path —
+  now only when there is nothing at all to show.
   A clip that fails to load is marked dead for the session and skipped, never
   retried in a loop.
 
