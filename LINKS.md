@@ -4,7 +4,29 @@ Every live URL for the Kattitude flash gallery, in one place. Joshua works
 from his phone and should never have to dig back through a conversation for a
 link. **Update this file whenever a URL changes.**
 
-Last updated: 5 August 2026
+Last updated: 2 October 2026
+
+---
+
+## 🖥️ MAC MINI STUDIO SERVER — branch `mac-mini-storage`
+
+The studio's data and photos on the kiosk Mac mini (`server/README.md`).
+**Not on the wall yet** — the wall still shows production below.
+
+| | |
+|---|---|
+| Branch | `mac-mini-storage` (off `main` @ `94826a6`) |
+| Kiosk, served by the Mac mini | http://localhost:8787 — **on the Mac mini only** |
+| Dashboard, served by the Mac mini | http://localhost:8787/dashboard/ — **on the Mac mini only** |
+| From a phone (temporary tunnel) | https://largely-legacy-boots-varies.trycloudflare.com/dashboard/ — **DIES when the tunnel or session stops, and the address changes every restart.** Testing only; never give it to artists. |
+| Data on disk | `~/KattitudeData/` (database, `files/`, `backups/`, `logs/`) |
+| Vercel previews of this branch | built **READY**, and unchanged for Vercel visitors — they still talk to Supabase: |
+| ↳ dashboard | https://kattitude-flash-dashboard-cvbl5az74-joshua-greenes-projects.vercel.app |
+| ↳ kiosk | https://flash-gallery-7wth7fuss-joshua-greenes-projects.vercel.app (behind Vercel login) |
+
+**Still to come:** a permanent tunnel address (needs Kat's Cloudflare account
+and her domain), and switching the wall from Vercel to `localhost:8787`
+(a production change — waits for Joshua).
 
 ---
 

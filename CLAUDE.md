@@ -120,6 +120,14 @@ for the 2 Oct session: it ran on the kiosk itself, with git, node 26, npm,
 brew, cloudflared, and `gh` logged in as `canyouseeus`, so `git push` of a
 branch works directly. Check `command -v` before assuming either way.
 
+**Commit as the GitHub account, or Vercel blocks the deploy.** git on the Mac
+mini has no `user.email`, so commits default to
+`kattitudetattoo@KATTITUDEs-Mac-mini.local`, and every Vercel preview of such a
+commit fails as "Deployment was blocked" — not a build error. Commit with
+`git -c user.name=Joshua -c user.email=121084994+canyouseeus@users.noreply.github.com commit …`
+(the identity upstream commits use). Found 2 Oct 2026, when all four previews
+of the first push were blocked and all four of the re-authored push built.
+
 ## EVIDENCE RULE — every task, no exceptions
 
 Statements about your own process are reconstructions, not logs — they come out
