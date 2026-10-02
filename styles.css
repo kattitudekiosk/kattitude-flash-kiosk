@@ -1,5 +1,32 @@
-/* ─── Kiosk: no cursor (touchscreen only) ───────────────────────────────── */
+/* ─── Cursor: hidden on the panel, present for anyone holding a mouse ─────
+ *
+ * The wall kiosk is a touchscreen, and a pointer floating over it looks like
+ * a fault rather than a feature. So the cursor is hidden by default.
+ *
+ * But this same build is what gets shown as a DEMO on a laptop, and there
+ * `cursor: none` means a visitor cannot see what they are about to click on
+ * the one page whose whole job is being clicked.
+ *
+ * `hover: hover` and `pointer: fine` together mean a real pointing device is
+ * attached. A touchscreen panel reports neither, so the wall is unaffected —
+ * and if a mouse ever IS plugged into the kiosk, showing the cursor is the
+ * correct behaviour, not a regression.
+ *
+ * Deliberately a capability query and NOT a viewport width. A width query
+ * would fire on a demo laptop and a phone alike while missing the actual
+ * distinction, which is exactly the mistake the deleted QR media query made
+ * further down this file.
+ */
 * { cursor: none !important; }
+
+@media (hover: hover) and (pointer: fine) {
+  * { cursor: auto !important; }
+  /* `auto` on a <button> is an arrow, and the chevrons and dots are divs that
+     would otherwise offer no affordance at all. */
+  a, button, .nav-btn, .dot, .qr-badge, [role="button"] { cursor: pointer !important; }
+  .stage { cursor: grab !important; }
+  .stage.dragging { cursor: grabbing !important; }
+}
 
 /* ─── Variables ─────────────────────────────────────────────────────────── */
 :root {

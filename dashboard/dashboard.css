@@ -31,6 +31,22 @@
  * This is recorded in CLAUDE.md under DESIGN RULES as well, because it has
  * been re-litigated three times and needs to stop being a matter of
  * interpretation.
+ *
+ * That licence covers LAYOUT ONLY. It is not licence for a different visual
+ * language, and reading it that way is how this file spent its whole life
+ * out of brand.
+ *
+ * GEOMETRY: NO ROUNDED CORNERS. The rule is stated in styles.css at
+ * .qr-badge — "The one deliberate exception to the no-rounded-corners rule"
+ * — and the kiosk enforces it positively, with an explicit
+ * `border-radius: 0` on .fs-exit-btn and #zoomBadge rather than just leaving
+ * the property out. Every box here is 0.
+ *
+ * Circles are allowed ONLY where the shape IS the element, which is the same
+ * licence the kiosk gives its .dot at 50%: the avatar, the "..." toggle and
+ * the three dots inside it, the tour's progress dots, the new-feature dot,
+ * and the "?" button. A card, a button, an input, a pill, a chip, a panel, a
+ * thumbnail and a toast are all boxes. Do not give a box a radius.
  */
 
 :root {
@@ -191,7 +207,9 @@ body {
  * z-index 30: above #topbar's own 20 and #tabs' 19, because it hangs below
  * the bar and would otherwise be drawn behind the tab strip. Still far under
  * the tour bubble at 802 — a walkthrough step has to stay readable even with
- * this open. */
+ * this open.
+ *
+ * A panel is a box. Square. */
 .who-menu {
   position: absolute;
   top: calc(100% + 10px);
@@ -206,7 +224,7 @@ body {
   padding: 8px;
   background: var(--bg);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 0;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
 }
 
@@ -274,7 +292,7 @@ body {
 .card {
   background: var(--bg);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 0;
   padding: 16px;
   margin-bottom: 12px;
 }
@@ -301,7 +319,7 @@ p.muted { line-height: 1.5; margin: 0 0 12px; }
   color: var(--text);
   background: var(--bg);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 0;
   min-height: 48px;
 }
 
@@ -312,7 +330,7 @@ p.muted { line-height: 1.5; margin: 0 0 12px; }
   font: inherit;
   font-size: 14px;
   font-weight: 600;
-  border-radius: 8px;
+  border-radius: 0;
   border: 1px solid transparent;
   cursor: pointer;
   min-height: 48px;
@@ -327,7 +345,7 @@ p.muted { line-height: 1.5; margin: 0 0 12px; }
 .pill {
   display: inline-block;
   padding: 3px 8px;
-  border-radius: 999px;
+  border-radius: 0;
   background: var(--surface);
   border: 1px solid var(--line);
   font-size: 11px;
@@ -346,7 +364,7 @@ p.muted { line-height: 1.5; margin: 0 0 12px; }
   padding: 8px 12px;
   font: inherit;
   font-size: 13px;
-  border-radius: 999px;
+  border-radius: 0;
   border: 1px solid var(--line);
   background: var(--bg);
   color: var(--text);
@@ -370,7 +388,7 @@ p.muted { line-height: 1.5; margin: 0 0 12px; }
   gap: 4px;
   padding: 28px 16px;
   border: 2px dashed var(--line);
-  border-radius: 10px;
+  border-radius: 0;
   background: var(--surface);
   cursor: pointer;
   text-align: center;
@@ -383,7 +401,7 @@ p.muted { line-height: 1.5; margin: 0 0 12px; }
 .item.is-bad { border-color: #f0c9c6; background: #fdf5f5; }
 .item-thumb {
   width: 84px; height: 84px; flex: 0 0 auto;
-  object-fit: contain; background: var(--surface); border-radius: 6px;
+  object-fit: contain; background: var(--surface); border-radius: 0;
 }
 .item-body { flex: 1 1 auto; min-width: 0; }
 
@@ -399,10 +417,49 @@ p.muted { line-height: 1.5; margin: 0 0 12px; }
 .design { display: flex; gap: 12px; align-items: flex-start; }
 .design-thumb {
   width: 96px; height: 96px; flex: 0 0 auto;
-  object-fit: cover; background: var(--surface); border-radius: 6px;
+  object-fit: cover; background: var(--surface); border-radius: 0;
 }
 .design-title { font-weight: 600; margin-bottom: 2px; }
 .status { margin-top: 6px; }
+
+/* ── Flash sale event photos ────────────────────────────────────────────
+ *
+ * flash-sales.js builds .sale-media / .media-strip / .media-item /
+ * .media-thumb / .tier-x, and NONE of them had a rule anywhere. An
+ * <img class="media-thumb"> therefore rendered at its natural size — a
+ * 1320x1615 photo grew the card straight off the side of the screen.
+ *
+ * Not a demo-only problem: the first real photo Kat added to a sale would
+ * have done the same thing.
+ *
+ * 96px to match .design-thumb, which is already this app's answer to "how big
+ * is a thumbnail". Fixed px rather than a percentage, because a percentage of
+ * a flex row gives one answer for a single photo and a different one for six,
+ * and a strip of thumbnails should not resize itself as it fills up. */
+.media-strip { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+
+/* relative so the remove button can sit ON the image; line-height 0 so the
+ * inline image leaves no descender gap beneath itself. */
+.media-item { position: relative; flex: 0 0 auto; line-height: 0; }
+
+.media-thumb {
+  display: block;
+  width: 96px; height: 96px;
+  object-fit: cover;
+  background: var(--surface);
+  border-radius: 0;
+}
+
+/* A "×" was inheriting .btn's 48px minimum and 12px/16px padding — a primary
+ * action's touch target wrapped around a delete affordance. */
+.tier-x {
+  min-height: 0;
+  padding: 4px 9px;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.media-item .tier-x { position: absolute; top: 4px; right: 4px; }
 
 /* ── Toast ──────────────────────────────────────────────────────────────── */
 /* Was a black slab, and it is the one place a dark fill was arguably earned —
@@ -416,7 +473,7 @@ p.muted { line-height: 1.5; margin: 0 0 12px; }
   left: 12px; right: 12px; bottom: 12px;
   z-index: 50;
   padding: 14px 16px;
-  border-radius: 10px;
+  border-radius: 0;
   background: var(--bg);
   color: var(--text);
   border: 1px solid var(--line);

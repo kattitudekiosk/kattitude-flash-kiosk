@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Kattitude — Flash Dashboard (Live Demo)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="dashboard.css" />
+<link rel="stylesheet" href="requests.css" />
+<link rel="stylesheet" href="avatar.css" />
+<link rel="stylesheet" href="tour.css" />
+<style>
+#demoBanner {
+  position: sticky; top: 0; z-index: 60;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 8px 16px;
+  background: #FDE446; color: #1a1a1a;
+  font: 600 12px/1.3 'Inter', sans-serif;
+  border-bottom: 1px solid rgba(0,0,0,0.18);
+}
+#demoBanner strong { letter-spacing: .12em; }
+#demoBanner span { font-weight: 400; }
+#demoBanner button {
+  margin-left: auto; padding: 6px 10px;
+  font: 600 12px 'Inter', sans-serif;
+  background: #1a1a1a; color: #fff; border: 0; border-radius: 0; cursor: pointer;
+}
+/* The app's own sticky bars must sit below the banner, not under it. */
+#topbar { top: 37px; }
+#tabs { top: 94px; }
+</style>
+</head>
+<body>
+<div id="demoBanner">
+  <strong>LIVE DEMO</strong>
+  <span>Nothing here is saved &mdash; refresh to start over. Real studio, sample content.</span>
+  <button type="button" onclick="window.KATTITUDE_DEMO.reset()">Reset demo</button>
+</div>
+
+<!-- This is the STUDIO TOOL, not the kiosk. Deliberately a different shape:
+     normal responsive layout, mobile-first, browser chrome intact. The
+     kiosk's fixed 1080x1920 canvas is a wall-panel concern and must never be
+     applied here — artists use this on phones between clients. -->
+
+<header id="topbar" hidden>
+  <div class="brand">KATTITUDE<span>flash dashboard</span></div>
+  <div class="who">
+    <!-- Your own photo. Tapping it is how you change it — there is no
+         profile tab, because a fifth tab is a fifth thing to learn and this
+         is the control you would reach for anyway.
+
+         The avatar STAYS in the bar. topbar-menu.js folds every button in
+         here behind a "..." menu, but not this one: it is identity, not an
+         action, and the tutorial's my-photo step points straight at it. -->
+    <button id="myAvatar" class="avatar-btn" hidden></button>
+    <span id="whoName"></span>
+    <span id="whoRole" class="pill"></span>
+    <!-- view-as.js appends its "View as artist" toggle here, for admins only,
+         and topbar-menu.js moves it into the overflow panel alongside Sign
+         out. Nothing needs to be added to this markup to fold a new control
+         away — putting a button in .who is enough. -->
+    <button id="signOut" class="btn btn-quiet">Sign out</button>
+  </div>
+</header>
+
+<nav id="tabs" hidden>
+  <button class="tab is-active" data-view="upload">Upload</button>
+  <button class="tab" data-view="designs">My Designs</button>
+  <!-- Deliberately NOT admin-only: artists use this tab to ask, admins use
+       the same tab to answer. -->
+  <button class="tab" data-view="requests">Requests</button>
+  <button class="tab admin-only" data-view="artists" hidden>Artists</button>
+  <button class="tab admin-only" data-view="categories" hidden>Categories</button>
+  <!-- A flash sale is Kat's to create, never an artist request. Handled by
+       flash-sales.js, which takes this tab's click handler after app.js has
+       bound its own — app.js has no renderer for this view.
+
+       HOW TO WITHHOLD A FEATURE FOR A TUTORIAL TEST, since the obvious way
+       used not to work: add an inline display:none here. That hides the tab
+       from the tour as well as from the eye, but ONLY because tour.js now
+       checks whether a tab is genuinely on screen before walking into it.
+       Before that fix it clicked straight through and taught the step during
+       the very run meant to withhold it. -->
+  <button class="tab admin-only" data-view="flashsales" hidden>Flash Sales</button>
+  <button class="tab admin-only" data-view="review" hidden>Review</button>
+</nav>
+
+<main id="app">
+  <!-- Starts hidden, like every other pane. app.js unhides it only after
+       getSession() comes back with no session. Shipping it visible meant
+       somebody arriving on a magic link was shown "Email me a sign-in link"
+       for the length of the token exchange — the one screen that makes a
+       working link look broken.
+
+       In the demo this never appears: demo-backend.js answers getSession()
+       with a session, so the app goes straight to the dashboard. It is kept
+       because it is part of what a client is being shown. -->
+  <section id="signin" class="pane" hidden>
+    <div class="card signin-card">
+      <h1>Flash Dashboard</h1>
+      <p class="muted">
+        Sign in with your studio email. We'll send a link — no password to
+        remember, and nothing for anyone to steal.
+      </p>
+
+      <!-- DO NOT WRAP THIS IN A <form>, AND DO NOT GIVE IT name="email".
+           That was tried and reverted. Both are what Safari reads as a LOGIN
+           form, and a login form gets the Passwords/keychain strip — the very
+           thing this page has no use for, since there is no password. What is
+           wanted here is the CONTACT autofill: the work/other addresses off
+           your own card, which is what autocomplete="email" on a standalone
+           field asks for.
+
+           NO inputmode either. It used to say inputmode="email" on top of
+           type="email", which is redundant — and it is where the emoji
+           keyboard came from: iOS remembers the last keyboard for fields it
+           treats as generic text, while the dedicated email keyboard is its
+           own type and does not carry the emoji plane over. type drives the
+           keyboard on its own.
+
+           autocapitalize/autocorrect/spellcheck are off so the
+           text-prediction strip cannot take the place of the autofill strip.
+
+           app.js sends on Enter via its own keydown listener, so nothing here
+           needs a submit path. -->
+      <label for="email">Email</label>
+      <input id="email" type="email"
+             autocomplete="email"
+             autocapitalize="none" autocorrect="off" spellcheck="false"
+             enterkeyhint="go"
+             placeholder="you@example.com" />
+
+      <!-- type="button" is not required while there is no form around it, but
+           it is correct, and it disarms the trap for whoever adds one back:
+           a <button> with no type defaults to submit and would reload the
+           page. -->
+      <button id="sendLink" class="btn btn-primary" type="button">Email me a sign-in link</button>
+
+      <p id="signinMsg" class="msg"></p>
+      <p class="muted small">
+        Not seeing it? Check spam. The link works once and expires after an
+        hour.
+      </p>
+    </div>
+  </section>
+
+  <section id="view-upload" class="pane" hidden></section>
+  <section id="view-designs" class="pane" hidden></section>
+  <section id="view-requests" class="pane" hidden></section>
+  <section id="view-artists" class="pane" hidden></section>
+  <section id="view-categories" class="pane" hidden></section>
+  <section id="view-flashsales" class="pane" hidden></section>
+  <section id="view-review" class="pane" hidden></section>
+</main>
+
+<div id="toast" class="toast" hidden></div>
+
+<!-- The replay affordance: one small question mark, bottom right, always
+     there. Tap it and it walks the screen you are on. It is deliberately not
+     a menu item and not a text link — somebody who is lost is not going to go
+     looking in a menu. Styled in tour.css. -->
+<button id="howThisWorks" aria-label="Show me how this works" title="How this works" hidden>?</button>
+
+<!-- THE ONE SUBSTANTIVE DIFFERENCE FROM index.html: the Supabase library is
+     not loaded at all, and this shim stands in its place. It must come first,
+     because config.js and dash-client.js both reach for window.supabase. -->
+<script src="demo-backend.js"></script>
+<script src="config.js"></script>
+<!-- dash-client.js hands avatar.js and tour.js a Supabase client that shares
+     app.js's session without competing to refresh it. It must load first. -->
+<script src="dash-client.js"></script>
+<script src="avatar.js"></script>
+<script src="my-avatar.js"></script>
+<!-- artists-tab.js defines window.ArtistsTab and must load BEFORE app.js,
+     which wires it up during sign-in. -->
+<script src="artists-tab.js"></script>
+<script src="app.js"></script>
+<!-- These bind to the document, or take over a tab app.js has already bound,
+     so they load AFTER it and it does not know they exist. -->
+<script src="category-suggest.js"></script>
+<script src="flash-sales.js"></script>
+<!-- tour.js watches for the top bar unhiding, so it loads late and does not
+     need app.js to know it exists. -->
+<script src="tour.js"></script>
+<!-- topbar-menu.js folds the header's controls into an overflow panel. It
+     watches .who rather than assuming it runs last, so it does not care that
+     view-as.js adds its button after sign-in — but it is placed before
+     view-as.js anyway, so the panel exists by the time that button arrives
+     and the toggle never flashes in the bar first. -->
+<script src="topbar-menu.js"></script>
+<!-- view-as.js LAST: it rebinds the "?" so help answers with whichever script
+     the current view calls for, and the last binding is the one that wins. -->
+<script src="view-as.js"></script>
+</body>
+</html>
