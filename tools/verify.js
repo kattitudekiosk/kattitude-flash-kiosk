@@ -57,6 +57,7 @@ async function boot(configOverride, mutateCatalog) {
     { configurable: true, get: () => 1920 });
   window.requestAnimationFrame = cb => setTimeout(() => cb(Date.now()), 0);
   window.matchMedia = () => ({ matches: false, addListener() {}, removeListener() {} });
+  window.__KIOSK_TEST_ALLOW_SEED = true;   // harness only; pages never see seed
   window.fetch = () => Promise.reject(new Error('network disabled in verify'));
 
   const order = [
@@ -75,7 +76,8 @@ async function boot(configOverride, mutateCatalog) {
       if (!fs.existsSync(file)) return '';
       let src = `\n/* ==== ${rel} ==== */\n` + fs.readFileSync(file, 'utf8');
       if (rel === 'config.js') {
-        src += '\n;if (window.__CONFIG_OVERRIDE) Object.assign(window.KIOSK_CONFIG, window.__CONFIG_OVERRIDE);\n';
+        src += '\n;window.KIOSK_CONFIG.catalogSource = "seed";   /* harness default; pages are live */' +
+               '\n;if (window.__CONFIG_OVERRIDE) Object.assign(window.KIOSK_CONFIG, window.__CONFIG_OVERRIDE);\n';
       }
       return src;
     })
@@ -178,6 +180,27 @@ function tap(window, node) {
       !/zoom/i.test(w.document.querySelector('.footer-hint').textContent));
   }
 
+  /* ══ 1d. LIVE ONLY — Joshua, 2 Oct 2026 ════════════════════════════════ *
+   * "No more placeholder data please it should be live." A page — anything
+   * without the test harness flag — must never load placeholder data, even
+   * when config says 'seed', and when the live catalog is unreachable it says
+   * so instead of inventing anything. VERIFY_ALLOW_SEED_LEAK=1 is the
+   * negative control: it lets the page see seed, and these checks must fail. */
+  console.log('\nlive only: no placeholder data on any page');
+  {
+    const leak = process.env.VERIFY_ALLOW_SEED_LEAK === '1';
+    const w = await boot({ catalogSource: 'seed' }, (cat, win) => { win.__KIOSK_TEST_ALLOW_SEED = leak; });
+    await w.Catalog.load();
+    const snap = w.Catalog.snapshot();
+    check('a page asking for seed gets live instead', snap.source === 'live', 'source ' + snap.source);
+    check('no made-up designs reach the page', snap.singleCount === 0, snap.singleCount + ' singles');
+    check('unreachable catalog is admitted, not faked', snap.degraded === true);
+    const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+    check('index.html loads no seed script', !/seed\/seed-data\.js/.test(html));
+    const vi = fs.readFileSync(path.join(ROOT, '.vercelignore'), 'utf8');
+    check('seed/ does not ship to Vercel', /^seed\/$/m.test(vi) && /^assets\/seed\/$/m.test(vi));
+  }
+
   /* ══ 2. SEED — full hybrid experience ═══════════════════════════════════ */
   console.log('\nseed catalog (hybrid grid)');
   {
@@ -210,7 +233,7 @@ function tap(window, node) {
     check('cover has Browse by Artist', !!gallery.querySelector('.g-mode-artist'));
     check('cover has Browse by Category', !!gallery.querySelector('.g-mode-category'));
     check('cover lists no artists', !gallery.querySelector('.g-card-artist'));
-    check('seed banner shown', !!gallery.querySelector('.g-seedbanner'));
+    check('no placeholder banner, ever', !/PLACEHOLDER/i.test(doc.body.textContent));
     check('logo present on cover', !!gallery.querySelector('.g-topbar-logo'));
 
     // Artists now live on their own page.

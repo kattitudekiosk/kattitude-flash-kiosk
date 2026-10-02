@@ -219,8 +219,17 @@ window.Catalog = (function () {
   }
 
   /* ── Load / refresh ─────────────────────────────────────────────── */
+  /* Placeholder data is for the test harness ONLY (tools/verify.js sets
+   * __KIOSK_TEST_ALLOW_SEED). Any page a customer can see is live — even if
+   * config says 'seed' by mistake. */
+  function sourceOf() {
+    if (cfg.catalogSource === 'sheets-only') return 'sheets-only';
+    if (cfg.catalogSource === 'seed' && window.__KIOSK_TEST_ALLOW_SEED === true) return 'seed';
+    return 'live';
+  }
+
   async function load() {
-    const source = cfg.catalogSource || 'seed';
+    const source = sourceOf();
     const sheets = loadSheets();
 
     // Explicit override: pretend the catalog is empty so the sheets-only
@@ -271,7 +280,7 @@ window.Catalog = (function () {
   }
 
   function startAutoRefresh(onChange) {
-    const source = cfg.catalogSource || 'seed';
+    const source = sourceOf();
     if (source !== 'live') return;
     const ms = (cfg.live && cfg.live.refreshMs) || 300000;
     setInterval(async () => {

@@ -124,10 +124,13 @@ window.KIOSK_ROUTER = (function () {
     return bar;
   }
 
+  /* The placeholder banner is gone with the placeholder data (2 Oct 2026).
+   * What remains is the honest one: when the live catalog cannot be reached,
+   * say so, rather than show anything made up. */
   function seedBanner() {
-    if (!cfg.showSeedBanner || snap.source !== 'seed') return null;
+    if (!snap.degraded) return null;
     return el('div', 'g-seedbanner',
-      'PLACEHOLDER CONTENT — seed data for layout testing, not real flash');
+      'Can\u2019t reach the studio catalog right now \u2014 showing what was last loaded.');
   }
 
   /* ── Home (PRD §3.1) ──────────────────────────────────────────────────────
