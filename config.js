@@ -69,10 +69,11 @@ window.KIOSK_CONFIG = {
    * appearing entirely. */
   includeSheets: true,
 
-  /* When the catalog has zero individual designs, there is nothing a grid can
-   * usefully show, so the kiosk routes straight into the legacy linear sheet
-   * viewer instead of rendering an empty or near-empty grid. This is the
-   * studio's actual state today. Leave true. */
+  /* When the catalog has zero individual designs AND no artists, the kiosk
+   * routes straight into the legacy linear sheet viewer. With artists on the
+   * roster it shows the home screen instead, so Browse by Artist and the
+   * headshots are reachable before anybody has uploaded a design (changed
+   * 2 Oct 2026, CLAUDE.md invariant 4). Leave true. */
   sheetsOnlyFallback: true,
 
   /* Home screen is skipped when there is only one artist AND no sheets —

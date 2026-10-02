@@ -378,11 +378,15 @@ window.Catalog = (function () {
 
       /* THE fallback decision, in one place.
        *
-       * With zero individual designs there is nothing a grid can show that
-       * the linear sheet viewer does not already show better, so the kiosk
-       * must not render a grid at all. This is the studio's state today, so
-       * this branch is the live path, not a corner case. */
-      sheetsOnly: singleCount === 0 && (cfg.sheetsOnlyFallback !== false),
+       * [CHANGED 2 Oct 2026, Joshua: "yes go ahead and change the rule"]
+       * Zero designs used to mean "straight into the linear sheet viewer",
+       * which hid the artist cards — and with them every real headshot —
+       * until somebody uploaded a design. Now the home screen shows whenever
+       * there are artists to show: Browse by Artist (real photos, letter
+       * circles for the rest) and the sheets, one tap away. The sheet viewer
+       * is only the whole kiosk when there is nobody and nothing else. */
+      sheetsOnly: singleCount === 0 && state.artists.length === 0 &&
+        (cfg.sheetsOnlyFallback !== false),
 
       /* One artist and no sheets means the home hub has exactly one
        * destination — skip it and open that artist's grid directly. */

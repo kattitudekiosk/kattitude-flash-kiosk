@@ -281,8 +281,22 @@ Cropping silently is not, and that distinction is the whole of the rule.
 ### 4. Sheets-only artists bypass the grid
 
 An artist with only full sheets routes straight into the linear sheet viewer.
-It becomes the hybrid grid automatically once they have singles. This is the
-state the studio is in today — it must never regress.
+It becomes the hybrid grid automatically once they have singles.
+
+**[CHANGED 2 Oct 2026 — Joshua: "yes go ahead and change the rule"]** Zero
+published designs no longer turns the WHOLE kiosk into the sheet viewer. That
+hid the artist cards, and with them every real headshot, until somebody
+uploaded a design — which is exactly the state the studio was in. Now:
+
+- **Artists on the roster, zero designs** → the home screen: View All, Browse
+  by Artist (real headshots, letter circles for anyone without one) and Full
+  Flash Sheets. The sheets are one tap away, never hidden.
+- **No artists and zero designs** → the linear sheet viewer, as before.
+- Per artist, the rule above is unchanged: a sheets-only artist opens the
+  sheet viewer.
+
+The decision is one line, `sheetsOnly` in `catalog.js`. `tools/verify.js`
+section 1b checks it, and fails if the old rule comes back.
 
 ### 5. Production is sacred
 
