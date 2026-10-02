@@ -1,6 +1,6 @@
 /* Studio server — file storage on the Mac mini's disk
  *
- *   <data>/files/<bucket>/<path>
+ *   ~/Desktop/KIOSK MEDIA/<Artist>/Designs|Headshots/…  (see init() below)
  *
  * Same URL shape as Supabase Storage, so the dashboard's upload / list /
  * remove / getPublicUrl calls need no change:
