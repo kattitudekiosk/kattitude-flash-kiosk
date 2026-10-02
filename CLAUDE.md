@@ -83,6 +83,42 @@ Live URLs live in `LINKS.md`. Keep it current.
 | Dashboard palette — the only place it is decided | `dashboard/dashboard.css`, and the PALETTE RULE below |
 | Seed/placeholder content | `seed/`, `assets/seed/` (gitignored — never commit) |
 | Deploy helper | `tools/deploy-preview.sh` |
+| **Mac mini studio server** (data + photos on the kiosk's own disk) | `server/` — start at `server/README.md` |
+| Dashboard's studio-server client + sign-in links card | `dashboard/local-backend.js`, `dashboard/local-links.js` (injected by the server; never referenced by `index.html`) |
+
+## THE STUDIO SERVER — **[ADDED 2 Oct 2026]**
+
+The handoff to Kat moves data and photos off Supabase onto the kiosk Mac mini
+so she pays nothing. `server/` is that backend: one Node process, no npm
+dependencies, SQLite + files under `~/KattitudeData`, speaking Supabase's URL
+shapes so the kiosk and dashboard code are unchanged. Served by it, each page
+gets one injected script tag; served by Vercel, nothing changes.
+
+- **Access rules live in `server/policy.js`** — it is this backend's RLS.
+  Default deny. Filters run AFTER the policy strips columns, so nobody can
+  probe for an email with `?email=eq.…`. `node server/test.js` must stay
+  green AND `--sabotage` must keep failing its refusal checks.
+- **Sign-in is by link, not email.** Admin makes a one-time link; there is no
+  mail server. Never add copy that promises an email — `local-links.js`
+  rewrites the four places the Supabase build says one is sent.
+- **Photo URLs are stored as paths** and given a host per request. Never store
+  a tunnel address in the database: a quick tunnel's address changes on
+  restart and would orphan every image at once.
+- **The wall is NOT on it yet.** It still loads production from Vercel. Moving
+  it is a production change and waits for Joshua.
+
+**[CORRECTED 2 Oct 2026] — the wall runs Chrome, not Safari.** The Hardware
+table above says Safari. As found on 2 Oct 2026, launchd agent
+`com.kattitude.kiosk.chrome` runs `~/kiosk-setup/chrome-kiosk.sh`, which
+starts Chrome `--kiosk` at `https://flash-gallery.vercel.app`, alongside
+`com.kattitude.kiosk.touchup`. Both were installed that day by another
+session. Check `launchctl list | grep kattitude` before assuming either.
+
+**[CORRECTED 2 Oct 2026] — a session can run ON the Mac mini.** "Terminal on
+the Mac is off the table" and "no dev tooling on the Mac mini" were both false
+for the 2 Oct session: it ran on the kiosk itself, with git, node 26, npm,
+brew, cloudflared, and `gh` logged in as `canyouseeus`, so `git push` of a
+branch works directly. Check `command -v` before assuming either way.
 
 ## EVIDENCE RULE — every task, no exceptions
 

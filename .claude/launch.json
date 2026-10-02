@@ -7,6 +7,12 @@
       "runtimeArgs": [".claude/static-server.cjs"],
       "port": 4453,
       "autoPort": true
+    },
+    {
+      "name": "studio-server",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["server/server.js"],
+      "port": 8787
     }
   ]
 }

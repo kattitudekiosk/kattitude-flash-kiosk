@@ -8,6 +8,8 @@
 
 # Dev tooling — never needed at runtime.
 tools/
+# The Mac mini studio server. Runs on the Mac mini, never on Vercel.
+server/
 db/
 node_modules/
 .claude/
