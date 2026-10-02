@@ -267,6 +267,36 @@ function tap(window, node) {
       JSON.stringify(s3).slice(0, 80));
   }
 
+  /* ══ 1f. COVER COUNTS == CATALOG — Joshua, 2 Oct 2026 ═══════════════════
+   * "these counts are off". The cover's numbers must always be the catalog's
+   * own: View All = singles + sheets, Browse by Artist = roster size, Full
+   * Flash Sheets = sheets. Checked for two different catalogs, so a cover
+   * that kept the first catalog's numbers would fail the second. */
+  console.log('\ncover counts always equal the catalog');
+  {
+    const coverNumbers = (doc) => {
+      const t = cls => (doc.querySelector('.' + cls) || { textContent: '' }).textContent;
+      const n = (txt, word) => { const m = txt.match(new RegExp('(\\d+) ' + word)); return m ? +m[1] : 0; };
+      return { singles: n(t('g-mode-all'), 'designs?'), sheets: n(t('g-mode-all'), 'sheets?'),
+               artists: n(t('g-mode-artist'), 'artists?'), sheetCard: n(t('g-mode-sheets'), 'sheets?') };
+    };
+    const matches = (c, s) => c.singles === s.singleCount && c.sheets === s.sheetCount &&
+      c.artists === s.artists.length && (!s.hasSheets || c.sheetCard === s.sheetCount);
+
+    for (const [label, mut] of [['full seed catalog', null],
+                                ['catalog with most designs removed', cat => { cat.designs = cat.designs.slice(0, 5); }]]) {
+      const w = await boot({ catalogSource: 'seed' }, mut || undefined);
+      w.KIOSK_ROUTER.goHome();
+      const s = w.Catalog.snapshot(), c = coverNumbers(w.document);
+      check(`${label}: cover counts equal the catalog`, matches(c, s),
+        JSON.stringify(c) + ' vs ' + JSON.stringify({ singles: s.singleCount, sheets: s.sheetCount, artists: s.artists.length }));
+      // Negative control: the same comparison against a catalog one sheet
+      // bigger must NOT match, or this check could not catch a wrong count.
+      check(`${label}: ...and a count off by one is caught`,
+        !matches(c, Object.assign({}, s, { sheetCount: s.sheetCount + 1 })));
+    }
+  }
+
   /* ══ 2. SEED — full hybrid experience ═══════════════════════════════════ */
   console.log('\nseed catalog (hybrid grid)');
   {
