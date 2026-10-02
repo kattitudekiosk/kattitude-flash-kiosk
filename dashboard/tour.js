@@ -102,10 +102,10 @@ window.Tour = (function () {
     {
       id: 'upload-sizes',
       view: 'upload', sel: '#view-upload > .card',
-      title: 'Sizes are strict',
-      body: 'A single design has to be 2048×2048. A full sheet has to be ' +
-            '2160×3840. Anything else is refused, and the message tells you ' +
-            'the size it needs.',
+      title: 'We resize for you',
+      body: 'Singles are square, at least 2048×2048. Flash sheets can be any ' +
+            'shape, at least 1080 wide — big ones are resized to fit the ' +
+            'wall. Nothing is ever cropped, and your original is kept.',
     },
     {
       id: 'upload-tagging',

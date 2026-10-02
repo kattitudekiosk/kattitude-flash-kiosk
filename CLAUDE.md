@@ -268,8 +268,28 @@ why it kept coming back. `tools/verify.js` now greps for viewport reads.
 ### 3. Image spec is fixed and enforced
 
 Singles **2048 x 2048**. Sheets **2160 x 3840**. Derivatives at 512 x 512
-(cover) and 1024 x 1536 (contain), WebP. Off-size uploads are **rejected with
-the required dimensions in the error**. Never auto-crop an artist's work.
+(cover) and 1024 x 1536 (contain), WebP. Never auto-crop an artist's work.
+
+**[CHANGED 2 Oct 2026 — Joshua: sheets must be "resized to the appropriate
+size"]** Off-size uploads are no longer all refused. Big files are RESIZED,
+never cropped, never upscaled, and the original upload is always kept:
+
+- a square at least 2048 wide → a single, kiosk copy 2048×2048
+- any other shape at least 1080 wide → a sheet, kiosk copy fitted INSIDE
+  2160×3840 (2× the wall, so zoom stays sharp), aspect kept, no padding
+- smaller than that → refused, saying the minimum
+
+On disk: `original.<ext>` (untouched), `kiosk.webp` (what `image_url` points
+at), plus `thumb`/`medium`. Exact-spec uploads are shown as uploaded.
+`fitInside()` and `classify()` in `dashboard/app.js`.
+
+The studio's 4 original sheets follow the same rule: served from
+`assets/sheets/2160/`. Sheet III 2550×3300 → 2160×2795; Sheet IV cut from the
+10000×10000 source in `assets/originals/` → 2160×2160; Sheets I and II are
+1320 wide with no larger source anywhere, so they are their originals — a
+bigger file would be blurrier, not sharper. **Get larger scans of I and II
+from the artist if they need to hold up under zoom.** The untouched originals
+stay in `assets/sheets/` and `~/Desktop/KIOSK MEDIA/real/`.
 
 **Headshots are not artist work and are the one exception.** A profile photo is
 a picture *of* a person, every avatar surface is a circle, and something has to

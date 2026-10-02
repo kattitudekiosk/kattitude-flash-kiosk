@@ -243,19 +243,41 @@
    * Dimensions decide the type, so an artist cannot mislabel a file into the
    * wrong shape and break the kiosk grid.
    */
+  /* [CHANGED 2 Oct 2026 — Joshua: flash sheets must be "resized to the
+   * appropriate size"] Exact sizes still classify as before. Beyond that:
+   *   - a square at least 2048 wide is a single, scaled down to 2048×2048;
+   *   - any other shape at least 1080 wide (the wall's width) is a sheet,
+   *     fitted inside 2160×3840 on upload (fitInside below).
+   * NOTHING IS EVER CROPPED and nothing is upscaled — the original upload is
+   * kept untouched next to the resized copy. Smaller files are still refused:
+   * stretched, they would look soft on the wall. */
   function classify(w, h) {
     const d = cfg.spec.design, s = cfg.spec.sheet;
     if (w === d.w && h === d.h) return 'design';
     if (w === s.w && h === s.h) return 'sheet';
+    if (w === h && w >= d.w) return 'design';
+    if (w !== h && w >= 1080) return 'sheet';
     return null;
   }
 
   function specError(w, h) {
-    const d = cfg.spec.design, s = cfg.spec.sheet;
-    return `${w}×${h} is not a supported size. A ${d.label} must be exactly ` +
-           `${d.w}×${d.h}, and a ${s.label} must be exactly ${s.w}×${s.h}. ` +
-           `Resize or re-export at one of those sizes — we will not crop your ` +
-           `artwork automatically.`;
+    const d = cfg.spec.design;
+    return `${w}×${h} is too small for the wall. A ${d.label} needs to be at ` +
+           `least ${d.w}×${d.w} (square), and a flash sheet at least 1080 ` +
+           `pixels wide. Bigger files are resized for you — never cropped.`;
+  }
+
+  /** The copy the kiosk shows: the whole image scaled to fit inside maxW×maxH,
+   *  aspect kept, no padding, never larger than the original. */
+  function fitInside(img, maxW, maxH) {
+    const s = Math.min(1, maxW / img.naturalWidth, maxH / img.naturalHeight);
+    const c = document.createElement('canvas');
+    c.width = Math.round(img.naturalWidth * s);
+    c.height = Math.round(img.naturalHeight * s);
+    const ctx = c.getContext('2d');
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, 0, 0, c.width, c.height);
+    return new Promise(res => c.toBlob(b => res({ blob: b, w: c.width, h: c.height }), 'image/webp', 0.92));
   }
 
   /** Render a derivative with canvas. `cover` centre-crops, `contain` fits. */
@@ -635,8 +657,9 @@
     const p = el('p', 'muted');
     p.textContent = 'Pick as many files as you like. Tagging is optional — you ' +
       'can tag them all at once below, or upload now and tag later. Singles ' +
-      'must be ' + cfg.spec.design.w + '×' + cfg.spec.design.h +
-      ', sheets ' + cfg.spec.sheet.w + '×' + cfg.spec.sheet.h + '.';
+      'are square, at least ' + cfg.spec.design.w + '×' + cfg.spec.design.h +
+      '; sheets any shape, at least 1080 wide. Big files are resized to fit ' +
+      'the wall — never cropped, and your original is kept.';
     head.appendChild(p);
 
     const pick = el('label', 'dropzone');
@@ -831,6 +854,19 @@
     await put(originalPath, item.file, item.file.type);
 
     const urls = { image_url: publicUrl(originalPath) };
+
+    /* Off-spec sizes: the kiosk shows a resized copy; the original upload
+     * stays alongside it, untouched. Exact-spec files are shown as uploaded. */
+    const spec = cfg.spec[item.type];
+    if (item.w !== spec.w || item.h !== spec.h) {
+      const fit = await fitInside(item.img, spec.w, item.type === 'sheet' ? cfg.spec.sheet.h : spec.h);
+      if (!fit.blob) throw new Error('This browser could not resize the image. Try Safari or Chrome.');
+      const kioskPath = `${base}/kiosk.webp`;
+      await put(kioskPath, fit.blob, 'image/webp');
+      urls.image_url = publicUrl(kioskPath);
+      item.w = fit.w; item.h = fit.h;
+    }
+
     for (const spec of cfg.derivatives) {
       const blob = await derive(item.img, spec);
       if (!blob) continue;
