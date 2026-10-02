@@ -149,6 +149,7 @@ window.Catalog = (function () {
       displayOrder: r.display_order || 0,
       createdAt: r.created_at || null,
       sheetIndex: null,
+      sourceName: r.source_name || null,
     }));
 
     // Artists can be derived from the catalog if no artists endpoint is set,
@@ -262,9 +263,16 @@ window.Catalog = (function () {
   function apply(payload, sheets, source) {
     state.artists = (payload.artists || []).slice()
       .sort((a, b) => a.displayOrder - b.displayOrder);
+    /* A built-in studio sheet (data.js) that has since been dropped into an
+     * artist's KIOSK MEDIA folder is shown once — under the artist — not
+     * twice. Matched on file name, ignoring case, extension and a "_web"
+     * suffix (Untitled_Artwork_2_web.JPEG is Untitled_Artwork_2.jpg). */
+    const key = n => String(n || '').split('/').pop().replace(/\.[^.]+$/, '').replace(/_web$/i, '').toLowerCase();
+    const claimed = new Set((payload.designs || []).map(d => d.sourceName).filter(Boolean).map(key));
+    const studioSheets = sheets.filter(s => !claimed.has(key(s.image)));
     state.items = payload.providesSheets
       ? (payload.designs || []).slice()
-      : (payload.designs || []).concat(sheets);
+      : (payload.designs || []).concat(studioSheets);
     state.source = source;
     state.loadedAt = Date.now();
 

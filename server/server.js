@@ -111,6 +111,8 @@ const KIOSK_OVERRIDE = `/* Served by the Kattitude studio server (server/server.
     artistsUrl: '/rest/v1/artists?active=eq.true&order=display_order' +
       '&select=id,name,handle,portrait_url,portrait_thumb_url,bio,instagram_url,seniority,display_order',
     categoriesUrl: '/rest/v1/categories?order=display_order',
+    /* A file dropped into KIOSK MEDIA should reach the wall within a minute. */
+    refreshMs: 60 * 1000,
   });
 })();
 `;
@@ -348,6 +350,8 @@ function start() {
   const conn = db.open(path.join(DATA, 'kattitude.db'));
   storage.init(DATA, { artistName: id => (db.getByKey(conn, 'artists', [id]) || {}).name });
   storage.ensureArtistFolders(db.all(conn, 'artists').map(a => a.name));
+  /* Files dropped straight into KIOSK MEDIA go on the wall too. */
+  require('./folder-sync').start(conn);
   const server = makeServer(conn);
   server.listen(PORT, HOST, () => {
     console.log(`[studio-server] ${db.nowIso()} listening on http://${HOST}:${PORT}  data=${DATA}`);

@@ -74,12 +74,101 @@ window.Screensaver = (function () {
       const types = src === 'sheets' ? ['sheet'] : null;
       items = window.Catalog.query({ types: types })
         .filter(i => src !== 'featured' || i.featured)
-        .map(i => ({ image: i.image || i.thumb, title: i.title }));
+        .map(i => ({ image: i.image || i.thumb, title: i.title, artistId: i.artistId || null }));
     }
     if (!items.length && window.GALLERY_DATA && window.GALLERY_DATA.sheets) {
-      items = window.GALLERY_DATA.sheets.map(s => ({ image: s.file, title: s.title }));
+      items = window.GALLERY_DATA.sheets.map(s => ({ image: s.file, title: s.title, artistId: null }));
     }
     return items.filter(i => i.image);
+  }
+
+  /* ── Fair, resumable order — Joshua, 2 Oct 2026 ─────────────────────────
+   * "picks up from the last position ... continuous loop. But whenever new
+   * designs are added ... shuffle the playlist and restart the loop. That
+   * way it's always equal for artists to get their work seen."
+   *
+   * EQUAL TURNS PER ARTIST. The playlist is built in rounds; in every round
+   * each artist (studio sheets with no artist count as one more "artist")
+   * gets exactly one slot. An artist with many designs shows a different one
+   * each round; an artist with few cycles through theirs. So a big portfolio
+   * cannot take over the wall, and no artist ever shows twice in a row
+   * (unless only one artist has work). Rounds = the largest portfolio, so
+   * every design is shown at least once per loop.
+   *
+   * Artist order within each round and design order within each artist are
+   * shuffled from a SEED. The seed, the position and a fingerprint of the
+   * catalog live in localStorage (the wall's Chrome profile persists), so a
+   * reload or server restart resumes exactly where the loop was. A changed
+   * fingerprint — a design added or removed — draws a new seed and restarts
+   * from the top. */
+  const STORE_KEY = 'kt-attract-v1';
+
+  function rng(seed) {   // mulberry32: small, fast, deterministic
+    let a = seed >>> 0;
+    return function () {
+      a = (a + 0x6D2B79F5) >>> 0;
+      let t = a;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function shuffled(list, rand) {
+    const a = list.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(rand() * (i + 1));
+      const t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+
+  function fairOrder(items, seed) {
+    const rand = rng(seed);
+    const groups = new Map();
+    items.forEach(i => {
+      const k = i.artistId || '__studio__';
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(i);
+    });
+    const lists = [...groups.values()].map(g => shuffled(g, rand));
+    const rounds = Math.max(0, ...lists.map(l => l.length));
+    const out = [];
+    let last = null;
+    for (let r = 0; r < rounds; r++) {
+      let order = shuffled(lists, rand);
+      // Never the same artist twice running across a round boundary.
+      if (order.length > 1 && order[0] === last) order.push(order.shift());
+      order.forEach(l => out.push(l[r % l.length]));
+      last = order[order.length - 1];
+    }
+    return out;
+  }
+
+  function fingerprint(items) {
+    return items.map(i => (i.artistId || '-') + '|' + i.image).sort().join('\n');
+  }
+
+  function load() {
+    try { return JSON.parse(window.localStorage.getItem(STORE_KEY) || 'null') || null; }
+    catch (e) { return null; }
+  }
+  function save(st) {
+    try { window.localStorage.setItem(STORE_KEY, JSON.stringify(st)); } catch (e) { /* kiosk keeps going */ }
+  }
+
+  /* The loop state for the CURRENT catalog: resumes if the catalog is the
+   * one the stored position belongs to, otherwise reshuffles from 0. */
+  let loopState = null;
+  function currentLoop() {
+    const s = stills();
+    const fp = fingerprint(s);
+    let st = loopState || load();
+    if (!st || st.fp !== fp) {
+      st = { fp: fp, seed: Math.floor(Math.random() * 4294967296), pos: 0, shuffledAt: Date.now() };
+      save(st);
+    }
+    loopState = st;
+    return { stills: fairOrder(s, st.seed), state: st };
   }
 
   /**
@@ -89,8 +178,14 @@ window.Screensaver = (function () {
    * often as they need to.
    */
   function buildPlaylist() {
-    const v = clips(), s = stills();
-    if (!v.length || !s.length) return [];
+    const v = clips(), s = currentLoop().stills;
+    if (!s.length) return [];
+
+    /* No clips: a stills-only loop of every artist's work, in the fair order.
+     * [CHANGED 2 Oct 2026] This used to return [] and leave script.js cycling
+     * the 4 built-in sheets — which meant artists' designs were never in the
+     * screensaver at all. */
+    if (!v.length) return s.map(still => ({ kind: 'still', still: still }));
 
     const out = [];
     let vi = 0, si = 0;
@@ -194,8 +289,17 @@ window.Screensaver = (function () {
   function step() {
     if (!active || !playlist.length) return;
 
+    // The catalog refreshes underneath us; if its set of designs changed,
+    // currentLoop() has drawn a new shuffle and reset the position to 0.
+    const before = loopState && loopState.fp;
+    const fresh = buildPlaylist();
+    if (!loopState || loopState.fp !== before) { playlist = fresh; pos = 0; }
+    if (!playlist.length) return;
+
     const item = playlist[pos % playlist.length];
     pos++;
+    loopState.pos = pos % playlist.length;
+    save(loopState);
 
     if (item.failed) { step(); return; }   // dead clip — move on immediately
 
@@ -237,13 +341,14 @@ window.Screensaver = (function () {
 
       onExit = exitFn || null;
       active = true;
-      pos = 0;
+      // Resume where the loop was (0 if the catalog changed since).
+      pos = (loopState && loopState.pos) || 0;
       if (!stageEl) buildLayers(host || document.body);
       stageEl.style.display = 'block';
       document.body.classList.add('attract');
 
       // First item ready before anything is shown — no blank frame on entry.
-      const first = playlist[0];
+      const first = playlist[pos % playlist.length];
       prepare(first).then(() => { if (active) step(); });
       return true;
     },
@@ -271,5 +376,9 @@ window.Screensaver = (function () {
      * If this climbs, the blob path has been bypassed and egress is leaking. */
     netFetches() { return observedFetches; },
     _playlist() { return buildPlaylist(); },
+    _fairOrder: fairOrder,
+    _loop() { return loopState ? Object.assign({}, loopState) : null; },
+    _step() { step(); },
+    _pos() { return pos; },
   };
 })();
