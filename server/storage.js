@@ -60,7 +60,7 @@ function ensureArtistFolders(names) {
   for (const n of names) {
     const f = folderName(n);
     if (!f) continue;
-    for (const s of Object.values(SUB)) fs.mkdirSync(path.join(MEDIA, f, s), { recursive: true });
+    for (const s of Object.values(SUB).concat(['Sheets'])) fs.mkdirSync(path.join(MEDIA, f, s), { recursive: true });
   }
 }
 

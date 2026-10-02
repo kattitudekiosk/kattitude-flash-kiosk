@@ -305,6 +305,60 @@ const PNG = Buffer.from('89504e470d0a1a0a0000000d4948445200000001000000010806000
     '&select=id,name,handle,portrait_url,portrait_thumb_url,bio,instagram_url,seniority,display_order');
   check('the kiosk\'s exact artists URL answers', kioskArtists.status === 200 && kioskArtists.json.length >= 2, kioskArtists.text);
 
+  /* ── files dropped into KIOSK MEDIA (server/folder-sync.js) ── */
+  {
+    const { execFileSync } = require('node:child_process');
+    const sync = require('./folder-sync');
+    const media = path.join(DATA, 'KIOSK MEDIA');
+    const mk = (file, w, h) => {
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      const tiny = path.join(DATA, 'tiny.png');
+      fs.writeFileSync(tiny, PNG);
+      execFileSync('/usr/bin/sips', ['-s', 'format', 'jpeg', '-z', String(h), String(w), tiny, '--out', file], { stdio: 'ignore' });
+      const t = new Date(Date.now() - 10000); fs.utimesSync(file, t, t);   // settled, not mid-copy
+      return crypto.createHash('md5').update(fs.readFileSync(file)).digest('hex');
+    };
+    const sheetFile = path.join(media, 'Barbie', 'Designs', 'IMG_1705.JPEG');
+    const md5Before = mk(sheetFile, 2550, 3300);
+    mk(path.join(media, 'Barbie', 'Designs', 'big-square.jpg'), 3000, 3000);
+    mk(path.join(media, 'Barbie', 'Sheets', 'square-sheet.jpg'), 3000, 3000);
+    mk(path.join(media, 'Barbie', 'Designs', 'tiny.jpg'), 800, 800);
+    mk(path.join(media, 'Barbie', 'Designs', 'some-upload', 'original.jpg'), 2048, 2048);
+
+    const r1 = sync.syncOnce(conn);
+    const rows = db.all(conn, 'designs').filter(d => d.source_file && d.source_file.startsWith('Barbie/'));
+    const bySrc = Object.fromEntries(rows.map(d => [d.source_file, d]));
+    const sh = bySrc['Barbie/Designs/IMG_1705.JPEG'];
+    check('a sheet dropped in <artist>/Designs is imported, published, under that artist',
+      sh && sh.type === 'sheet' && sh.published && sh.artist_id === barbie.id, JSON.stringify(r1));
+    check('...resized to fit 2160×3840, never cropped (aspect kept)',
+      sh && sh.width === 2160 && sh.height === Math.round(3300 * 2160 / 2550), sh && sh.width + 'x' + sh.height);
+    check('...and the dropped original is untouched',
+      crypto.createHash('md5').update(fs.readFileSync(sheetFile)).digest('hex') === md5Before);
+    const kioskFile = sh ? storage.diskPath('flash', sh.image_url.replace(/^\/storage\/v1\/object\/public\/flash\//, '')) : '/nonexistent';
+    check('...with a kiosk copy on disk', fs.existsSync(kioskFile), kioskFile);
+    const big = bySrc['Barbie/Designs/big-square.jpg'];
+    check('a big square in Designs becomes a 2048 single', big && big.type === 'design' && big.width === 2048);
+    const sq = bySrc['Barbie/Sheets/square-sheet.jpg'];
+    check('a square in Sheets/ is a sheet', sq && sq.type === 'sheet' && sq.width === 2160 && sq.height === 2160,
+      sq && sq.type + ' ' + sq.width + 'x' + sq.height);
+    check('a too-small file is skipped, not stretched', !bySrc['Barbie/Designs/tiny.jpg']);
+    check('files inside subfolders (dashboard uploads) are not re-imported',
+      !rows.some(d => /some-upload/.test(d.source_file)));
+    const kc2 = await req('GET', '/rest/v1/kiosk_catalog?select=*');
+    check('imported sheet is on the wall\'s catalog, with its file name',
+      kc2.json.some(r => r.source_name === 'IMG_1705.JPEG' && r.artist_name === 'Barbie'));
+    const r2 = sync.syncOnce(conn);
+    check('a second scan with nothing changed imports nothing', r2.imported.length === 0, JSON.stringify(r2));
+
+    fs.unlinkSync(sheetFile);
+    const r3 = sync.syncOnce(conn);
+    check('deleting the file takes the design off the wall',
+      r3.removed.includes('Barbie/Designs/IMG_1705.JPEG') &&
+      !db.all(conn, 'designs').some(d => d.source_file === 'Barbie/Designs/IMG_1705.JPEG') &&
+      !fs.existsSync(kioskFile), JSON.stringify(r3));
+  }
+
   server.close();
   conn.close();
   fs.rmSync(DATA, { recursive: true, force: true });

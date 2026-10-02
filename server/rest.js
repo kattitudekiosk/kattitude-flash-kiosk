@@ -186,6 +186,7 @@ function kioskCatalog(conn) {
         title: d.title, type: d.type, image_url: d.image_url, thumb_url: d.thumb_url,
         width: d.width, height: d.height, price_band: d.price_band, featured: d.featured,
         display_order: d.display_order, created_at: d.created_at, source_sheet_id: d.source_sheet_id,
+        source_name: d.source_file ? d.source_file.split('/').pop() : null,
         categories,
       };
     });

@@ -29,6 +29,24 @@ created at start-up; adding an artist creates theirs; renaming an artist
 renames their folder. Override with `KT_MEDIA_DIR`. URLs stay keyed by artist
 ID, so a rename never breaks a link.
 
+## Dropping files straight into KIOSK MEDIA
+
+Drag an image into an artist's folder and it goes on the wall within a few
+seconds (`server/folder-sync.js`). No dashboard needed.
+
+| Put it in | It becomes |
+|---|---|
+| `<Artist>/Designs/` | a **single** if it is square and at least 2048 wide, otherwise a **flash sheet** (at least 1080 wide) |
+| `<Artist>/Sheets/` | always a **flash sheet** — use this for square sheets |
+
+- The file you dropped is never changed or moved. The wall shows a copy,
+  resized to fit (never cropped, never enlarged), kept in `_kiosk/` beside it.
+- Drop it loose in the folder. Subfolders are where dashboard uploads live and
+  are left alone.
+- Delete the file and it leaves the wall. Replace it and the wall updates.
+- Too small (a square under 2048, anything under 1080 wide) is skipped; the
+  reason is in `~/KattitudeData/logs/server.log`.
+
 ## Run it
 
 ```sh

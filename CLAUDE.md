@@ -104,7 +104,13 @@ gets one injected script tag; served by Vercel, nothing changes.
 - **Photo URLs are stored as paths** and given a host per request. Never store
   a tunnel address in the database: a quick tunnel's address changes on
   restart and would orphan every image at once.
-- **The wall is NOT on it yet.** It still loads production from Vercel. Moving
+- **KIOSK MEDIA is an upload route.** A file dropped loose into
+  `<Artist>/Designs` or `<Artist>/Sheets` is imported, resized by invariant 3's
+  rules into `_kiosk/`, and published; deleting it unpublishes it
+  (`server/folder-sync.js`, startup + file-change watch + 60 s rescan). The
+  original is never touched. A studio sheet from `data.js` that has been
+  dropped into an artist's folder is shown once, under the artist.
+- **[STALE — the wall moved to the Mac mini on 2 Oct 2026.]** The wall is NOT on it yet. It still loads production from Vercel. Moving
   it is a production change and waits for Joshua.
 
 **[CORRECTED 2 Oct 2026] — the wall runs Chrome, not Safari.** The Hardware

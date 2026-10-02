@@ -60,6 +60,10 @@ const TABLES = {
             image_url: 'text', thumb_url: 'text', width: 'int', height: 'int', type: 'text',
             source_sheet_id: 'text', display_order: 'int', featured: 'bool',
             published: 'bool', approved: 'bool', keywords: 'text',
+            /* Set only for designs imported from a file dropped into
+             * KIOSK MEDIA (server/folder-sync.js): the file's path relative
+             * to KIOSK MEDIA, and size-mtime so a replaced file re-imports. */
+            source_file: 'text', source_sig: 'text',
             created_at: 'ts', updated_at: 'ts' },
     defaults: { type: 'design', display_order: 0, featured: false, published: false, approved: true },
     required: ['image_url'],
@@ -69,7 +73,7 @@ const TABLES = {
           source_sheet_id TEXT REFERENCES designs(id) ON DELETE SET NULL,
           display_order INTEGER NOT NULL DEFAULT 0, featured INTEGER NOT NULL DEFAULT 0,
           published INTEGER NOT NULL DEFAULT 0, approved INTEGER NOT NULL DEFAULT 1,
-          keywords TEXT, created_at TEXT, updated_at TEXT,
+          keywords TEXT, source_file TEXT UNIQUE, source_sig TEXT, created_at TEXT, updated_at TEXT,
           CHECK (source_sheet_id IS NULL OR source_sheet_id <> id)`,
   },
   design_categories: {
@@ -174,6 +178,16 @@ function open(file) {
     db.exec(`CREATE TABLE IF NOT EXISTS ${name} (${idCol}${t.ddl})`);
   }
   db.exec(PRIVATE_DDL);
+  /* Columns added after a database was created. SQLite has no ADD COLUMN IF
+   * NOT EXISTS, so check first. (UNIQUE cannot be added by ALTER; an index
+   * gives the same guarantee.) */
+  for (const [name, t] of Object.entries(TABLES)) {
+    const have = new Set(db.prepare(`PRAGMA table_info(${name})`).all().map(c => c.name));
+    for (const col of Object.keys(t.cols)) {
+      if (!have.has(col)) db.exec(`ALTER TABLE ${name} ADD COLUMN ${col} TEXT`);
+    }
+  }
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS designs_source_file ON designs(source_file)');
   return db;
 }
 
