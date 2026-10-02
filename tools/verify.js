@@ -132,6 +132,25 @@ function tap(window, node) {
     check('no back-to-gallery marker', !w.document.body.classList.contains('sheets-has-back'));
   }
 
+  /* ══ 1b. ARTISTS, NO DESIGNS — the rule changed 2 Oct 2026 ═════════════ *
+   * Joshua: "yes go ahead and change the rule". Zero designs no longer hides
+   * the artists: with a roster, the home screen shows so Browse by Artist (and
+   * every real headshot) is reachable, and the sheets stay one tap away. */
+  console.log('\nartists but zero designs (home screen, not the sheet viewer)');
+  {
+    const w = await boot({ catalogSource: 'seed' }, cat => {
+      cat.designs = [];             // no singles, no seed sheets...
+      cat.providesSheets = false;   // ...so the 4 real sheets come from data.js, as live
+    });
+    const snap = w.Catalog.snapshot();
+    check('zero singles in this fixture', snap.singleCount === 0, 'got ' + snap.singleCount);
+    check('roster present', snap.artists.length === 7, 'got ' + snap.artists.length);
+    check('NOT sheetsOnly when there are artists', snap.sheetsOnly === false);
+    check('sheets still reachable', snap.sheetCount === 4, 'got ' + snap.sheetCount);
+    check('sheet viewer does not take over the kiosk',
+      !w.document.body.classList.contains('sheets-only'));
+  }
+
   /* ══ 2. SEED — full hybrid experience ═══════════════════════════════════ */
   console.log('\nseed catalog (hybrid grid)');
   {
