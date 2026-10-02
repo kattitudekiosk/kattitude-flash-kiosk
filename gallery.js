@@ -569,23 +569,14 @@ window.KIOSK_ROUTER = (function () {
     } else {
       const gridWidthPx = root.clientWidth || DESIGN_W;
       const cols = pickGridColumns();
-      const grid = el('div', 'g-grid');
-      grid.style.setProperty('--cols', String(cols));
-
-      // Rows must be SQUARE cells, not content-sized. With auto rows a sheet
-      // spanning 3 of them stretched those rows to its own natural height,
-      // which is what made the page look ragged: every row in the band grew,
-      // leaving big voids beside the small square tiles.
       const gridW = gridWidthPx - 28;
       const cell = Math.floor((gridW - GRID_GAP * (cols - 1)) / cols);
-      grid.style.setProperty('--cell', cell + 'px');
 
-      // layoutModules re-orders to spread the sheets, and returns the order it
-      // used so detail-view swiping matches what is on screen.
-      view.items = layoutModules(grid, items, cols);
+      // layoutEven returns the order it used so detail-view swiping matches
+      // what is on screen.
+      view.items = layoutEven(scroll, items, cols, cell);
       lastGridCols = cols;
       lastGridWidth = gridWidthPx;
-      scroll.appendChild(grid);
     }
 
     root.appendChild(scroll);
@@ -716,7 +707,7 @@ window.KIOSK_ROUTER = (function () {
    *      not for something a phone camera has to threshold in shop lighting.
    *      The colour goes on the panel behind the code, not the code.
    */
-  const QR_INK = '#111111';
+  const QR_INK = '#000000';   // pure black: best contrast for scanning
   const QR_ECC = 'H';
   const QR_R = 0.42;   // module corner radius, in module units
 
@@ -1003,6 +994,39 @@ window.KIOSK_ROUTER = (function () {
     // to fill and a badly matched block would crop away real artwork.
     const rows = Math.max(1, Math.min(4, Math.round(colSpan / a)));
     return { colSpan, rows };
+  }
+
+  /**
+   * THE GRID — [CHANGED 2 Oct 2026, Joshua: "the grid is not good"].
+   *
+   * The staggered 2-column sheet blocks (layoutModules, below, now unused)
+   * left big white gaps beside each sheet and cropped them to fill. Now two
+   * plain, even grids:
+   *   singles — square tiles, `cols` across (3 on the wall)
+   *   sheets  — one even grid of identical portrait tiles, 2 across, each
+   *             sheet shown WHOLE (contain, never cropped); a tap opens the
+   *             sheet viewer at full size, no zoom
+   * Singles first, then sheets, under a small label when both are present.
+   */
+  function layoutEven(scroll, items, cols, cell) {
+    const singles = items.filter(i => i.type !== 'sheet');
+    const sheets = items.filter(i => i.type === 'sheet');
+
+    if (singles.length) {
+      const g = el('div', 'g-grid');
+      g.style.setProperty('--cols', String(cols));
+      g.style.setProperty('--cell', cell + 'px');
+      singles.forEach((item, i) => g.appendChild(tile(item, i)));
+      scroll.appendChild(g);
+    }
+    if (sheets.length) {
+      if (singles.length) scroll.appendChild(el('div', 'g-section-label', 'Full flash sheets'));
+      const g = el('div', 'g-grid g-grid-sheets');
+      g.style.setProperty('--cols', String(Math.max(1, Math.min(2, cols - 1))));
+      sheets.forEach((item, k) => g.appendChild(tile(item, singles.length + k)));
+      scroll.appendChild(g);
+    }
+    return singles.concat(sheets);
   }
 
   function layoutModules(grid, items, cols) {

@@ -387,7 +387,7 @@
     }
     const path = document.createElementNS(svgNS, 'path');
     path.setAttribute('d', d);
-    path.setAttribute('fill', '#1a1a1a');
+    path.setAttribute('fill', '#000000');
     svg.appendChild(path);
     badge.appendChild(svg);
   }
