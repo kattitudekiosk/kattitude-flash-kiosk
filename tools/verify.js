@@ -151,6 +151,33 @@ function tap(window, node) {
       !w.document.body.classList.contains('sheets-only'));
   }
 
+  /* ══ 1c. NO ZOOM — Joshua, 2 Oct 2026 ══════════════════════════════════ *
+   * "I don't really want the customer to be able to zoom in on the sheets."
+   * A tap on a sheet must leave it at 1x. VERIFY_ZOOM=1 boots with zoom on,
+   * as the negative control: the same tap must then zoom, or this check is
+   * not testing anything. */
+  const zoomOn = process.env.VERIFY_ZOOM === '1';
+  console.log('\nno zoom on sheets' + (zoomOn ? ' (NEGATIVE CONTROL: zoom forced on)' : ''));
+  {
+    const w = await boot({ catalogSource: 'sheets-only', zoom: zoomOn });
+    const stage = w.document.getElementById('stage');
+    const inner = w.document.getElementById('stageInner');
+    stage.setPointerCapture = () => {};   // jsdom lacks it; the handler throws without it
+    const ptr = (type) => {
+      const e = new w.Event(type, { bubbles: true, cancelable: true });
+      Object.assign(e, { pointerType: 'mouse', pointerId: 1, clientX: 540, clientY: 900, button: 0 });
+      return e;
+    };
+    stage.dispatchEvent(ptr('pointerdown'));
+    stage.dispatchEvent(ptr('pointerup'));
+    await new Promise(r => setTimeout(r, 50));
+    const m = String(inner.style.transform).match(/scale\(([\d.]+)\)/);
+    const s = m ? parseFloat(m[1]) : 1;
+    check('a tap on a sheet does not zoom it', s <= 1.0001, 'scale ' + s);
+    check('footer hint does not offer zoom',
+      !/zoom/i.test(w.document.querySelector('.footer-hint').textContent));
+  }
+
   /* ══ 2. SEED — full hybrid experience ═══════════════════════════════════ */
   console.log('\nseed catalog (hybrid grid)');
   {
@@ -203,37 +230,20 @@ function tap(window, node) {
       gallery.querySelectorAll('.g-tile').length === 57,
       'got ' + gallery.querySelectorAll('.g-tile').length);
     check('sheet tiles distinct', gallery.querySelectorAll('.g-tile-sheet').length === 10);
-    check('sheets render as 2x3 modules',
-      gallery.querySelectorAll('.g-tile-module').length === 10,
+    /* [CHANGED 2 Oct 2026, Joshua: "the grid is not good"] The staggered
+     * 2-column sheet blocks are gone. Singles sit in a square grid; sheets in
+     * their own even grid of identical portrait tiles, each shown whole. */
+    const sheetGrid = gallery.querySelector('.g-grid-sheets');
+    check('sheets have their own grid', !!sheetGrid);
+    check('every sheet tile is in the sheet grid',
+      sheetGrid && sheetGrid.querySelectorAll('.g-tile-sheet').length ===
+        gallery.querySelectorAll('.g-tile-sheet').length);
+    check('no staggered sheet blocks remain', gallery.querySelectorAll('.g-tile-module').length === 0,
       'got ' + gallery.querySelectorAll('.g-tile-module').length);
-    check('modules alternate sides',
-      gallery.querySelectorAll('.g-tile-module.is-left').length === 5 &&
-      gallery.querySelectorAll('.g-tile-module.is-right').length === 5,
-      gallery.querySelectorAll('.g-tile-module.is-left').length + ' left / ' +
-      gallery.querySelectorAll('.g-tile-module.is-right').length + ' right');
-    check('module spans 2 columns',
-      /span 2/.test(gallery.querySelector('.g-tile-module').style.gridColumn));
-    // Span is no longer fixed — it matches each sheet's real proportions, so
-    // a square sheet gets 2 rows and a tall one 3.
-    const spans = [...gallery.querySelectorAll('.g-tile-module')]
-      .map(m => parseInt(m.style.gridRow.replace('span ', ''), 10));
-    check('every module spans a sane number of rows',
-      spans.every(n => n >= 2 && n <= 4), spans.join(','));
-    check('module spans vary with sheet shape', new Set(spans).size > 1,
-      'all spans identical: ' + spans.join(','));
-    check('the square real sheet gets a square block',
-      spans.length === 10 && spans.filter(n => n === 2).length >= 1,
-      spans.join(','));
-
-    // Sheets must be spread through the singles, not left clustered by date.
-    const kinds = [...gallery.querySelectorAll('.g-tile')]
-      .map(t => t.classList.contains('g-tile-sheet') ? 'S' : 'd');
-    let maxRun = 0, run = 0;
-    kinds.forEach(k => { run = k === 'S' ? run + 1 : 0; maxRun = Math.max(maxRun, run); });
-    check('no two sheets sit back to back', maxRun === 1, 'longest run ' + maxRun);
-    const sheetPositions = kinds.map((k, i) => k === 'S' ? i : -1).filter(i => i >= 0);
-    const gaps = sheetPositions.slice(1).map((p, i) => p - sheetPositions[i]);
-    check('sheets are evenly spaced', new Set(gaps).size <= 2, 'gaps ' + gaps.join(','));
+    check('sheet grid has no inline spans (even columns)',
+      sheetGrid && [...sheetGrid.children].every(t => !t.style.gridColumn && !t.style.gridRow));
+    check('singles grid holds only singles',
+      [...gallery.querySelectorAll('.g-grid:not(.g-grid-sheets) .g-tile')].every(t => t.classList.contains('g-tile-design')));
     check('design tiles present', gallery.querySelectorAll('.g-tile-design').length === 47);
     check('logo still centred on inner screens', !!gallery.querySelector('.g-topbar-logo'));
     check('sheet tiles badged', !!gallery.querySelector('.g-tile-badge'));
@@ -271,9 +281,9 @@ function tap(window, node) {
     check('artist grid scoped to 16 (12 singles + 4 sheets)',
       gallery.querySelectorAll('.g-tile').length === 16,
       'got ' + gallery.querySelectorAll('.g-tile').length);
-    check('mixed artist gallery shows sheet modules',
-      gallery.querySelectorAll('.g-tile-module').length === 4,
-      'got ' + gallery.querySelectorAll('.g-tile-module').length);
+    check('mixed artist gallery shows its sheets in the sheet grid',
+      gallery.querySelectorAll('.g-grid-sheets .g-tile-sheet').length === 4,
+      'got ' + gallery.querySelectorAll('.g-grid-sheets .g-tile-sheet').length);
     check('mixed artist gallery shows singles too',
       gallery.querySelectorAll('.g-tile-design').length === 12);
     check('artist QR panel present', !!gallery.querySelector('.qr-badge.qr-inline'));
@@ -559,16 +569,10 @@ function tap(window, node) {
       .filter(b => /grid-template-columns/.test(b.split('}')[0] + b.split('}')[1]));
     check('no media query overrides the grid column count', gridBlocks.length === 0,
       gridBlocks.length + ' found');
-    check('module tiles crop to fill rather than letterbox',
-      /\.g-tile-module \.g-tile-img img \{[^}]*object-fit:\s*cover/.test(css));
+    check('sheet tiles show the whole sheet (contain, never cropped)',
+      /\.g-grid-sheets \.g-tile-sheet \.g-tile-img img \{[^}]*object-fit:\s*contain/.test(css));
 
-    // moduleSpan is the single place the block geometry is decided.
     const w0 = await boot({ catalogSource: 'seed' });
-    const span = w0.KIOSK_ROUTER.moduleSpan;
-    check('a 9:16 sheet gets a 2x4 block', JSON.stringify(span(0.5625, 3)) === '{"colSpan":2,"rows":4}',
-      JSON.stringify(span(0.5625, 3)));
-    check('a square sheet gets a 2x2 block', JSON.stringify(span(1.0, 3)) === '{"colSpan":2,"rows":2}',
-      JSON.stringify(span(1.0, 3)));
     check('column count never varies with width',
       w0.KIOSK_ROUTER.pickGridColumns() === 3);
   }
@@ -718,18 +722,16 @@ function tap(window, node) {
     };
 
     openArtist(mixed[0].id);
-    const mods = gallery.querySelectorAll('.g-tile-module').length;
-    check('first mixed gallery has multiple modules', mods >= 2, 'got ' + mods);
-    check('both alternations visible in one gallery',
-      gallery.querySelectorAll('.g-tile-module.is-left').length >= 1 &&
-      gallery.querySelectorAll('.g-tile-module.is-right').length >= 1);
-    check('singles sit alongside the modules',
-      gallery.querySelectorAll('.g-tile-design').length >= 3);
+    check('first mixed gallery: sheets in their own even grid',
+      gallery.querySelectorAll('.g-grid-sheets .g-tile-sheet').length >= 1 &&
+      gallery.querySelectorAll('.g-tile-module').length === 0);
+    check('first mixed gallery: singles in the square grid',
+      gallery.querySelectorAll('.g-grid:not(.g-grid-sheets) .g-tile-design').length >= 3);
 
     openArtist(mixed[1].id);
-    check('second mixed gallery also tiles',
-      gallery.querySelectorAll('.g-tile-module').length >= 2 &&
-      gallery.querySelectorAll('.g-tile-design').length > 0);
+    check('second mixed gallery also has both grids',
+      !!gallery.querySelector('.g-grid-sheets') &&
+      gallery.querySelectorAll('.g-grid:not(.g-grid-sheets) .g-tile-design').length > 0);
 
     // Sheets-only artist bypasses the grid entirely.
     const sheetsArtist = sheetsOnlyArtists[0];
@@ -760,9 +762,9 @@ function tap(window, node) {
     const hasDesign = tiles.some(t => t.classList.contains('g-tile-design'));
     const firstSheetAt = tiles.findIndex(t => t.classList.contains('g-tile-sheet'));
     check('studio-wide mixes both kinds', hasSheet && hasDesign);
-    check('sheets interleave rather than clumping at the end',
-      firstSheetAt > -1 && firstSheetAt < tiles.length - 1,
-      'first sheet at index ' + firstSheetAt + ' of ' + tiles.length);
+    const lastDesignAt = tiles.map(t => t.classList.contains('g-tile-design')).lastIndexOf(true);
+    check('singles first, then the sheets, each in its own grid',
+      firstSheetAt > lastDesignAt, 'first sheet ' + firstSheetAt + ', last single ' + lastDesignAt);
 
     // A filter yielding very few items must still look like a grid, not junk.
     const chips = [...gallery.querySelectorAll('.g-chip')];

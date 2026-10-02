@@ -253,6 +253,14 @@ screen". The real buttons are **72 x 160 px, vertically centred** (`top: 50%`).
 Larger in area, different in placement. Decide which is right, then make the
 doc and the code agree.
 
+**[ADDED 2 Oct 2026] No zoom.** Joshua: *"I don't really want the customer
+to be able to zoom in on the sheets ... I don't really want the zoom
+function."* `KIOSK_CONFIG.zoom` is `false`: sheets show fitted to the screen
+(every zoom path in `script.js` is clamped to 1× at `MAX_SCALE`), and single
+designs open in the detail view as a no-zoom lightbox — tap the picture or
+Back to close. The footer hint no longer mentions zoom. `tools/verify.js`
+section 1c checks it; `VERIFY_ZOOM=1` is its negative control and must fail.
+
 ### 2. One layout everywhere — fixed canvas, scaled
 
 The entire app renders inside a fixed **1080 x 1920** canvas, CSS-scaled to the
@@ -505,7 +513,7 @@ and exactly two on the dashboard — see the re-sweep note below for the
 dashboard's pair. They are recorded precisely so that none of them becomes a
 precedent for a fifth:
 
-1. **QR container tiles.** Rounded because Joshua asked, and because rounding
+1. ~~**QR container tiles.**~~ **WITHDRAWN 2 Oct 2026** — Joshua asked for square QR boxes; every QR container is now `border-radius: 0` and the ink is pure `#000000`. Originally: rounded because Joshua asked, and because rounding
    the white *container* cannot affect decoding — only rounding the finder
    patterns can, and that is separately forbidden under QR RULES.
 
@@ -678,7 +686,25 @@ before decoding starts.
 - Physical sizing on a 32" panel (~69 ppi): detail 2.04 mm/module, artist card
   1.42 mm, sheet corner 1.08 mm.
 
-## GRID LAYOUT RULE — **[CORRECTED]**
+## GRID LAYOUT RULE — **[REPLACED 2 Oct 2026]**
+
+Joshua: *"the grid is not good"* — the staggered 2-column sheet blocks left
+big white gaps and cropped the sheets. Now (`layoutEven()` in `gallery.js`):
+
+- **Singles:** a plain square grid, 3 across on the wall.
+- **Sheets:** their OWN even grid, 2 across, identical 3:4 portrait tiles,
+  each sheet shown WHOLE (`object-fit: contain`), never cropped. A tap opens
+  the sheet viewer (no zoom).
+- Singles first, then a "Full flash sheets" label and the sheets.
+- `layoutModules`/`moduleSpan`/`arrangeHybrid` are no longer called. The notes
+  below describe that retired layout and are kept only as history.
+
+**Artist cards are never dimmed.** `.g-card-artist.is-empty` used to sit at
+opacity 0.55, which washed out every card (and greyed the QR codes) while
+the studio had no designs. Removed 2 Oct 2026.
+
+### Retired layout (history)
+ — **[CORRECTED]**
 
 The draft quoted PRD numbers rather than the code. Actual geometry at 1080:
 

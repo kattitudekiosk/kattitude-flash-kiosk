@@ -254,7 +254,9 @@ body.sheets-has-back #sheetBackBtn { display: inline-flex; }
 
 .g-card-artist.pressed { filter: brightness(1.12); }
 
-.g-card-artist.is-empty { opacity: 0.55; }
+/* .is-empty is no longer dimmed (Joshua, 2 Oct 2026: "why does this page look
+   like the opacity is turned down?"). An artist with no designs yet is shown
+   at full strength; their card already says "Coming soon". */
 
 .g-card-portrait {
   flex: 0 0 auto;
@@ -664,7 +666,7 @@ body.sheets-has-back #sheetBackBtn { display: inline-flex; }
      quiet zone the code gets. Decoders are permitted to refuse that. */
   padding: 28px;
   box-shadow: none;
-  border-radius: 20px;   /* container only — see note in styles.css */
+  border-radius: 0;   /* square, like every QR box (2 Oct 2026) */
 }
 
 .g-artistinfo-meta { min-width: 0; }
@@ -769,7 +771,7 @@ body.sheets-has-back #sheetBackBtn { display: inline-flex; }
      H first, which grows the code from 29 to 33+ modules and shrinks every
      module again. Not a good trade at card size. Offered rather than assumed:
      the detail-page code at 7px/module has the headroom if he wants it. */
-  border-radius: 14px;
+  border-radius: 0;   /* square: Joshua, 2 Oct 2026 — no rounded corners, QR boxes included */
   /* No border — fill and the pink card behind it do the separating. The white
      ground is not decoration: a QR needs a quiet zone to decode at all. */
   border: none;
@@ -939,3 +941,26 @@ body.mode-gallery .qr-badge.qr-inline { display: flex !important; }
 .g-tile-title { font-size: clamp(9px, calc(var(--cell, 340px) * 0.046), 16px); }
 .g-tile-artist { font-size: clamp(8px, calc(var(--cell, 340px) * 0.040), 14px); }
 .g-tile-cap { padding: clamp(4px, calc(var(--cell, 340px) * 0.024), 10px); }
+
+
+/* ── Even sheet grid — 2 Oct 2026 ───────────────────────────────────────────
+ * Joshua: "the grid is not good". Sheets get their own grid of identical
+ * portrait tiles, 2 across, each sheet whole on white (contain, never
+ * cropped). Rows size to the tile, not to the square single-design cell. */
+.g-grid-sheets {
+  grid-auto-rows: auto;
+  grid-auto-flow: row;
+}
+.g-grid-sheets .g-tile-img { aspect-ratio: 3 / 4; background: #fff; }
+.g-grid-sheets .g-tile-sheet .g-tile-img img {
+  object-fit: contain;
+  object-position: center;
+  padding: 12px;
+}
+.g-section-label {
+  font-family: 'Bebas Neue', 'Inter', sans-serif;
+  font-size: 34px;
+  letter-spacing: 0.04em;
+  color: #000;
+  margin: 28px 0 12px;
+}

@@ -37,7 +37,10 @@
   let tx    = 0;
   let ty    = 0;
   const MIN_SCALE = 1;
-  const MAX_SCALE = 6;
+  /* KIOSK_CONFIG.zoom false (the default) clamps every zoom path — tap,
+   * pinch, wheel, keys — to 1x, because they all go through zoomAt(). */
+  const ZOOM_ON = !!(window.KIOSK_CONFIG && window.KIOSK_CONFIG.zoom === true);
+  const MAX_SCALE = ZOOM_ON ? 6 : 1;
 
   // Pinch-to-zoom is intentionally disabled (see onTouchStart) — a stray
   // second touch point (common on large capacitive panels) was being
@@ -384,7 +387,7 @@
     }
     const path = document.createElementNS(svgNS, 'path');
     path.setAttribute('d', d);
-    path.setAttribute('fill', '#1a1a1a');
+    path.setAttribute('fill', '#000000');
     svg.appendChild(path);
     badge.appendChild(svg);
   }
@@ -551,6 +554,7 @@
   }
 
   function showZoomBadge() {
+    if (!ZOOM_ON) return;
     zoomBadge.textContent = `${Math.round(scale * 100)}%`;
     zoomBadge.classList.add('visible');
     clearTimeout(badgeTimer);

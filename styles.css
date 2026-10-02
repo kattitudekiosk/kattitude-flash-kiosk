@@ -406,11 +406,11 @@ body.screensaver .nav-btn {
      inside the arc, which only starts eating the code once the radius
      exceeds about 3.4x the padding. Rounding the MODULES is a different and
      riskier thing — see the note at .g-card-qr in gallery.css. */
-  border-radius: 12px;
+  border-radius: 0;   /* square — the rounded-QR exception was withdrawn 2 Oct 2026 */
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  box-shadow: none;   /* a translucent black shadow is grey; separate by fill */
   pointer-events: none;
 }
 
