@@ -114,6 +114,16 @@ gets one injected script tag; served by Vercel, nothing changes.
   their own folders". Imported, resized by invariant 3's rules into
   `Designs/_kiosk/`, published; deleting the file unpublishes it
   (`server/folder-sync.js`).
+- **THE WALL NEEDS NO INTERNET [2 Oct 2026 — Joshua: "if the internet goes out
+  the kiosk doesn't go down with it"].** Everything the wall loads comes from
+  `localhost:8787`: catalog, photos, QR codes (generated locally), and the
+  fonts, which are bundled in `assets/fonts/` (Bebas Neue + Inter, OFL) — the
+  page used to pull them from Google Fonts. Never add a CDN script, web font
+  or remote image to the kiosk; `tools/verify.js` 1h fails if `index.html` or
+  any kiosk stylesheet references another host. Proven offline: studio
+  server inside `sandbox-exec` denying all non-localhost traffic, plus a
+  headless Chrome whose only reachable host is localhost — cover, artists,
+  sheets, screensaver, a folder drop and touch (mouse events) all worked.
 - **The cover reads the live catalog** (`renderCover()` re-reads
   `Catalog.snapshot()`), the same source as the Artists page, so the two can
   never disagree. `tools/verify.js` 1f/1g check it.

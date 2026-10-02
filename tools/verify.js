@@ -314,6 +314,27 @@ function tap(window, node) {
     check('cover shows the reloaded catalog\'s numbers', all.indexOf(want) !== -1, JSON.stringify(all) + ' vs ' + want);
   }
 
+  /* ══ 1h. NO INTERNET NEEDED — Joshua, 2 Oct 2026 ═══════════════════════
+   * "if the internet goes out the kiosk doesn't go down with it." Nothing
+   * the wall's page loads may come from another host: no web fonts, CDN
+   * scripts or stylesheets. (URLs that are only QR-code TEXT, never fetched,
+   * are fine — they are not in src/href/url().) */
+  console.log('\nwall loads nothing from the internet');
+  {
+    const read = f => fs.readFileSync(path.join(ROOT, f), 'utf8');
+    const html = read('index.html');
+    const ext = [...html.matchAll(/(?:src|href)\s*=\s*"(https?:\/\/[^"]+)"/g)].map(m => m[1]);
+    check('index.html loads no external script, stylesheet or font', ext.length === 0, ext.join(', '));
+    const cssExt = ['styles.css', 'gallery.css', 'avatars.css', 'assets/fonts/fonts.css']
+      .filter(f => fs.existsSync(path.join(ROOT, f)))
+      .flatMap(f => [...read(f).matchAll(/url\(\s*['"]?(https?:\/\/[^)'"]+)/g)].map(m => f + ': ' + m[1]));
+    check('no stylesheet pulls anything from another host', cssExt.length === 0, cssExt.join(', '));
+    const fontsCss = fs.existsSync(path.join(ROOT, 'assets/fonts/fonts.css')) ? read('assets/fonts/fonts.css') : '';
+    const files = [...fontsCss.matchAll(/url\(([^)]+)\)/g)].map(m => m[1]);
+    check('the bundled font files exist', files.length > 0 &&
+      files.every(f => fs.existsSync(path.join(ROOT, 'assets/fonts', f))), files.join(', '));
+  }
+
   /* ══ 2. SEED — full hybrid experience ═══════════════════════════════════ */
   console.log('\nseed catalog (hybrid grid)');
   {
