@@ -6,6 +6,32 @@
  * object; applying it here would give a phone user 6px labels. Deliberately
  * a different approach for a different job.
  *
+ * ── THE PALETTE RULE, AND IT IS A RULE ─────────────────────────────────
+ *
+ * Joshua, 17 Aug 2026, having now said it three times: "Why do you keep
+ * adding this black background and dark gray at the top? That's not the brand
+ * colors or styling. It needs to look more consistent with the sign-in link
+ * for the magic link. I told you it should be predominantly a white
+ * background. Black is just for the text. It's a minimal highlight."
+ *
+ *   WHITE is the ground and every surface.
+ *   BLACK is TYPE. It is not a background. There is no black slab anywhere
+ *         in this app — no masthead, no identity strip, no tab bar.
+ *   PINK  is the accent, small and deliberate: the active tab and its
+ *         underline, primary buttons, the eyebrow label, the role pill.
+ *   YELLOW is a highlight, sparingly. It is never a heading colour and never
+ *         a fill behind a slab.
+ *
+ * THE REFERENCE IS THE SIGN-IN CARD, which has always been right: white card,
+ * black type, a pink eyebrow, one pink button. Everything else in this file
+ * is that card, repeated. If a change would make some region of this app
+ * predominantly dark, the change is wrong — go and look at the sign-in
+ * screen first.
+ *
+ * This is recorded in CLAUDE.md under DESIGN RULES as well, because it has
+ * been re-litigated three times and needs to stop being a matter of
+ * interpretation.
+ *
  * That licence covers LAYOUT ONLY. It is not licence for a different visual
  * language, and reading it that way is how this file spent its whole life
  * out of brand.
@@ -31,6 +57,7 @@
   --muted: #6b6b74;
   --pink: #E91E8C;
   --pink-deep: #C2156F;
+  --yellow: #FDE446;
   --ok: #0f7b4f;
   --warn: #8a6d00;
   --danger: #b3261e;
@@ -38,11 +65,14 @@
 
 * { box-sizing: border-box; }
 
+/* WHITE GROUND. This was --surface, and a near-white page under near-white
+ * cards is what made the dark bands at the top read as the app's identity —
+ * they were the only thing with any contrast on the screen. */
 body {
   margin: 0;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   color: var(--text);
-  background: var(--surface);
+  background: var(--bg);
   -webkit-text-size-adjust: 100%;
 }
 
@@ -59,7 +89,15 @@ body {
  * flex item defaults to min-width: auto and refuses to shrink below its
  * content — that default is what let .who push past the screen instead of
  * compressing. In topbar-menu.js: every ACTION folds behind one button, so
- * the bar carries identity only and stops growing altogether. */
+ * the bar carries identity only and stops growing altogether.
+ *
+ * WHITE, not black. This carried `background: var(--text)` — a black
+ * masthead, which with the identity row under it and the tab strip below
+ * that filled the top third of a phone with dark. See the palette rule at
+ * the top of this file. The bar is now the page: white, black type, and one
+ * hairline to separate it from what scrolls under it. Nothing about its
+ * METRICS changed — padding, sticky offsets and the 57px #tabs top are all
+ * as they were, so this is a repaint and not a relayout. */
 #topbar {
   position: sticky;
   top: 0;
@@ -69,8 +107,9 @@ body {
   justify-content: space-between;
   gap: 12px;
   padding: 12px 16px;
-  background: var(--text);
-  color: #fff;
+  background: var(--bg);
+  color: var(--text);
+  border-bottom: 1px solid var(--line);
 }
 
 .brand {
@@ -80,15 +119,19 @@ body {
   font-size: 22px;
   letter-spacing: 0.08em;
   line-height: 1;
+  color: var(--text);
 }
 
+/* The eyebrow. This is the one pink thing in the header and it is the same
+ * move the sign-in card makes — a 10px tracked-out label over a black
+ * wordmark. It was rgba white on black, which does not survive the repaint. */
 .brand span {
   display: block;
   font-family: 'Inter', sans-serif;
   font-size: 10px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--pink);
   margin-top: 3px;
 }
 
@@ -100,6 +143,7 @@ body {
   gap: 8px;
   min-width: 0;
   font-size: 13px;
+  color: var(--text);
 }
 
 /* A long name shortens rather than shoving the menu button off-screen. */
@@ -108,14 +152,25 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-weight: 600;
+}
+
+/* The role pill is one of the accents. Pink type on white, pink hairline —
+ * not a filled badge, which at this size would be a small pink slab. */
+#whoRole {
+  color: var(--pink);
+  border-color: var(--pink);
+  background: var(--bg);
 }
 
 /* ── Top bar overflow menu ──────────────────────────────────────────────── */
 
-/* The "..." button. Round — the shape IS the element, so this is one of the
- * permitted circles — 40px, and the three dots are elements rather than an
- * ellipsis character, because a text "…" inherits Inter's baseline and sits
- * low in a circle instead of centred in it. */
+/* The "..." button. Round, 40px, and the three dots are elements rather than
+ * an ellipsis character — a text "…" inherits Inter's baseline and sits low
+ * in a circle instead of centred in it.
+ *
+ * Round on purpose and a recorded exception in square.css: it is a round
+ * button, not a softened rectangle. */
 .who-menu-toggle {
   flex: 0 0 auto;
   display: flex;
@@ -125,9 +180,9 @@ body {
   width: 40px;
   height: 40px;
   padding: 0;
-  border: 1px solid rgba(255, 255, 255, 0.22);
+  border: 1px solid var(--line);
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--bg);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
@@ -136,10 +191,12 @@ body {
   width: 4px;
   height: 4px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--text);
 }
 
+/* Open inverts to pink — the accent doing its one job, on a 40px control. */
 .who-menu-toggle.is-on { background: var(--pink); border-color: var(--pink); }
+.who-menu-toggle.is-on i { background: #fff; }
 .who-menu-toggle:active { transform: scale(0.94); }
 .who-menu-toggle:focus { outline: none; }
 .who-menu-toggle:focus-visible { outline: 3px solid var(--pink); outline-offset: 2px; }
@@ -168,7 +225,7 @@ body {
   background: var(--bg);
   border: 1px solid var(--line);
   border-radius: 0;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
 }
 
 .who-menu[hidden] { display: none; }
@@ -208,6 +265,10 @@ body {
 
 #tabs::-webkit-scrollbar { display: none; }
 
+/* BLACK TYPE ON WHITE. An inactive tab was --muted grey, which on a white
+ * strip under a white bar left the whole header looking unfinished and made
+ * the dark slab above it seem necessary. Black type, pink for the one you
+ * are on, and the pink underline as the only fill in the strip. */
 .tab {
   flex: 0 0 auto;
   border: 0;
@@ -216,7 +277,7 @@ body {
   font: inherit;
   font-size: 14px;
   font-weight: 600;
-  color: var(--muted);
+  color: var(--text);
   border-bottom: 3px solid transparent;
   cursor: pointer;
   /* 44px minimum target — this gets used one-handed on a phone. */
@@ -314,6 +375,7 @@ p.muted { line-height: 1.5; margin: 0 0 12px; }
 .chip.is-on { background: var(--pink); border-color: var(--pink); color: #fff; }
 
 /* ── Sign in ────────────────────────────────────────────────────────────── */
+/* THE REFERENCE SCREEN. Everything above is this, repeated. */
 .signin-card { max-width: 420px; margin: 40px auto; }
 .msg { min-height: 20px; font-size: 13px; color: var(--pink); }
 
@@ -400,20 +462,28 @@ p.muted { line-height: 1.5; margin: 0 0 12px; }
 .media-item .tier-x { position: absolute; top: 4px; right: 4px; }
 
 /* ── Toast ──────────────────────────────────────────────────────────────── */
+/* Was a black slab, and it is the one place a dark fill was arguably earned —
+ * it is transient and it overlays. It is still a slab, so it goes white like
+ * everything else and earns its attention with a thick accent edge and the
+ * shadow it needs to lift off the page. An error keeps the red where it is
+ * useful: on the edge and on nothing else, so the message itself stays black
+ * on white and readable at arm's length. */
 .toast {
   position: fixed;
   left: 12px; right: 12px; bottom: 12px;
   z-index: 50;
   padding: 14px 16px;
   border-radius: 0;
-  background: var(--text);
-  color: #fff;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--pink);
   font-size: 14px;
   line-height: 1.45;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.22);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.16);
 }
 
-.toast-error { background: var(--danger); }
+.toast-error { border-left-color: var(--danger); }
 
 @media (min-width: 640px) {
   .toast { left: auto; right: 20px; max-width: 460px; }

@@ -1,0 +1,76 @@
+/* SQUARE CORNERS — the sweep, and the one place corner radius is decided.
+ *
+ * Joshua, 17 Aug 2026, verbatim: "get rid of all the rounded corners... we're
+ * not supposed to have rounded corners on this website at all, except for the
+ * profile pictures and the question mark for the helper. I'm talking about
+ * the squares on the site... if there are circles, leave those alone."
+ *
+ * This is CLAUDE.md's existing no-rounded-corners rule, which had drifted on
+ * the dashboard — partly because CLAUDE.md itself used to exempt the
+ * dashboard from it outright. That exemption is now narrowed to borders only;
+ * see DESIGN RULES in CLAUDE.md, updated the same day.
+ *
+ * WHY A SINGLE RESET RATHER THAN EDITS IN FIVE FILES.
+ * Radius was declared in dashboard.css, requests.css, avatar.css and
+ * tour.css, and can also arrive from JavaScript — several scripts here build
+ * their own markup, and any of them could set a radius inline. A sweep that
+ * edits declarations one by one fixes today and drifts again by Christmas,
+ * and it cannot reach an inline style at all. One !important reset cannot
+ * drift and cannot be out-specified, including by inline styles. The cost is
+ * that the declarations still sitting in those four files are now dead
+ * letters — that is the honest trade, and it is written down here so the next
+ * person is not confused by finding border-radius: 10px in dashboard.css and
+ * square corners on screen.
+ *
+ * THIS FILE LOADS LAST. If it is ever moved earlier in index.html the reset
+ * still wins on !important, but the circle allowlist below could lose to a
+ * later !important rule. Keep it last.
+ */
+
+*,
+*::before,
+*::after {
+  border-radius: 0 !important;
+}
+
+/* ── The circles, which stay circles ────────────────────────────────────
+ *
+ * Two of these are the exceptions Joshua named. The rest are things that are
+ * literally round — dots and a round icon button — and are covered by "if
+ * there are circles, leave those alone." Every one is listed so that the
+ * list is arguable rather than accidental. If any of them should be square,
+ * delete its line; nothing else has to change.
+ */
+
+/* NAMED EXCEPTION 1 — profile pictures. Recorded in CLAUDE.md: a headshot in
+   a hard square reads as an ID photo, and the circular mask IS the crop the
+   artist is shown in avatar.js. */
+.avatar,
+.avatar-btn:focus-visible,      /* the focus ring has to follow the circle */
+.crop-ring,                     /* the mask that shows what will be kept */
+
+/* NAMED EXCEPTION 2 — the "?" helper. A help affordance that is not a circle
+   reads as a form control. */
+#howThisWorks,
+
+/* Round because they are dots. A square progress dot is a dash, and a square
+   notification dot is a pixel. */
+.tour-dot,
+.tab .new-dot,
+
+/* The top bar's "..." overflow button and the three dots inside it. A 40px
+   round icon button, already shipped. */
+.who-menu-toggle,
+.who-menu-toggle i {
+  border-radius: 50% !important;
+}
+
+/* NOT LISTED, ON PURPOSE — .tagtoggle, the new tag button. In THE LOST+
+   UNFOUNDS the equivalent tool-tray button is a pill, and it is one of that
+   system's two sanctioned roundings. It is square here anyway: it is new, the
+   instruction was emphatic, and a third kind of circle would be exactly the
+   drift this file exists to stop. Say the word and it becomes one line above.
+
+   Also not listed, and worth knowing: .pill and .chip shipped at
+   border-radius: 999px. A pill is a squashed rectangle, not a circle, so
+   both are now square. That is the most visible change on the screen. */

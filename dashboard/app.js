@@ -18,6 +18,17 @@
  * is_admin() guard inside a SECURITY DEFINER function. Everything below is
  * the friendly face of those three, and none of it is load-bearing.
  *
+ * WHAT IS NO LONGER HERE: a category is NOT required to publish. There used
+ * to be a `designs_publish_gate` trigger refusing to publish an untagged
+ * design, and this file wore its shape in three places — a refusal in
+ * uploadAll(), a three-write dance in uploadOne(), and a guard against
+ * removing a published design's last category. The trigger was dropped on
+ * 17 Aug 2026 because it was stopping artists uploading at all. Joshua:
+ * "they shouldn't be forced to do that. They should be able to just upload
+ * the designs, and they can add categories or remove the categories later."
+ * An untagged design is a perfectly ordinary design. It appears under See All
+ * on the kiosk; it simply matches no category filter until somebody tags it.
+ *
  * The Artists tab lives in artists-tab.js — it is the largest surface here
  * and the one Kat uses most, so it earns its own file.
  */
@@ -622,8 +633,9 @@
     const head = el('div', 'card');
     head.appendChild(el('h2', null, 'Upload flash'));
     const p = el('p', 'muted');
-    p.textContent = 'Pick as many files as you like — you can tag them all at ' +
-      'once below. Singles must be ' + cfg.spec.design.w + '×' + cfg.spec.design.h +
+    p.textContent = 'Pick as many files as you like. Tagging is optional — you ' +
+      'can tag them all at once below, or upload now and tag later. Singles ' +
+      'must be ' + cfg.spec.design.w + '×' + cfg.spec.design.h +
       ', sheets ' + cfg.spec.sheet.w + '×' + cfg.spec.sheet.h + '.';
     head.appendChild(p);
 
@@ -776,18 +788,13 @@
     return card;
   }
 
+  /* Publish or draft, tagged or not. There is deliberately no check here for
+   * files without a category: an untagged design is allowed to be published,
+   * it just matches no category filter on the kiosk until somebody tags it.
+   * Refusing the whole batch over it is what was stopping artists uploading. */
   async function uploadAll(publish) {
     const usable = state.queue.filter(i => !i.error);
     if (!usable.length) { toast('Nothing uploadable staged.', 'error'); return; }
-
-    if (publish) {
-      const untagged = usable.filter(i => !i.categories.length);
-      if (untagged.length) {
-        toast(`${untagged.length} file(s) have no category yet. A design needs ` +
-              `at least one before it can be published — save as drafts, or tag them.`, 'error');
-        return;
-      }
-    }
 
     let ok = 0;
     for (const item of usable) {
@@ -832,9 +839,11 @@
       if (spec.name === 'thumb') urls.thumb_url = publicUrl(p);
     }
 
-    // Insert unpublished first, attach categories, THEN publish. The database
-    // refuses to publish a design with no category, so doing it in this order
-    // is what makes a one-shot "Publish all" work at all.
+    // ONE write, in the state it is meant to end up in. This used to insert
+    // unpublished, attach categories, and then publish in a third statement —
+    // a dance that existed only to get past a trigger that refused to publish
+    // an untagged design. That trigger is gone, so the row is simply inserted
+    // published or not, and the categories (if any) follow.
     const { data: row, error } = await sb.from('designs').insert({
       artist_id: artistId,
       title: item.title || null,
@@ -843,7 +852,7 @@
       thumb_url: urls.thumb_url || null,
       width: item.w,
       height: item.h,
-      published: false,
+      published: publish,
       approved: !cfg.requireApproval,
       display_order: 0,
     }).select().single();
@@ -853,12 +862,6 @@
       const rows = item.categories.map(cid => ({ design_id: row.id, category_id: cid }));
       const { error: ce } = await sb.from('design_categories').insert(rows);
       if (ce) throw ce;
-    }
-
-    if (publish) {
-      const { error: pe } = await sb.from('designs')
-        .update({ published: true }).eq('id', row.id);
-      if (pe) throw pe;
     }
   }
 
@@ -916,15 +919,12 @@
     if (d.featured) status.appendChild(el('span', 'pill', 'Featured'));
     body.appendChild(status);
 
-    // Categories
+    // Categories. Adding and removing are both always allowed — including
+    // taking the last one off a published design. The kiosk keeps showing it
+    // under See All; it just stops matching a category filter.
     const mine = (d.design_categories || []).map(x => x.category_id);
     body.appendChild(chipGroups(mine, async (c, on) => {
       if (on) {
-        if (mine.length === 1 && d.published) {
-          toast('That is its only category, and it is published. Unpublish first, ' +
-                'or add another — a published design needs at least one.', 'error');
-          return;
-        }
         const { error } = await sb.from('design_categories').delete()
           .eq('design_id', d.id).eq('category_id', c.id);
         if (error) return fail('Removing category', error);

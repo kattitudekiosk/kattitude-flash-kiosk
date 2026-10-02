@@ -11,6 +11,13 @@
 <link rel="stylesheet" href="requests.css" />
 <link rel="stylesheet" href="avatar.css" />
 <link rel="stylesheet" href="tour.css" />
+<!-- The collapsed tag bar and its expandable picker. Additive; deleting this
+     line and the tag-ui.js script below restores the old chip list. -->
+<link rel="stylesheet" href="tag-ui.css" />
+<!-- LAST ON PURPOSE. square.css is the one place corner radius is decided
+     for this app — a blanket reset plus an explicit list of the things that
+     stay circular. Moving it earlier lets a later !important win. -->
+<link rel="stylesheet" href="square.css" />
 </head>
 <body>
 
@@ -42,6 +49,10 @@
 
 <nav id="tabs" hidden>
   <button class="tab is-active" data-view="upload">Upload</button>
+  <!-- Label is rewritten to "All Designs" for admins by all-designs-label.js.
+       The pane itself has always shown every artist's work to an admin — the
+       query carries no artist filter and RLS decides the rows — so this is a
+       labelling fix, not a new view. -->
   <button class="tab" data-view="designs">My Designs</button>
   <!-- Deliberately NOT admin-only: artists use this tab to ask, admins use
        the same tab to answer. -->
@@ -152,14 +163,26 @@
 <!-- tour.js watches for the top bar unhiding, so it loads late and does not
      need app.js to know it exists. -->
 <script src="tour.js"></script>
+<!-- tag-ui.js collapses the category chips behind one icon and moves the
+     picker into an expandable card. It watches #app for the panes app.js
+     renders, so app.js does not know it exists either — same arrangement as
+     everything else in this block. It must load AFTER tour.js: it rewrites
+     the copy of one tutorial step through Tour._steps, and that object has to
+     exist first. -->
+<script src="tag-ui.js"></script>
 <!-- topbar-menu.js folds the header's controls into an overflow panel. It
      watches .who rather than assuming it runs last, so it does not care that
      view-as.js adds its button after sign-in — but it is placed before
      view-as.js anyway, so the panel exists by the time that button arrives
      and the toggle never flashes in the bar first. -->
 <script src="topbar-menu.js"></script>
-<!-- view-as.js LAST: it rebinds the "?" so help answers with whichever script
-     the current view calls for, and the last binding is the one that wins. -->
+<!-- view-as.js LAST among the behavioural scripts: it rebinds the "?" so help
+     answers with whichever script the current view calls for, and the last
+     binding is the one that wins. -->
 <script src="view-as.js"></script>
+<!-- Label-only, and it reads the role pill that view-as.js rewrites, so it
+     goes after it — that way the tab is right on first paint rather than
+     corrected a frame later. -->
+<script src="all-designs-label.js"></script>
 </body>
 </html>
