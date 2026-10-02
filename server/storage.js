@@ -60,7 +60,8 @@ function ensureArtistFolders(names) {
   for (const n of names) {
     const f = folderName(n);
     if (!f) continue;
-    for (const s of Object.values(SUB).concat(['Sheets'])) fs.mkdirSync(path.join(MEDIA, f, s), { recursive: true });
+    // Designs/ (work) and Headshots/ only. Sheets/ was retired 2 Oct 2026.
+    for (const s of Object.values(SUB)) fs.mkdirSync(path.join(MEDIA, f, s), { recursive: true });
   }
 }
 

@@ -310,52 +310,82 @@ const PNG = Buffer.from('89504e470d0a1a0a0000000d4948445200000001000000010806000
     const { execFileSync } = require('node:child_process');
     const sync = require('./folder-sync');
     const media = path.join(DATA, 'KIOSK MEDIA');
-    const mk = (file, w, h) => {
+    const md5 = f => fs.existsSync(f) ? crypto.createHash('md5').update(fs.readFileSync(f)).digest('hex') : 'missing:' + f;
+    const ls = d => { try { return fs.readdirSync(d); } catch (e) { return []; } };
+    const mk = (file, w, h, label) => {
       fs.mkdirSync(path.dirname(file), { recursive: true });
       const tiny = path.join(DATA, 'tiny.png');
       fs.writeFileSync(tiny, PNG);
       execFileSync('/usr/bin/sips', ['-s', 'format', 'jpeg', '-z', String(h), String(w), tiny, '--out', file], { stdio: 'ignore' });
+      if (label) fs.appendFileSync(file, Buffer.from(label));
       const t = new Date(Date.now() - 10000); fs.utimesSync(file, t, t);   // settled, not mid-copy
-      return crypto.createHash('md5').update(fs.readFileSync(file)).digest('hex');
+      return md5(file);
     };
-    const sheetFile = path.join(media, 'Barbie', 'Designs', 'IMG_1705.JPEG');
-    const md5Before = mk(sheetFile, 2550, 3300);
-    mk(path.join(media, 'Barbie', 'Designs', 'big-square.jpg'), 3000, 3000);
-    mk(path.join(media, 'Barbie', 'Sheets', 'square-sheet.jpg'), 3000, 3000);
-    mk(path.join(media, 'Barbie', 'Designs', 'tiny.jpg'), 800, 800);
-    mk(path.join(media, 'Barbie', 'Designs', 'some-upload', 'original.jpg'), 2048, 2048);
+    const B = (...p) => path.join(media, 'Barbie', ...p);
+    const sheetMd5 = mk(B('Designs', 'IMG_1705.JPEG'), 2550, 3300);
+    mk(B('Designs', 'exact-2048.jpg'), 2048, 2048);
+    mk(B('loose-in-artist-folder.jpg'), 1320, 1700);
+    mk(B('Designs', 'tiny.jpg'), 800, 800);
+    mk(B('Designs', 'some-upload', 'original.jpg'), 2048, 2048);
+    mk(B('Headshots', 'face.jpg'), 1500, 1500);
 
     const r1 = sync.syncOnce(conn);
-    const rows = db.all(conn, 'designs').filter(d => d.source_file && d.source_file.startsWith('Barbie/'));
-    const bySrc = Object.fromEntries(rows.map(d => [d.source_file, d]));
-    const sh = bySrc['Barbie/Designs/IMG_1705.JPEG'];
-    check('a sheet dropped in <artist>/Designs is imported, published, under that artist',
+    const bySrc = () => Object.fromEntries(db.all(conn, 'designs').filter(d => d.source_file).map(d => [d.source_file, d]));
+    let S = bySrc();
+    const sh = S['Barbie/Designs/IMG_1705.JPEG'];
+    check('a file in <artist>/Designs is imported as a published flash sheet under that artist',
       sh && sh.type === 'sheet' && sh.published && sh.artist_id === barbie.id, JSON.stringify(r1));
     check('...resized to fit 2160×3840, never cropped (aspect kept)',
       sh && sh.width === 2160 && sh.height === Math.round(3300 * 2160 / 2550), sh && sh.width + 'x' + sh.height);
-    check('...and the dropped original is untouched',
-      crypto.createHash('md5').update(fs.readFileSync(sheetFile)).digest('hex') === md5Before);
+    check('...and the dropped original is untouched', md5(B('Designs', 'IMG_1705.JPEG')) === sheetMd5);
     const kioskFile = sh ? storage.diskPath('flash', sh.image_url.replace(/^\/storage\/v1\/object\/public\/flash\//, '')) : '/nonexistent';
-    check('...with a kiosk copy on disk', fs.existsSync(kioskFile), kioskFile);
-    const big = bySrc['Barbie/Designs/big-square.jpg'];
-    check('a big square in Designs becomes a 2048 single', big && big.type === 'design' && big.width === 2048);
-    const sq = bySrc['Barbie/Sheets/square-sheet.jpg'];
-    check('a square in Sheets/ is a sheet', sq && sq.type === 'sheet' && sq.width === 2160 && sq.height === 2160,
-      sq && sq.type + ' ' + sq.width + 'x' + sq.height);
-    check('a too-small file is skipped, not stretched', !bySrc['Barbie/Designs/tiny.jpg']);
-    check('files inside subfolders (dashboard uploads) are not re-imported',
-      !rows.some(d => /some-upload/.test(d.source_file)));
+    check('...with a kiosk copy in Designs/_kiosk', fs.existsSync(kioskFile) && /\/Designs\/_kiosk\//.test(kioskFile), kioskFile);
+    const ex = S['Barbie/Designs/exact-2048.jpg'];
+    check('a 2048×2048 file is a flash SHEET too (everything is a sheet)', ex && ex.type === 'sheet', ex && ex.type);
+    const loose = S['Barbie/loose-in-artist-folder.jpg'];
+    check('a file loose in <artist>/ counts, as a sheet', loose && loose.type === 'sheet' && loose.artist_id === barbie.id);
+    check('Headshots/ is never imported', !Object.keys(S).some(k => /Headshots/.test(k)));
+    check('a too-small file is skipped, not stretched', !S['Barbie/Designs/tiny.jpg']);
+    check('files inside subfolders (dashboard uploads, _kiosk) are not re-imported',
+      !Object.keys(S).some(k => /some-upload|_kiosk/.test(k)));
     const kc2 = await req('GET', '/rest/v1/kiosk_catalog?select=*');
     check('imported sheet is on the wall\'s catalog, with its file name',
-      kc2.json.some(r => r.source_name === 'IMG_1705.JPEG' && r.artist_name === 'Barbie'));
-    const r2 = sync.syncOnce(conn);
-    check('a second scan with nothing changed imports nothing', r2.imported.length === 0, JSON.stringify(r2));
+      kc2.json.some(r => r.source_name === 'IMG_1705.JPEG' && r.artist_name === 'Barbie' && r.type === 'sheet'));
+    check('a second scan with nothing changed imports nothing', sync.syncOnce(conn).imported.length === 0);
 
-    fs.unlinkSync(sheetFile);
+    /* ── Sheets/ is emptied into Designs/ and removed ── */
+    const M = (...p) => path.join(media, 'Miranda', ...p);
+    const ivMd5 = mk(M('Sheets', 'Untitled_Artwork_2_web.JPEG'), 3000, 3000, 'iv');
+    fs.mkdirSync(M('Designs', '_kiosk-sheets', 'Untitled_Artwork_2_web'), { recursive: true });   // stale old copy
+    const preRow = db.insertRow(conn, 'designs', { artist_id: miranda.id, title: 'old', type: 'sheet',
+      image_url: '/x', published: true, source_file: 'Miranda/Sheets/Untitled_Artwork_2_web.JPEG', source_sig: 'old' });
+    const clashA = mk(M('Designs', 'clash.jpg'), 1320, 1700, 'a');
+    const clashB = mk(M('Sheets', 'clash.jpg'), 1320, 1700, 'b');
+    mk(M('Designs', 'dupe.jpg'), 1320, 1700, 'same');
+    fs.copyFileSync(M('Designs', 'dupe.jpg'), M('Sheets', 'dupe.jpg'));
+    const t = new Date(Date.now() - 10000); fs.utimesSync(M('Sheets', 'dupe.jpg'), t, t);
+
+    const r4 = sync.syncOnce(conn);
+    S = bySrc();
+    check('Sheets/ is emptied into Designs/ and removed', !fs.existsSync(M('Sheets')), JSON.stringify(r4.moved));
+    check('the moved file is byte-identical in Designs/', md5(M('Designs', 'Untitled_Artwork_2_web.JPEG')) === ivMd5);
+    const iv = S['Miranda/Designs/Untitled_Artwork_2_web.JPEG'];
+    check('its design keeps the same id — re-pointed, not duplicated',
+      iv && iv.id === preRow.id && iv.type === 'sheet' &&
+      db.all(conn, 'designs').filter(d => /Untitled_Artwork_2_web/.test(d.source_file || '')).length === 1);
+    check('...and its wall copy is rebuilt in Designs/_kiosk; the old _kiosk-sheets copy is gone',
+      iv && /\/_kiosk\/Untitled_Artwork_2_web\//.test(iv.image_url) && !fs.existsSync(M('Designs', '_kiosk-sheets')));
+    const names = ls(M('Designs')).filter(n => /clash/.test(n)).sort();
+    check('a name clash keeps BOTH files, nothing overwritten',
+      names.length === 2 && names.map(n => md5(M('Designs', n))).sort().join() === [clashA, clashB].sort().join(), names.join(', '));
+    check('an exact duplicate is stored once', ls(M('Designs')).filter(n => /dupe/.test(n)).length === 1);
+    check('no other folders are created (Designs + Headshots only)',
+      ls(M()).filter(n => !n.startsWith('.')).sort().join() === 'Designs', ls(M()).join());
+
+    fs.unlinkSync(B('Designs', 'IMG_1705.JPEG'));
     const r3 = sync.syncOnce(conn);
-    check('deleting the file takes the design off the wall',
-      r3.removed.includes('Barbie/Designs/IMG_1705.JPEG') &&
-      !db.all(conn, 'designs').some(d => d.source_file === 'Barbie/Designs/IMG_1705.JPEG') &&
+    check('deleting the file takes the sheet off the wall',
+      r3.removed.includes('Barbie/Designs/IMG_1705.JPEG') && !bySrc()['Barbie/Designs/IMG_1705.JPEG'] &&
       !fs.existsSync(kioskFile), JSON.stringify(r3));
   }
 

@@ -31,21 +31,22 @@ ID, so a rename never breaks a link.
 
 ## Dropping files straight into KIOSK MEDIA
 
-Drag an image into an artist's folder and it goes on the wall within a few
-seconds (`server/folder-sync.js`). No dashboard needed.
+**Drop sheets into `KIOSK MEDIA/<Artist>/Designs/`** — it goes on the wall
+within about a minute (`server/folder-sync.js`). A file loose directly in
+`<Artist>/` counts too.
 
-| Put it in | It becomes |
-|---|---|
-| `<Artist>/Designs/` | a **single** if it is square and at least 2048 wide, otherwise a **flash sheet** (at least 1080 wide) |
-| `<Artist>/Sheets/` | always a **flash sheet** — use this for square sheets |
-
-- The file you dropped is never changed or moved. The wall shows a copy,
-  resized to fit (never cropped, never enlarged), kept in `_kiosk/` beside it.
-- Drop it loose in the folder. Subfolders are where dashboard uploads live and
-  are left alone.
+- **Everything is a flash sheet** (Joshua: "designs are sheets"). Only a
+  picture under 1080 px on its long side is skipped, and the reason logged.
+- The file you dropped is never changed. The wall shows a copy, fitted
+  (never cropped, never enlarged), in `Designs/_kiosk/`.
+- Subfolders of `Designs/` (dashboard uploads, `_kiosk`) are left alone;
+  `Headshots/` is never imported.
 - Delete the file and it leaves the wall. Replace it and the wall updates.
-- Too small (a square under 2048, anything under 1080 wide) is skipped; the
-  reason is in `~/KattitudeData/logs/server.log`.
+- The old `Sheets/` folder is retired: anything in it is moved into
+  `Designs/` (same design id, exact duplicates stored once, clashing names
+  kept under a new name) and the empty folder removed — every scan.
+- `server/KIOSK-MEDIA-HOW-TO.txt` is the staff-facing version; it heads the
+  README.txt in the KIOSK MEDIA folder.
 
 ## Run it
 

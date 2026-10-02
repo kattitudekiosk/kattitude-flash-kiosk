@@ -297,6 +297,23 @@ function tap(window, node) {
     }
   }
 
+  /* ══ 1g. COVER NEVER LAGS THE CATALOG — Joshua, 2 Oct 2026 ═════════════
+   * Change the catalog, reload it WITHOUT the refresh callback, then show the
+   * cover: it must show the new numbers, exactly like the Artists page. */
+  console.log('\ncover reads the live catalog (never lags the Artists page)');
+  {
+    const w = await boot({ catalogSource: 'seed' });
+    w.SEED_CATALOG.designs = w.SEED_CATALOG.designs.slice(0, 3);
+    await w.Catalog.load();
+    w.KIOSK_ROUTER.goHome();
+    const s = w.Catalog.snapshot();
+    const all = w.document.querySelector('.g-mode-all').textContent;
+    const want = (s.singleCount ? s.singleCount + (s.singleCount === 1 ? ' design' : ' designs') : '') +
+      (s.singleCount && s.sheetCount ? ' · ' : '') +
+      (s.sheetCount ? s.sheetCount + (s.sheetCount === 1 ? ' sheet' : ' sheets') : '');
+    check('cover shows the reloaded catalog\'s numbers', all.indexOf(want) !== -1, JSON.stringify(all) + ' vs ' + want);
+  }
+
   /* ══ 2. SEED — full hybrid experience ═══════════════════════════════════ */
   console.log('\nseed catalog (hybrid grid)');
   {
