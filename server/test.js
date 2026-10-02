@@ -60,7 +60,8 @@ const PNG = Buffer.from('89504e470d0a1a0a0000000d4948445200000001000000010806000
 
 (async () => {
   const conn = db.open(path.join(DATA, 'kattitude.db'));
-  storage.init(DATA);
+  storage.init(DATA, { mediaDir: path.join(DATA, 'KIOSK MEDIA'),
+                      artistName: id => (db.getByKey(conn, 'artists', [id]) || {}).name });
   const server = makeServer(conn);
   await new Promise(r => server.listen(0, '127.0.0.1', r));
   BASE = `http://127.0.0.1:${server.address().port}`;
@@ -183,6 +184,11 @@ const PNG = Buffer.from('89504e470d0a1a0a0000000d4948445200000001000000010806000
   const f2 = await up(B.token, `flash/${miranda.id}/x/original.png`);
   const f3 = await up(K.token, `flash/${miranda.id}/k/original.png`);
   check('flash: own folder yes', f1.status === 200, f1.text);
+  const onDisk = path.join(DATA, 'KIOSK MEDIA', 'Barbie', 'Designs', 'x', 'original.png');
+  check('an upload lands in KIOSK MEDIA/<artist name>/Designs', fs.existsSync(onDisk) &&
+    fs.readFileSync(onDisk).equals(PNG), onDisk);
+  check('a headshot lands in KIOSK MEDIA/<artist name>/Headshots',
+    fs.existsSync(path.join(DATA, 'KIOSK MEDIA', 'Barbie', 'Headshots', 'me.png')));
   check('flash: someone else\'s folder no', f2.status === 403, f2.status);
   check('flash: admin may upload on someone\'s behalf', f3.status === 200, f3.text);
   const s1 = await up(B.token, 'sale-media/s1/a.png');

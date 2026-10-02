@@ -90,7 +90,7 @@ Live URLs live in `LINKS.md`. Keep it current.
 
 The handoff to Kat moves data and photos off Supabase onto the kiosk Mac mini
 so she pays nothing. `server/` is that backend: one Node process, no npm
-dependencies, SQLite + files under `~/KattitudeData`, speaking Supabase's URL
+dependencies, SQLite under `~/KattitudeData`, photos in `~/Desktop/KIOSK MEDIA/<Artist>/Designs|Headshots`, speaking Supabase's URL
 shapes so the kiosk and dashboard code are unchanged. Served by it, each page
 gets one injected script tag; served by Vercel, nothing changes.
 

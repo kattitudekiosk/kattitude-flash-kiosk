@@ -27,10 +27,57 @@ const path = require('node:path');
 const { httpError } = require('./db');
 const { storageWrite, BUCKETS } = require('./policy');
 
-let ROOT = null;
-function init(dataDir) {
-  ROOT = path.join(dataDir, 'files');
-  for (const b of Object.keys(BUCKETS)) fs.mkdirSync(path.join(ROOT, b), { recursive: true });
+/* WHERE FILES LIVE — Joshua, 2 Oct 2026: photos go in a Desktop folder named
+ * "KIOSK MEDIA", one subfolder per artist, so the studio can see and back up
+ * its own work in Finder:
+ *
+ *   ~/Desktop/KIOSK MEDIA/<Artist name>/Designs/…     flash bucket
+ *   ~/Desktop/KIOSK MEDIA/<Artist name>/Headshots/…   avatars bucket
+ *   ~/Desktop/KIOSK MEDIA/Flash Sales/…               sale-media bucket
+ *
+ * URLs stay keyed by artist ID (/storage/v1/object/public/flash/<id>/…), and
+ * the ID is turned into the folder name on every request. Renaming an artist
+ * renames their folder (renameArtistFolder) so nothing is orphaned. */
+let MEDIA = null;
+let artistName = () => null;
+const SUB = { flash: 'Designs', avatars: 'Headshots' };
+
+function folderName(name) {
+  return String(name || '').replace(/[\/:\0]/g, '-').replace(/^\.+/, '').trim() || null;
+}
+
+function init(dataDir, opts) {
+  opts = opts || {};
+  MEDIA = opts.mediaDir || process.env.KT_MEDIA_DIR ||
+    path.join(require('node:os').homedir(), 'Desktop', 'KIOSK MEDIA');
+  if (opts.artistName) artistName = opts.artistName;
+  fs.mkdirSync(path.join(MEDIA, 'Flash Sales'), { recursive: true });
+}
+
+/* Make sure every artist has their folder, so Kat sees all seven in Finder
+ * before anybody uploads. */
+function ensureArtistFolders(names) {
+  for (const n of names) {
+    const f = folderName(n);
+    if (!f) continue;
+    for (const s of Object.values(SUB)) fs.mkdirSync(path.join(MEDIA, f, s), { recursive: true });
+  }
+}
+
+function renameArtistFolder(oldName, newName) {
+  const a = folderName(oldName), b = folderName(newName);
+  if (!a || !b || a === b) return;
+  const from = path.join(MEDIA, a), to = path.join(MEDIA, b);
+  if (fs.existsSync(from) && !fs.existsSync(to)) fs.renameSync(from, to);
+  else ensureArtistFolders([newName]);
+}
+
+/* bucket + object path → the real directory that holds it */
+function bucketDir(bucket, firstSeg) {
+  if (bucket === 'sale-media') return path.join(MEDIA, 'Flash Sales');
+  const f = folderName(artistName(firstSeg));
+  if (!f) throw httpError(404, 'No artist folder for that path', 'NoSuchKey');
+  return path.join(MEDIA, f, SUB[bucket]);
 }
 
 const TYPES = {
@@ -48,8 +95,13 @@ function safePath(bucket, p) {
       segs.some(s => !s || s === '.' || s === '..' || s.startsWith('.') || !/^[A-Za-z0-9._-]+$/.test(s))) {
     throw httpError(400, 'Invalid file path', 'InvalidKey');
   }
-  const full = path.resolve(ROOT, bucket, ...segs);
-  if (!full.startsWith(path.resolve(ROOT, bucket) + path.sep)) throw httpError(400, 'Invalid file path', 'InvalidKey');
+  /* flash/<artist_id>/rest → KIOSK MEDIA/<Name>/Designs/rest; sale-media keeps
+   * its sale-id folder inside Flash Sales. */
+  const base = bucketDir(bucket, segs[0]);
+  const rest = bucket === 'sale-media' ? segs : segs.slice(1);
+  if (!rest.length) return base;
+  const full = path.resolve(base, ...rest);
+  if (!full.startsWith(path.resolve(base) + path.sep)) throw httpError(400, 'Invalid file path', 'InvalidKey');
   return full;
 }
 
@@ -83,8 +135,10 @@ function upload(ctx, bucket, objectPath, buf, upsert) {
 
 function list(ctx, bucket, prefix, limit) {
   if (!ctx.me) throw httpError(403, 'Sign in first', '42501');
-  const dir = prefix ? safePath(bucket, String(prefix).replace(/\/+$/, '')) : path.join(ROOT, bucket);
   if (!BUCKETS[bucket]) throw httpError(404, 'Bucket not found', 'NoSuchBucket');
+  if (!prefix) return [];
+  let dir;
+  try { dir = safePath(bucket, String(prefix).replace(/\/+$/, '')); } catch (e) { return []; }
   let names = [];
   try { names = fs.readdirSync(dir, { withFileTypes: true }); } catch (e) { return []; }
   return names.filter(d => !d.name.startsWith('.') && !d.name.includes('.part-'))
@@ -132,4 +186,4 @@ function publicFile(bucket, objectPath) {
   };
 }
 
-module.exports = { init, upload, list, remove, publicFile, existsPublicPath, typeOf, MAX_BYTES };
+module.exports = { diskPath: safePath, init, ensureArtistFolders, renameArtistFolder, folderName, mediaDir: () => MEDIA, upload, list, remove, publicFile, existsPublicPath, typeOf, MAX_BYTES };

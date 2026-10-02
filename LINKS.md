@@ -19,7 +19,8 @@ The studio's data and photos on the kiosk Mac mini (`server/README.md`).
 | Kiosk, served by the Mac mini | http://localhost:8787 — **on the Mac mini only** |
 | Dashboard, served by the Mac mini | http://localhost:8787/dashboard/ — **on the Mac mini only** |
 | From a phone (temporary tunnel) | https://largely-legacy-boots-varies.trycloudflare.com/dashboard/ — **DIES when the tunnel or session stops, and the address changes every restart.** Testing only; never give it to artists. |
-| Data on disk | `~/KattitudeData/` (database, `files/`, `backups/`, `logs/`) |
+| Photos on disk | `~/Desktop/KIOSK MEDIA/<Artist>/Designs` and `/Headshots` |
+| Database on disk | `~/KattitudeData/` (database, `backups/`, `logs/`) |
 | Vercel previews of this branch | built **READY**, and unchanged for Vercel visitors — they still talk to Supabase: |
 | ↳ dashboard | https://kattitude-flash-dashboard-cvbl5az74-joshua-greenes-projects.vercel.app |
 | ↳ kiosk | https://flash-gallery-7wth7fuss-joshua-greenes-projects.vercel.app (behind Vercel login) |

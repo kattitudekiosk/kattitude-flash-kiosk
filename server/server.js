@@ -224,9 +224,16 @@ function makeServer(conn) {
       m = p.match(/^\/rest\/v1\/([a-z_]+)$/);
       if (m) {
         const body = ['POST', 'PATCH'].includes(req.method) ? await readJson(req) : null;
+        /* Artist renamed → rename their KIOSK MEDIA folder to match. */
+        const before = (m[1] === 'artists' && body && body.name !== undefined)
+          ? Object.fromEntries(db.all(conn, 'artists').map(a => [a.id, a.name])) : null;
         const rows = rest.handle(conn, ctx, req.method, m[1], url.searchParams, body, origin);
         if (m[1] === 'artists' && req.method === 'PATCH' && body && body.active === false) {
           rows.forEach(r => auth.revokeArtist(conn, r.id));
+        }
+        if (m[1] === 'artists' && rows.length) {
+          if (before) rows.forEach(r => storage.renameArtistFolder(before[r.id], r.name));
+          if (req.method === 'POST') storage.ensureArtistFolders(rows.map(r => r.name));
         }
         return send(res, req.method === 'POST' ? 201 : 200, rows);
       }
@@ -327,7 +334,8 @@ function linkUrl(redirectTo, origin, token) {
 
 function start() {
   const conn = db.open(path.join(DATA, 'kattitude.db'));
-  storage.init(DATA);
+  storage.init(DATA, { artistName: id => (db.getByKey(conn, 'artists', [id]) || {}).name });
+  storage.ensureArtistFolders(db.all(conn, 'artists').map(a => a.name));
   const server = makeServer(conn);
   server.listen(PORT, HOST, () => {
     console.log(`[studio-server] ${db.nowIso()} listening on http://${HOST}:${PORT}  data=${DATA}`);

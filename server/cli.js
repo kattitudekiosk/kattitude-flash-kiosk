@@ -26,7 +26,11 @@ const { withKeys } = require('./rpc');
 const DATA = process.env.KT_DATA_DIR || path.join(os.homedir(), 'KattitudeData');
 const PORT = process.env.KT_PORT || '8787';
 
-function conn() { storage.init(DATA); return db.open(path.join(DATA, 'kattitude.db')); }
+function conn() {
+  const c = db.open(path.join(DATA, 'kattitude.db'));
+  storage.init(DATA, { artistName: id => (db.getByKey(c, 'artists', [id]) || {}).name });
+  return c;
+}
 function arg(name) { const i = process.argv.indexOf(name); return i > 0 ? process.argv[i + 1] : null; }
 
 function findArtist(c, q) {
@@ -68,7 +72,7 @@ async function pull(url) {
   if (!r.ok) { console.warn(`  ! could not download ${url}: ${r.status}`); return url; }
   const buf = Buffer.from(await r.arrayBuffer());
   const rel = decodeURIComponent(m[2]);
-  const full = path.join(DATA, 'files', m[1], ...rel.split('/'));
+  const full = storage.diskPath(m[1], rel);   // → ~/Desktop/KIOSK MEDIA/<Artist>/…
   fs.mkdirSync(path.dirname(full), { recursive: true });
   fs.writeFileSync(full, buf);
   console.log(`  ↓ ${m[1]}/${rel} (${buf.length} bytes)`);

@@ -7,10 +7,13 @@ storage bill, and the wall keeps working when the shop's internet doesn't.
  wall (Chrome, this Mac) ──► http://localhost:8787            kiosk
  artists' phones ──► tunnel (https) ──► localhost:8787/dashboard/
                                           │
-                       ~/KattitudeData/   ├─ kattitude.db      SQLite: artists, designs, categories, sales
-                                          ├─ files/<bucket>/   flash, avatars, sale-media
-                                          ├─ backups/          nightly DB snapshots (last 30)
-                                          └─ logs/
+  ~/Desktop/KIOSK MEDIA/   ├─ <Artist>/Designs/     every upload, in that artist's own folder
+                          ├─ <Artist>/Headshots/   profile photos
+                          ├─ Flash Sales/          event photos
+                          └─ real/, placeholder/   the original image package (untouched)
+  ~/KattitudeData/        ├─ kattitude.db          SQLite: artists, designs, categories, sales
+                          ├─ backups/              nightly DB snapshots (last 30)
+                          └─ logs/
 ```
 
 One Node process (`server/server.js`), **zero npm dependencies** — Node's
@@ -19,6 +22,12 @@ built-in `node:sqlite` and `node:http`. It answers the same URLs Supabase did
 unchanged. When it serves them, it injects one script tag into each page to
 point it at itself. The same files served from Vercel are untouched and still
 talk to Supabase.
+
+Photos live in **`~/Desktop/KIOSK MEDIA`**, one folder per artist, named
+exactly as in the dashboard (Joshua, 2 Oct 2026). Folders for every artist are
+created at start-up; adding an artist creates theirs; renaming an artist
+renames their folder. Override with `KT_MEDIA_DIR`. URLs stay keyed by artist
+ID, so a rename never breaks a link.
 
 ## Run it
 
