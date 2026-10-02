@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__Vercel__list_deployments",
+      "mcp__Vercel__get_deployment",
+      "mcp__Vercel__list_deployment_events",
+      "mcp__Vercel__list_deployment_aliases",
+      "mcp__Vercel__list_deployment_files",
+      "mcp__Vercel__get_deployment_file_contents",
+      "mcp__Vercel__get_runtime_logs",
+      "mcp__Vercel__get_runtime_errors",
+      "mcp__Vercel__get_project",
+      "mcp__Vercel__list_projects",
+      "mcp__Vercel__web_fetch_vercel_url"
+    ]
+  }
+}
