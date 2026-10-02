@@ -1,0 +1,20 @@
+HOW TO PUT FLASH SHEETS ON THE WALL
+===================================
+
+Drop the picture into the artist's  Designs  folder:
+
+    KIOSK MEDIA / <Artist name> / Designs /
+
+It shows on the wall within about a minute, under that artist and in View
+All. Everything dropped in counts as a flash sheet. (A picture dropped loose
+straight into the artist's own folder counts too.)
+
+  - Your file is never changed. The wall uses a resized copy kept in the
+    _kiosk folder inside Designs - leave _kiosk alone.
+  - Very small pictures (under 1080 pixels on the long side) are skipped.
+  - To take a sheet off the wall, delete the file or move it out.
+
+Headshots go in  <Artist name> / Headshots  (set from the dashboard).
+
+-------------------------------------------------------------------------
+

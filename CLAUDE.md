@@ -104,12 +104,19 @@ gets one injected script tag; served by Vercel, nothing changes.
 - **Photo URLs are stored as paths** and given a host per request. Never store
   a tunnel address in the database: a quick tunnel's address changes on
   restart and would orphan every image at once.
-- **KIOSK MEDIA is an upload route.** A file dropped loose into
-  `<Artist>/Designs` or `<Artist>/Sheets` is imported, resized by invariant 3's
-  rules into `_kiosk/`, and published; deleting it unpublishes it
-  (`server/folder-sync.js`, startup + file-change watch + 60 s rescan). The
-  original is never touched. A studio sheet from `data.js` that has been
-  dropped into an artist's folder is shown once, under the artist.
+- **KIOSK MEDIA is an upload route: drop sheets into `<Artist>/Designs/`.**
+  **[CHANGED 2 Oct 2026 — Joshua: "designs are sheets ... they only need one
+  folder for designs/sheets".]** EVERY dropped image is a flash sheet — no
+  single/2048 decision for folder drops. A file loose in `<Artist>/` counts
+  too; `Headshots/` and `_kiosk/` never do. The old `Sheets/` folder is
+  emptied into `Designs/` and removed (every scan). Do not invent new
+  folders: Joshua rejected a `Flash/` folder outright — "they already have
+  their own folders". Imported, resized by invariant 3's rules into
+  `Designs/_kiosk/`, published; deleting the file unpublishes it
+  (`server/folder-sync.js`).
+- **The cover reads the live catalog** (`renderCover()` re-reads
+  `Catalog.snapshot()`), the same source as the Artists page, so the two can
+  never disagree. `tools/verify.js` 1f/1g check it.
 - **[STALE — the wall moved to the Mac mini on 2 Oct 2026.]** The wall is NOT on it yet. It still loads production from Vercel. Moving
   it is a production change and waits for Joshua.
 
