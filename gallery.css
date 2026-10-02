@@ -666,7 +666,7 @@ body.sheets-has-back #sheetBackBtn { display: inline-flex; }
      quiet zone the code gets. Decoders are permitted to refuse that. */
   padding: 28px;
   box-shadow: none;
-  border-radius: 0;   /* square, like every QR box (2 Oct 2026) */
+  border-radius: 20px;   /* container only — rounded is allowed (Joshua, 2 Oct 2026) */
 }
 
 .g-artistinfo-meta { min-width: 0; }
@@ -771,7 +771,7 @@ body.sheets-has-back #sheetBackBtn { display: inline-flex; }
      H first, which grows the code from 29 to 33+ modules and shrinks every
      module again. Not a good trade at card size. Offered rather than assumed:
      the detail-page code at 7px/module has the headroom if he wants it. */
-  border-radius: 0;   /* square: Joshua, 2 Oct 2026 — no rounded corners, QR boxes included */
+  border-radius: 14px;   /* rounded container is allowed (Joshua, 2 Oct 2026) */
   /* No border — fill and the pink card behind it do the separating. The white
      ground is not decoration: a QR needs a quiet zone to decode at all. */
   border: none;

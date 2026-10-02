@@ -32,12 +32,15 @@ const ROOT = path.resolve(__dirname, '..');
   Object.defineProperty(window.HTMLElement.prototype, 'clientHeight', { get: () => 1920 });
   window.requestAnimationFrame = cb => setTimeout(() => cb(Date.now()), 0);
   window.matchMedia = () => ({ matches: false, addListener() {}, removeListener() {} });
+  window.__KIOSK_TEST_ALLOW_SEED = true;   // harness only; pages never see seed
 
   const order = ['assets/lib/qrcode.js', 'config.js', 'data.js', 'seed/seed-data.js',
                  'catalog.js', 'gallery.js', 'script.js'];
   window.eval(order.map(rel => {
     const f = path.join(ROOT, rel);
-    return fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '';
+    const src = fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '';
+    // Harness only: placeholder roster so every artist has a code to decode.
+    return rel === 'config.js' ? src + '\n;window.KIOSK_CONFIG.catalogSource = "seed";\n' : src;
   }).join('\n'));
 
   window.document.dispatchEvent(new window.Event('DOMContentLoaded'));

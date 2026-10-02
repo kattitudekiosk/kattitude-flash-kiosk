@@ -22,7 +22,12 @@ window.KIOSK_CONFIG = {
    * 'sheets-only' — force the legacy linear sheet viewer, ignoring any
    *                 catalog. Useful for verifying the fallback on demand.
    */
-  catalogSource: 'seed',
+  /* LIVE ONLY. [Joshua, 2 Oct 2026: "No more placeholder data please it
+   * should be live".] Placeholder ("seed") data is never shown to the public:
+   * catalog.js refuses it outside the test harness, and seed/ does not ship.
+   * Served by the studio server, the live URLs below are replaced with the
+   * Mac mini's own; served from Vercel they read Supabase (real data). */
+  catalogSource: 'live',
 
   /* Supabase project "kattitude-flash-gallery" (us-east-1), schema applied.
    *
@@ -89,7 +94,7 @@ window.KIOSK_CONFIG = {
 
   /* Visible banner marking placeholder content. Auto-on for seed, and worth
    * leaving on until real content lands. */
-  showSeedBanner: true,
+  showSeedBanner: false,   // retired: there is no placeholder data to label
 
   /* Keep "Full Flash Sheets" as a fourth card on the cover. Set false to fold
    * sheets into View All only — they already appear there as tiles.

@@ -1,10 +1,7 @@
-# Vercel falls back to .gitignore when this file is absent — and .gitignore
-# excludes assets/seed/ and seed/, which would strip every placeholder image
-# out of a preview deploy and leave a gallery of broken tiles. This file
-# overrides that: seed content SHIPS to previews on purpose.
-#
-# Remove this file (or drop the seed lines) once real content is in Supabase
-# and catalogSource is 'live'.
+# Placeholder (seed) data never ships. Joshua, 2 Oct 2026: "No more
+# placeholder data please it should be live". The kiosk is live-only.
+seed/
+assets/seed/
 
 # Dev tooling — never needed at runtime.
 tools/

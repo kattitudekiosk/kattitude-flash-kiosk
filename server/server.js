@@ -43,7 +43,8 @@ const JSON_LIMIT = 2 * 1024 * 1024;
 /* ── static files ────────────────────────────────────────────────────── *
  * The repo is the website, as on Vercel — minus what .vercelignore keeps off
  * Vercel, minus this server's own code, minus anything dotted (.git!). */
-const DENY_TOP = new Set(['server', 'tools', 'db', 'node_modules', 'assets/originals']);
+const DENY_TOP = new Set(['server', 'tools', 'db', 'node_modules', 'assets/originals',
+  'seed', 'assets/seed']);   // placeholder data never reaches a browser
 const STATIC_TYPES = {
   html: 'text/html; charset=utf-8', js: 'text/javascript; charset=utf-8', css: 'text/css; charset=utf-8',
   json: 'application/json', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
@@ -203,6 +204,17 @@ function makeServer(conn) {
     const url = new URL(req.url, 'http://x');
     const p = url.pathname;
     const origin = originOf(req);
+    /* One line per write — uploads, saves, deletes, sign-ins — with who did
+     * it and how it ended. "Where did my uploads go?" must be answerable
+     * from ~/KattitudeData/logs/server.log, not from guesswork. */
+    if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+      res.on('finish', () => {
+        let who = 'anon';
+        try { const c = auth.contextFor(conn, req.headers.authorization); if (c.me) who = c.me.name; } catch (e) {}
+        console.log(`[studio-server] ${db.nowIso()} ${req.method} ${p} -> ${res.statusCode} by ${who}` +
+          (req.headers['content-length'] ? ` (${req.headers['content-length']} bytes)` : ''));
+      });
+    }
     try {
       if (req.method === 'OPTIONS') return send(res, 204, '');
       const ctx = auth.contextFor(conn, req.headers.authorization);

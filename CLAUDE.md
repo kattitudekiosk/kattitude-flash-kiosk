@@ -369,7 +369,32 @@ policies, and then proving the refusal.
 A service-role key must never appear in any static file. Verify anonymous
 insert is refused before calling auth work done.
 
-### 7. Placeholder content is never presented as artist work
+### 7. NO PLACEHOLDER DATA ANYWHERE THE PUBLIC CAN SEE — **[HARD RULE, 2 Oct 2026]**
+
+Joshua: *"No more placeholder data please it should be live."* After the
+wall had moved to the Mac mini, `flash-gallery.vercel.app` was still on
+`catalogSource: 'seed'`: fake counts, letter circles for everyone, a
+PLACEHOLDER banner — and the wall's own "browse on your phone" QR sends
+customers there. Now:
+
+- `catalogSource` is `'live'`. `catalog.js` refuses `'seed'` unless
+  `window.__KIOSK_TEST_ALLOW_SEED` is set, which ONLY `tools/verify.js` and
+  `tools/verify-qr.js` do. A config mistake cannot bring seed back.
+- `seed/` and `assets/seed/` do not ship: not to Vercel (`.vercelignore`), not
+  from the studio server (`DENY_TOP`), not via `index.html`.
+- Live but unreachable → the kiosk keeps what it last loaded, or shows the
+  sheets alone, with an honest "can't reach the studio catalog" notice.
+  Never invented content.
+- Zero designs reads as zero: "Coming soon", no counts.
+- `tools/verify.js` section 1d checks all of this;
+  `VERIFY_ALLOW_SEED_LEAK=1` is its negative control and must fail.
+
+**The hosted dashboard does not write to Supabase any more.**
+`dashboard/hosted-notice.js` blocks it (and says the dashboard moved) unless
+`DASH_CONFIG.studioServerUrl` is set, in which case it forwards there. The
+wall reads only the Mac mini; a second writable backend is a split brain.
+
+### 7b. (history) Placeholder content is never presented as artist work
 
 Seed art carries real artist names. It renders with a loud pink banner and
 `seed/` stays gitignored. The placeholder attract reel
@@ -513,7 +538,7 @@ and exactly two on the dashboard — see the re-sweep note below for the
 dashboard's pair. They are recorded precisely so that none of them becomes a
 precedent for a fifth:
 
-1. ~~**QR container tiles.**~~ **WITHDRAWN 2 Oct 2026** — Joshua asked for square QR boxes; every QR container is now `border-radius: 0` and the ink is pure `#000000`. Originally: rounded because Joshua asked, and because rounding
+1. **QR container tiles.** **[CONFIRMED 2 Oct 2026 — Joshua: "the qr codes are allowed to be rounded"]** QR ink is pure `#000000`. Rounded because Joshua asked, and because rounding
    the white *container* cannot affect decoding — only rounding the finder
    patterns can, and that is separately forbidden under QR RULES.
 
