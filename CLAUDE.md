@@ -253,6 +253,14 @@ screen". The real buttons are **72 x 160 px, vertically centred** (`top: 50%`).
 Larger in area, different in placement. Decide which is right, then make the
 doc and the code agree.
 
+**[ADDED 2 Oct 2026] No zoom.** Joshua: *"I don't really want the customer
+to be able to zoom in on the sheets ... I don't really want the zoom
+function."* `KIOSK_CONFIG.zoom` is `false`: sheets show fitted to the screen
+(every zoom path in `script.js` is clamped to 1× at `MAX_SCALE`), and single
+designs open in the detail view as a no-zoom lightbox — tap the picture or
+Back to close. The footer hint no longer mentions zoom. `tools/verify.js`
+section 1c checks it; `VERIFY_ZOOM=1` is its negative control and must fail.
+
 ### 2. One layout everywhere — fixed canvas, scaled
 
 The entire app renders inside a fixed **1080 x 1920** canvas, CSS-scaled to the

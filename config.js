@@ -69,6 +69,13 @@ window.KIOSK_CONFIG = {
    * appearing entirely. */
   includeSheets: true,
 
+  /* Zoom. [Joshua, 2 Oct 2026: "I don't really want the customer to be able
+   * to zoom in on the sheets ... I don't really want the zoom function".]
+   * false: sheets show fitted to the screen with no tap/pinch/wheel zoom, and
+   * single designs open in a lightbox — larger, fitted, tap anywhere on the
+   * picture (or Back) to close. true restores the old zoom on both. */
+  zoom: false,
+
   /* When the catalog has zero individual designs AND no artists, the kiosk
    * routes straight into the legacy linear sheet viewer. With artists on the
    * roster it shows the home screen instead, so Browse by Artist and the

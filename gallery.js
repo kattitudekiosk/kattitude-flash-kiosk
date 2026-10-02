@@ -1256,6 +1256,9 @@ window.KIOSK_ROUTER = (function () {
   }
 
   function toggleDetailZoom(ox, oy) {
+    /* Zoom off (config.zoom !== true): the detail view is a lightbox, and
+     * tapping the picture closes it, back to where the customer was. */
+    if (cfg.zoom !== true) { renderGrid(); return; }
     if (dScale > 1.01) {
       dScale = 1; dTx = 0; dTy = 0;
       applyDetail(true);

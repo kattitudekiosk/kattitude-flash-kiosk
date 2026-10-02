@@ -151,6 +151,33 @@ function tap(window, node) {
       !w.document.body.classList.contains('sheets-only'));
   }
 
+  /* ══ 1c. NO ZOOM — Joshua, 2 Oct 2026 ══════════════════════════════════ *
+   * "I don't really want the customer to be able to zoom in on the sheets."
+   * A tap on a sheet must leave it at 1x. VERIFY_ZOOM=1 boots with zoom on,
+   * as the negative control: the same tap must then zoom, or this check is
+   * not testing anything. */
+  const zoomOn = process.env.VERIFY_ZOOM === '1';
+  console.log('\nno zoom on sheets' + (zoomOn ? ' (NEGATIVE CONTROL: zoom forced on)' : ''));
+  {
+    const w = await boot({ catalogSource: 'sheets-only', zoom: zoomOn });
+    const stage = w.document.getElementById('stage');
+    const inner = w.document.getElementById('stageInner');
+    stage.setPointerCapture = () => {};   // jsdom lacks it; the handler throws without it
+    const ptr = (type) => {
+      const e = new w.Event(type, { bubbles: true, cancelable: true });
+      Object.assign(e, { pointerType: 'mouse', pointerId: 1, clientX: 540, clientY: 900, button: 0 });
+      return e;
+    };
+    stage.dispatchEvent(ptr('pointerdown'));
+    stage.dispatchEvent(ptr('pointerup'));
+    await new Promise(r => setTimeout(r, 50));
+    const m = String(inner.style.transform).match(/scale\(([\d.]+)\)/);
+    const s = m ? parseFloat(m[1]) : 1;
+    check('a tap on a sheet does not zoom it', s <= 1.0001, 'scale ' + s);
+    check('footer hint does not offer zoom',
+      !/zoom/i.test(w.document.querySelector('.footer-hint').textContent));
+  }
+
   /* ══ 2. SEED — full hybrid experience ═══════════════════════════════════ */
   console.log('\nseed catalog (hybrid grid)');
   {
