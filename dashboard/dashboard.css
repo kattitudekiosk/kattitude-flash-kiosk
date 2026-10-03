@@ -230,6 +230,13 @@ body {
 
 .who-menu[hidden] { display: none; }
 
+/* #topbar and #tabs set display: flex, and an id rule beats the browser's
+ * [hidden] default, so both showed to SIGNED-OUT visitors: the header and the
+ * three artist tabs above the sign-in card, with no name and no role. It read
+ * as "signed in, but not admin" (Joshua, 3 Oct 2026, after his magic link
+ * landed on the kiosk instead of here). app.js unhides them on sign-in. */
+#topbar[hidden], #tabs[hidden] { display: none; }
+
 /* Full-width rows, left aligned, and NOWRAP is the point of the whole
  * exercise: "View as artist" broke onto three lines in the bar because it
  * was being squeezed. Here it has the width to say itself on one. */

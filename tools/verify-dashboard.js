@@ -55,7 +55,7 @@ async function boot({ card, otpError }) {
       getUser: async () => ({ data: { user: session && session.user }, error: null }),
       onAuthStateChange: cb => { if (session) setTimeout(() => cb('SIGNED_IN', session), 0);
                                  return { data: { subscription: { unsubscribe() {} } } }; },
-      signInWithOtp: async a => { otp.push(a.email); return { data: null, error: otpError ? { message: otpError } : null }; },
+      signInWithOtp: async a => { otp.push(a.email); otp.redirect = a.options && a.options.emailRedirectTo; return { data: null, error: otpError ? { message: otpError } : null }; },
       signOut: async () => ({ error: null }),
     },
   }) };
@@ -115,6 +115,42 @@ async function boot({ card, otpError }) {
     await new Promise(r => setTimeout(r, 300));
     const shown = d.getElementById('signinMsg').textContent;
     check(`"${err}" → ${want}`, otp.length === 1 && want.test(shown), shown);
+  }
+
+  console.log('\nthe link comes back to the dashboard');
+  {
+    const { d, otp } = await boot({ card: null, otpError: null });
+    d.getElementById('email').value = 'someone@example.invalid';
+    d.getElementById('sendLink').click();
+    await new Promise(r => setTimeout(r, 300));
+    check('the link asks to return to <this deployment>/dashboard/ exactly',
+      otp.redirect === 'https://kattitude-flash-kiosk.vercel.app/dashboard/', otp.redirect);
+  }
+  {
+    const vm = require('vm');
+    const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+    const m = html.match(/<script>\s*(\(function \(\) \{[\s\S]*?location\.replace[\s\S]*?\}\)\(\);)\s*<\/script>/);
+    check('the kiosk page has the sign-in forwarder', !!m);
+    const run = (hash, search) => { let went = null;
+      vm.runInNewContext(m ? m[1] : '', { location: { hash, search, replace: u => { went = u; } } }); return went; };
+    if (m) {
+      check('a magic-link token on the kiosk goes to dashboard/, token kept',
+        run('#access_token=abc&type=magiclink', '') === 'dashboard/#access_token=abc&type=magiclink');
+      check('an expired-link error goes there too (to the sign-in card, not the kiosk)',
+        run('#error=access_denied&error_code=otp_expired', '') === 'dashboard/#error=access_denied&error_code=otp_expired');
+      check('a PKCE ?code= return goes there too', run('', '?code=xyz') === 'dashboard/?code=xyz');
+      check('the ordinary kiosk (no token) stays put', run('', '') === null && run('#sheet-2', '') === null);
+    }
+  }
+
+  console.log('\nsigned out shows the sign-in card only');
+  {
+    const css = fs.readFileSync(path.join(ROOT, 'dashboard/dashboard.css'), 'utf8');
+    check('#topbar and #tabs honour [hidden] despite display:flex',
+      /#topbar\[hidden\],\s*#tabs\[hidden\]\s*\{\s*display:\s*none/.test(css));
+    const { d } = await boot({ card: null });
+    check('signed out: header and tabs are hidden, sign-in card shown',
+      d.getElementById('topbar').hidden && d.getElementById('tabs').hidden && !d.getElementById('signin').hidden);
   }
 
   console.log(`\n${passed} passed, ${failed} failed`);

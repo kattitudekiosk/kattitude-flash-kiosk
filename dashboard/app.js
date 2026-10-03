@@ -132,7 +132,7 @@
 
     const { error } = await sb.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: window.location.origin + window.location.pathname },
+      options: { emailRedirectTo: window.location.origin + '/dashboard/' },   // this deployment's dashboard, exactly
     });
 
     $('#sendLink').disabled = false;

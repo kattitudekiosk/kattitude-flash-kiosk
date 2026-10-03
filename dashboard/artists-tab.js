@@ -57,7 +57,7 @@ window.ArtistsTab = (function () {
    * hardcoding it means a preview deployment invites people back to that same
    * preview instead of bouncing them to production. */
   function redirectTo() {
-    return window.location.origin + window.location.pathname;
+    return window.location.origin + '/dashboard/';   // exactly; see app.js sendMagicLink
   }
 
   /**

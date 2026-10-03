@@ -2,6 +2,20 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <!-- A dashboard sign-in link that lands on the kiosk belongs to the dashboard.
+       Supabase falls back to the site root when it will not honour the exact
+       return address; the token is in the URL and the kiosk would ignore it,
+       leaving the person signed out (Joshua, 3 Oct 2026). Same deployment,
+       token kept. The wall never carries these, so it never fires there. -->
+  <script>
+    (function () {
+      var h = location.hash, q = location.search;
+      if (/(^#|&)(access_token|refresh_token|error_code|error_description)=/.test(h) ||
+          /[?&](code|token_hash)=/.test(q)) {
+        location.replace('dashboard/' + q + h);
+      }
+    })();
+  </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Kattitude Tattoo — Flash Gallery</title>
   <!-- Fonts are bundled (assets/fonts/), not loaded from Google: the wall has
