@@ -48,6 +48,35 @@ within about a minute (`server/folder-sync.js`). A file loose directly in
 - `server/KIOSK-MEDIA-HOW-TO.txt` is the staff-facing version; it heads the
   README.txt in the KIOSK MEDIA folder.
 
+## The hosted dashboard → Supabase → this Mac (2 Oct 2026)
+
+Artists upload from anywhere through the **hosted dashboard**
+(https://kattitude-flash-dashboard.vercel.app), which saves to Supabase
+`tovydesiocfgmasvzjvt`. This Mac pulls from there:
+
+- `com.kattitude.studio-sync` (launchd, every 5 min, log `logs/sync.log`)
+  runs `node server/cli.js sync-supabase` (`server/supabase-sync.js`).
+- It reads Supabase's `kiosk_catalog` with the public key — published,
+  approved designs only — and downloads each into
+  `KIOSK MEDIA/<Artist>/Designs/<title> (<id>).<ext>`. The folder importer
+  then resizes it and puts it on the wall.
+- Deleted or unpublished in the dashboard → the sync removes its own copy
+  (and the wall drops it). It only ever deletes a file it wrote, and only if
+  the file is unchanged; a hand-dropped or edited file is never deleted.
+- Offline or Supabase down → logs "will retry", changes nothing, exits 0.
+  The wall never depends on it.
+- **Keep-alive:** every run is a real database query. The first success each
+  day is logged: `keep-alive: database query OK`. Supabase says free
+  projects pause "after 1 week of inactivity" but does not define activity,
+  so this is the standard practice, not a guarantee. A paused project can be
+  restored with one click for a year; the wall keeps running either way.
+- **Folder drops are NOT pushed up to Supabase.** Writing there needs a
+  signed-in user or the service-role key, and neither belongs on an
+  unattended kiosk. So a hand-dropped sheet is on the wall but not the phone
+  page; for both, upload through the dashboard.
+- The studio server's own `/dashboard/` redirects to the hosted one: ONE
+  dashboard writes, so nothing saved can miss the phone page.
+
 ## Run it
 
 ```sh

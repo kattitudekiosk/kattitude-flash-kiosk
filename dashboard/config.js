@@ -43,10 +43,4 @@ window.DASH_CONFIG = {
    */
   requireApproval: false,
 
-  /* The studio server's permanent https address, once one exists (a named
-   * Cloudflare Tunnel on Kat's domain). Set it and the hosted copy of this
-   * dashboard forwards there; leave null and the hosted copy refuses to save
-   * anything (hosted-notice.js) rather than write to Supabase, which the
-   * wall no longer reads. */
-  studioServerUrl: null,
 };

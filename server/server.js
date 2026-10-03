@@ -39,6 +39,7 @@ const DATA = process.env.KT_DATA_DIR || path.join(os.homedir(), 'KattitudeData')
 const PORT = parseInt(process.env.KT_PORT || '8787', 10);
 const HOST = process.env.KT_HOST || '127.0.0.1';
 const JSON_LIMIT = 2 * 1024 * 1024;
+const HOSTED_DASHBOARD = process.env.KT_DASHBOARD_URL || 'https://kattitude-flash-dashboard.vercel.app/';
 
 /* ── static files ────────────────────────────────────────────────────── *
  * The repo is the website, as on Vercel — minus what .vercelignore keeps off
@@ -307,7 +308,12 @@ function makeServer(conn) {
         return send(res, 200, KIOSK_OVERRIDE, { 'Content-Type': 'text/javascript; charset=utf-8',
                                                 'Cache-Control': 'no-cache' });
       }
-      if (p === '/dashboard') return send(res, 301, '', { Location: '/dashboard/' });
+      /* ONE writable dashboard: the hosted one, on Supabase (2 Oct 2026). A
+       * second dashboard writing to this Mac would be a split brain — work
+       * saved here would never reach the phone page. */
+      if (p === '/dashboard' || p.startsWith('/dashboard/')) {
+        return send(res, 302, '', { Location: HOSTED_DASHBOARD });
+      }
       if (req.method === 'GET' || req.method === 'HEAD') {
         const full = staticPath(p);
         let st = null;

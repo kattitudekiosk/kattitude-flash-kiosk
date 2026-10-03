@@ -114,6 +114,16 @@ gets one injected script tag; served by Vercel, nothing changes.
   their own folders". Imported, resized by invariant 3's rules into
   `Designs/_kiosk/`, published; deleting the file unpublishes it
   (`server/folder-sync.js`).
+- **UPLOAD PATH [2 Oct 2026, Joshua approved]: hosted dashboard → Supabase →
+  Mac mini sync → KIOSK MEDIA → wall.** The hosted dashboard writes to
+  Supabase again (`hosted-notice.js` is gone). `server/supabase-sync.js`
+  (launchd `com.kattitude.studio-sync`, every 5 min) pulls published sheets
+  into `<Artist>/Designs/` and removes ones unpublished/deleted — only files
+  it wrote, only if unchanged. Network trouble = retry, never delete. Every
+  run is a Supabase query (keep-alive, logged daily). Hand drops are NOT
+  pushed up (no write credential on the kiosk), so they are wall-only. The
+  studio server's `/dashboard/` redirects to the hosted dashboard so there is
+  exactly one writable dashboard. Dashboard uploads are all flash sheets.
 - **THE WALL NEEDS NO INTERNET [2 Oct 2026 — Joshua: "if the internet goes out
   the kiosk doesn't go down with it"].** Everything the wall loads comes from
   `localhost:8787`: catalog, photos, QR codes (generated locally), and the
