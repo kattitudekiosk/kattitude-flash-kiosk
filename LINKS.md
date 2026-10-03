@@ -21,7 +21,7 @@ Last updated: 3 October 2026
 | | |
 |---|---|
 | **Gallery for phones** (the wall's QR codes) | https://kattitude-flash-kiosk.vercel.app — project `kattitude-flash-kiosk`, builds from `main` |
-| Dashboard files | https://kattitude-flash-kiosk.vercel.app/dashboard/ — served (200) because `main` carries `dashboard/`, but **signing in there waits on the Supabase move** to Kat's project `hnwyoglbmhvafxnzizqe`. Not yet a separate Vercel project. |
+| Dashboard (hosted copy) | https://kattitude-flash-kiosk.vercel.app/dashboard/ — **read-only by design since 2 Oct 2026** (`dashboard/hosted-notice.js`): it says the dashboard has moved and saves nothing. The real dashboard is http://localhost:8787/dashboard/ on the Mac mini. |
 
 ## Old addresses (Joshua's Vercel) — being retired
 
