@@ -74,6 +74,10 @@ window.ArtistsTab = (function () {
       // card to it the moment they sign in.
       options: { emailRedirectTo: redirectTo() },
     });
+    // The sign-in gate (db/kat-project/08) refuses non-admin addresses: no email goes out.
+    if (error && /database error saving new user|limited to admin cards/i.test(error.message)) {
+      return { sent: false, message: 'Sign-in links are paused while Joshua tests the dashboard. Nobody else can get one yet.' };
+    }
     if (error) return { sent: false, message: error.message };
     return { sent: true };
   }

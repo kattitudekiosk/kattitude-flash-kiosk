@@ -39,6 +39,28 @@ const DATA = process.env.KT_DATA_DIR || path.join(os.homedir(), 'KattitudeData')
 const PORT = parseInt(process.env.KT_PORT || '8787', 10);
 const HOST = process.env.KT_HOST || '127.0.0.1';
 const JSON_LIMIT = 2 * 1024 * 1024;
+/* Supabase sync triggers (Joshua, 2 Oct 2026: "maybe it only checks when the
+ * screensaver gets activated and then once a day"): the wall's screensaver
+ * start (POST /api/sync-now, at most every SYNC_GAP_MS), server start-up, and
+ * a daily launchd run (com.kattitude.studio-sync). Never polled. */
+const SYNC_GAP_MS = parseInt(process.env.KT_SYNC_GAP_MS || String(10 * 60 * 1000), 10);
+let lastSyncAt = 0, syncing = null;
+function runSync(conn, why) {
+  if (syncing) return syncing;
+  lastSyncAt = Date.now();
+  syncing = (async () => {
+    try {
+      const r = await require('./supabase-sync').syncOnce(conn);
+      const fs2 = require('./folder-sync').syncOnce(conn);   // import what arrived, now
+      const changed = !!(r.ok && (r.downloaded.length || r.removed.length));
+      console.log(`[studio-server] ${db.nowIso()} sync (${why}): ` +
+        (r.ok ? `${r.downloaded.length} new, ${r.removed.length} removed` : 'offline, will retry at the next trigger'));
+      return { ran: true, ok: r.ok, changed, imported: (fs2.imported || []).length };
+    } finally { syncing = null; }
+  })();
+  return syncing;
+}
+const HOSTED_DASHBOARD = process.env.KT_DASHBOARD_URL || 'https://kattitude-flash-kiosk.vercel.app/dashboard/';
 
 /* ── static files ────────────────────────────────────────────────────── *
  * The repo is the website, as on Vercel — minus what .vercelignore keeps off
@@ -202,6 +224,7 @@ function streamFile(req, res, file, size, headers) {
 
 /* ── routes ──────────────────────────────────────────────────────────── */
 function makeServer(conn) {
+  makeServer.runSync = why => runSync(conn, why);
   return http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://x');
     const p = url.pathname;
@@ -220,6 +243,17 @@ function makeServer(conn) {
     try {
       if (req.method === 'OPTIONS') return send(res, 204, '');
       const ctx = auth.contextFor(conn, req.headers.authorization);
+
+      /* The wall's screensaver started. Local callers only — this is the
+       * kiosk on this Mac, never a request arriving through a tunnel. */
+      if (p === '/api/sync-now' && req.method === 'POST') {
+        const local = /^(::ffff:)?127\.0\.0\.1$|^::1$/.test(req.socket.remoteAddress || '') &&
+          !req.headers['x-forwarded-for'] && !req.headers['cf-connecting-ip'];
+        if (!local) throw db.httpError(403, 'Only the kiosk on this Mac can ask for a sync');
+        const wait = lastSyncAt + SYNC_GAP_MS - Date.now();
+        if (wait > 0 && !syncing) return send(res, 200, { ran: false, reason: 'recently synced', retryInMs: wait });
+        return send(res, 200, await runSync(conn, 'screensaver started'));
+      }
 
       if (p === '/healthz') {
         const n = t => conn.prepare(`SELECT count(*) AS n FROM ${t}`).get().n;
@@ -307,7 +341,12 @@ function makeServer(conn) {
         return send(res, 200, KIOSK_OVERRIDE, { 'Content-Type': 'text/javascript; charset=utf-8',
                                                 'Cache-Control': 'no-cache' });
       }
-      if (p === '/dashboard') return send(res, 301, '', { Location: '/dashboard/' });
+      /* ONE writable dashboard: the hosted one, on Supabase (2 Oct 2026). A
+       * second dashboard writing to this Mac would be a split brain — work
+       * saved here would never reach the phone page. */
+      if (p === '/dashboard' || p.startsWith('/dashboard/')) {
+        return send(res, 302, '', { Location: HOSTED_DASHBOARD });
+      }
       if (req.method === 'GET' || req.method === 'HEAD') {
         const full = staticPath(p);
         let st = null;
@@ -352,6 +391,8 @@ function start() {
   storage.ensureArtistFolders(db.all(conn, 'artists').map(a => a.name));
   /* Files dropped straight into KIOSK MEDIA go on the wall too. */
   require('./folder-sync').start(conn);
+  /* (c) A reboot: pull anything uploaded while the Mac was off. */
+  setTimeout(() => runSync(conn, 'server start').catch(() => {}), 3000);
   const server = makeServer(conn);
   server.listen(PORT, HOST, () => {
     console.log(`[studio-server] ${db.nowIso()} listening on http://${HOST}:${PORT}  data=${DATA}`);

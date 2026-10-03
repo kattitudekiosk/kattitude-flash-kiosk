@@ -328,6 +328,22 @@ window.Screensaver = (function () {
     });
   }
 
+  /* ── Supabase sync trigger — Joshua, 2 Oct 2026 ─────────────────────────
+   * "only checks when the screensaver gets activated and then once a day".
+   * Served by the studio server only (KIOSK_CONFIG.studioServer). The server
+   * debounces to one sync per 10 minutes. If the sync brought new or removed
+   * sheets, reload the catalog now: the next step() sees a new fingerprint
+   * and reshuffles, per the existing rule. Fire-and-forget; never blocks. */
+  let syncPings = 0;
+  function pingSync() {
+    if (!(window.KIOSK_CONFIG && window.KIOSK_CONFIG.studioServer) || typeof fetch !== 'function') return;
+    syncPings++;
+    fetch('/api/sync-now', { method: 'POST' })
+      .then(r => r.json())
+      .then(r => { if (r && r.changed && window.Catalog && window.Catalog.load) return window.Catalog.load(); })
+      .catch(() => { /* offline or server busy: the next trigger tries again */ });
+  }
+
   /* ── Public API ────────────────────────────────────────────────────────── */
   return {
     /**
@@ -336,6 +352,7 @@ window.Screensaver = (function () {
      */
     start(host, exitFn) {
       if (active) return true;
+      pingSync();
       playlist = buildPlaylist();
       if (!playlist.length) return false;
 
@@ -380,5 +397,6 @@ window.Screensaver = (function () {
     _loop() { return loopState ? Object.assign({}, loopState) : null; },
     _step() { step(); },
     _pos() { return pos; },
+    _syncPings() { return syncPings; },
   };
 })();

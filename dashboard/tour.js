@@ -103,8 +103,8 @@ window.Tour = (function () {
       id: 'upload-sizes',
       view: 'upload', sel: '#view-upload > .card',
       title: 'We resize for you',
-      body: 'Singles are square, at least 2048×2048. Flash sheets can be any ' +
-            'shape, at least 1080 wide — big ones are resized to fit the ' +
+      body: 'Everything you upload is a flash sheet — any shape, at least ' +
+            '1080 pixels on the long side. Big ones are resized to fit the ' +
             'wall. Nothing is ever cropped, and your original is kept.',
     },
     {

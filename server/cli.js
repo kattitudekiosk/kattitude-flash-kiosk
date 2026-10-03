@@ -9,6 +9,8 @@
  *        Copy the studio's data off Supabase onto this machine. Safe to re-run:
  *        rows are matched by id and updated, never duplicated.
  *   node server/cli.js backup
+ *   node server/cli.js sync-supabase
+ *        Pull the hosted dashboard's published sheets into KIOSK MEDIA (launchd, daily 09:15).
  *        Snapshot the database into <data>/backups/, keeping the last 30.
  *
  * Works while the server is running — SQLite in WAL mode allows it.
@@ -168,6 +170,15 @@ function status() {
     console.log(`${base}/dashboard/#kt_signin=${l.token}`);
   } else if (cmd === 'import-supabase') {
     await importSupabase();
+  } else if (cmd === 'sync-supabase') {
+    /* Run by launchd once a day (com.kattitude.studio-sync). Pulls the
+     * hosted dashboard's published sheets into KIOSK MEDIA; see
+     * server/supabase-sync.js. Exits 0 even when offline — it just retries. */
+    const c = conn();
+    const r = await require('./supabase-sync').syncOnce(c);
+    if (r.ok && !r.downloaded.length && !r.removed.length && !r.kept.length) {
+      console.log(`[supabase-sync] ${db.nowIso()} up to date`);
+    }
   } else if (cmd === 'backup') {
     backup();
   } else if (cmd === 'status') {

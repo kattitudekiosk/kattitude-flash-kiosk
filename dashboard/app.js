@@ -120,6 +120,13 @@
     });
 
     $('#sendLink').disabled = false;
+    /* db/kat-project/08-signin-gate.sql refuses a login for any address not on
+     * an admin card (Joshua's rule, 3 Oct 2026); Supabase reports that as a
+     * database error, which would read as a breakdown. Say what it means. */
+    if (error && /database error saving new user|limited to admin cards/i.test(error.message)) {
+      $('#signinMsg').textContent = 'Sign-in links are paused while Joshua tests the dashboard. Nobody else can get one yet.';
+      return;
+    }
     if (error) { $('#signinMsg').textContent = error.message; return; }
     $('#signinMsg').textContent =
       'Sent. Open the link on this device — it signs you in here.';
@@ -251,20 +258,19 @@
    * NOTHING IS EVER CROPPED and nothing is upscaled — the original upload is
    * kept untouched next to the resized copy. Smaller files are still refused:
    * stretched, they would look soft on the wall. */
+  /* [CHANGED 2 Oct 2026 — Joshua: "designs are sheets".] Every upload is a
+   * flash sheet, exactly as a file dropped into KIOSK MEDIA is — so the
+   * phone page and the wall always agree on what something is. Too small to
+   * read on the 1080-wide wall (long side under 1080) is still refused. */
   function classify(w, h) {
-    const d = cfg.spec.design, s = cfg.spec.sheet;
-    if (w === d.w && h === d.h) return 'design';
-    if (w === s.w && h === s.h) return 'sheet';
-    if (w === h && w >= d.w) return 'design';
-    if (w !== h && w >= 1080) return 'sheet';
-    return null;
+    return Math.max(w, h) >= 1080 ? 'sheet' : null;
   }
 
   function specError(w, h) {
     const d = cfg.spec.design;
-    return `${w}×${h} is too small for the wall. A ${d.label} needs to be at ` +
-           `least ${d.w}×${d.w} (square), and a flash sheet at least 1080 ` +
-           `pixels wide. Bigger files are resized for you — never cropped.`;
+    return `${w}×${h} is too small for the wall. A flash sheet needs at ` +
+           `least 1080 pixels on its long side. Bigger files are resized for ` +
+           `you — never cropped.`;
   }
 
   /** The copy the kiosk shows: the whole image scaled to fit inside maxW×maxH,
@@ -656,10 +662,10 @@
     head.appendChild(el('h2', null, 'Upload flash'));
     const p = el('p', 'muted');
     p.textContent = 'Pick as many files as you like. Tagging is optional — you ' +
-      'can tag them all at once below, or upload now and tag later. Singles ' +
-      'are square, at least ' + cfg.spec.design.w + '×' + cfg.spec.design.h +
-      '; sheets any shape, at least 1080 wide. Big files are resized to fit ' +
-      'the wall — never cropped, and your original is kept.';
+      'can tag them all at once below, or upload now and tag later. Every ' +
+      'upload is a flash sheet: any shape, at least 1080 pixels on the long ' +
+      'side. Big files are resized to fit the wall — never cropped, and your ' +
+      'original is kept.';
     head.appendChild(p);
 
     const pick = el('label', 'dropzone');

@@ -294,10 +294,10 @@ const PNG = Buffer.from('89504e470d0a1a0a0000000d4948445200000001000000010806000
   const home = await req('GET', '/');
   check('kiosk is served with the studio-server override injected after config.js',
     home.status === 200 && /<script src="config.js"><\/script>\s*<script src="studio-server.js">/.test(home.text), home.text.slice(0, 120));
-  const dash = await req('GET', '/dashboard/');
-  check('dashboard is served with the local backend injected, and no Supabase script',
-    dash.status === 200 && /<script src="config.js"><\/script>\s*<script src="local-backend.js">/.test(dash.text) &&
-    !/supabase-js@/.test(dash.text.replace(/<!--[\s\S]*?-->/g, '')) && /local-links\.js/.test(dash.text), '');
+  const dash = await fetch(BASE + '/dashboard/', { redirect: 'manual' });
+  check('the studio server sends /dashboard/ to the ONE hosted dashboard (no split brain)',
+    dash.status === 302 && /kattitude-flash-kiosk\.vercel\.app\/dashboard\//.test(dash.headers.get('location') || ''),
+    dash.status + ' ' + dash.headers.get('location'));
   const ovr = await req('GET', '/studio-server.js');
   check('kiosk override switches the catalog to live, on this server', /catalogSource = 'live'/.test(ovr.text) &&
     /\/rest\/v1\/kiosk_catalog/.test(ovr.text), ovr.text);
@@ -387,6 +387,131 @@ const PNG = Buffer.from('89504e470d0a1a0a0000000d4948445200000001000000010806000
     check('deleting the file takes the sheet off the wall',
       r3.removed.includes('Barbie/Designs/IMG_1705.JPEG') && !bySrc()['Barbie/Designs/IMG_1705.JPEG'] &&
       !fs.existsSync(kioskFile), JSON.stringify(r3));
+  }
+
+  /* ── Supabase → KIOSK MEDIA sync (server/supabase-sync.js) ──
+   * A stand-in Supabase on a local port: same URL shapes, real image bytes. */
+  {
+    const http = require('node:http');
+    const { execFileSync } = require('node:child_process');
+    const sync = require('./supabase-sync');
+    const folderSync = require('./folder-sync');
+    const media = path.join(DATA, 'KIOSK MEDIA');
+    const img = (w, h, label) => {
+      const f = path.join(DATA, 'remote-' + label + '.jpg'); fs.writeFileSync(path.join(DATA, 't.png'), PNG);
+      execFileSync('/usr/bin/sips', ['-s', 'format', 'jpeg', '-z', String(h), String(w), path.join(DATA, 't.png'), '--out', f], { stdio: 'ignore' });
+      return Buffer.concat([fs.readFileSync(f), Buffer.from(label)]);
+    };
+    let catalog = [], files = {}, down = false, requests = 0;
+    const mock = http.createServer((q, r) => {
+      requests++;
+      if (down) { r.socket.destroy(); return; }
+      if (q.url.startsWith('/rest/v1/kiosk_catalog')) { r.writeHead(200, { 'Content-Type': 'application/json' }); return r.end(JSON.stringify(catalog)); }
+      const f = files[q.url];
+      if (f) { r.writeHead(200, { 'Content-Type': 'image/jpeg' }); return r.end(f); }
+      r.writeHead(404); r.end();
+    });
+    await new Promise(res => mock.listen(0, '127.0.0.1', res));
+    const SB = `http://127.0.0.1:${mock.address().port}`;
+    const opts = { url: SB, key: 'test' };
+    const J = (...p) => path.join(media, 'Jen', ...p);
+    const jen = db.insertRow(conn, 'artists', { name: 'Jen', display_order: 9 });
+    const md5f = f => fs.existsSync(f) ? crypto.createHash('md5').update(fs.readFileSync(f)).digest('hex') : null;
+
+    files['/storage/v1/object/public/flash/x/a.jpg'] = img(2160, 2795, 'a');
+    files['/storage/v1/object/public/flash/x/b.jpg'] = img(2048, 2048, 'b');
+    catalog = [
+      { id: 'aaaaaaaa-1111', artist_id: jen.id, title: 'Rose sheet', type: 'sheet', image_url: SB + '/storage/v1/object/public/flash/x/a.jpg' },
+      { id: 'bbbbbbbb-2222', artist_id: jen.id, title: 'Square', type: 'design', image_url: SB + '/storage/v1/object/public/flash/x/b.jpg' },
+    ];
+    // A sheet Joshua dropped in by hand, which the sync must never touch.
+    fs.mkdirSync(J('Designs'), { recursive: true });
+    fs.writeFileSync(J('Designs', 'hand-drop.jpg'), img(1320, 1700, 'hand'));
+    { const t = new Date(Date.now() - 10000); fs.utimesSync(J('Designs', 'hand-drop.jpg'), t, t); }   // settled, as a real drop would be
+    const handMd5 = md5f(J('Designs', 'hand-drop.jpg'));
+
+    const r1 = await sync.syncOnce(conn, opts);
+    check('a published dashboard upload is downloaded into <artist>/Designs',
+      r1.ok && fs.existsSync(J('Designs', 'Rose sheet (aaaaaaaa).jpg')) && fs.existsSync(J('Designs', 'Square (bbbbbbbb).jpg')),
+      JSON.stringify(r1));
+    check('...byte-for-byte what Supabase holds', md5f(J('Designs', 'Rose sheet (aaaaaaaa).jpg')) ===
+      crypto.createHash('md5').update(files['/storage/v1/object/public/flash/x/a.jpg']).digest('hex'));
+    check('the first successful query of the day is logged as the keep-alive', r1.keepalive === true &&
+      conn.prepare("SELECT value FROM meta WHERE key='supabase_keepalive_day'").get().value === db.nowIso().slice(0, 10));
+    const r1b = await sync.syncOnce(conn, opts);
+    check('...once a day, not every run; and an unchanged catalog downloads nothing',
+      r1b.ok && !r1b.keepalive && r1b.downloaded.length === 0, JSON.stringify(r1b));
+    folderSync.syncOnce(conn);
+    const onWall = db.all(conn, 'designs').filter(d => d.artist_id === jen.id);
+    check('the folder importer puts them on the wall as sheets (the 2048 square too)',
+      onWall.length === 3 && onWall.every(d => d.type === 'sheet' && d.published), onWall.map(d => d.source_file + ':' + d.type).join(', '));
+
+    // Offline: Supabase unreachable. Nothing may be deleted.
+    down = true;
+    const r2 = await sync.syncOnce(conn, opts);
+    check('offline: the run fails safely and deletes NOTHING',
+      !r2.ok && r2.removed.length === 0 && fs.existsSync(J('Designs', 'Rose sheet (aaaaaaaa).jpg')), JSON.stringify(r2));
+    down = false;
+    const r3 = await sync.syncOnce(conn, opts);
+    check('...and the next run after the network returns succeeds', r3.ok, JSON.stringify(r3));
+
+    // Re-uploaded image (new URL) → replaced.
+    files['/storage/v1/object/public/flash/x/a2.jpg'] = img(2160, 2795, 'a2');
+    catalog[0].image_url = SB + '/storage/v1/object/public/flash/x/a2.jpg';
+    await sync.syncOnce(conn, opts);
+    check('a changed upload replaces the local copy', md5f(J('Designs', 'Rose sheet (aaaaaaaa).jpg')) ===
+      crypto.createHash('md5').update(files['/storage/v1/object/public/flash/x/a2.jpg']).digest('hex'));
+
+    // Deleted / unpublished in the dashboard → it leaves the folder and the wall.
+    catalog = catalog.filter(d => d.id !== 'bbbbbbbb-2222');
+    const r4 = await sync.syncOnce(conn, opts);
+    folderSync.syncOnce(conn);
+    check('deleted or unpublished in the dashboard → removed from the folder and the wall',
+      r4.removed.includes('Jen/Designs/Square (bbbbbbbb).jpg') && !fs.existsSync(J('Designs', 'Square (bbbbbbbb).jpg')) &&
+      !db.all(conn, 'designs').some(d => /Square \(bbbbbbbb\)/.test(d.source_file || '')), JSON.stringify(r4));
+
+    // A synced file someone edited on the Mac is kept even when unpublished.
+    fs.appendFileSync(J('Designs', 'Rose sheet (aaaaaaaa).jpg'), Buffer.from('edited'));
+    catalog = [];
+    const r5 = await sync.syncOnce(conn, opts);
+    check('a synced file that was edited on this Mac is kept, not deleted',
+      r5.kept.includes('Jen/Designs/Rose sheet (aaaaaaaa).jpg') && fs.existsSync(J('Designs', 'Rose sheet (aaaaaaaa).jpg')), JSON.stringify(r5));
+    check('a hand-dropped file is never touched by the sync', md5f(J('Designs', 'hand-drop.jpg')) === handMd5);
+    check('every run reached the database (that is the keep-alive traffic)', requests >= 7, requests + ' requests');
+
+    // A sheet that STARTED on this Mac and was copied to Supabase with the
+    // same id (the move to Kat's project) is already on the wall: no download.
+    const homegrown = db.insertRow(conn, 'designs', { artist_id: jen.id, title: 'Studio sheet', type: 'sheet',
+      image_url: '/storage/v1/object/public/flash/x/studio.jpg', published: true });
+    files['/storage/v1/object/public/flash/x/studio.jpg'] = img(2160, 2795, 'studio');
+    catalog = [{ id: homegrown.id, artist_id: jen.id, title: 'Studio sheet', type: 'sheet',
+                 image_url: SB + '/storage/v1/object/public/flash/x/studio.jpg' }];
+    const wallBefore = db.all(conn, 'designs').length;
+    const r6 = await sync.syncOnce(conn, opts);
+    folderSync.syncOnce(conn);
+    check('a sheet that came FROM this Mac is not downloaded back (no duplicate on the wall)',
+      r6.ok && r6.downloaded.length === 0 && r6.alreadyHere.includes(homegrown.id) &&
+      !fs.existsSync(J('Designs', `Studio sheet (${homegrown.id.slice(0, 8)}).jpg`)) &&
+      db.all(conn, 'designs').length === wallBefore, JSON.stringify(r6));
+    catalog = [];
+
+    /* ── triggers: the screensaver start → POST /api/sync-now ── */
+    process.env.KT_SUPABASE_URL = SB; process.env.KT_SUPABASE_KEY = 'test';
+    files['/storage/v1/object/public/flash/x/c.jpg'] = img(2160, 2795, 'c');
+    catalog = [{ id: 'cccccccc-3333', artist_id: jen.id, title: 'From phone', type: 'sheet',
+                 image_url: SB + '/storage/v1/object/public/flash/x/c.jpg' }];
+    const before = requests;
+    const t1 = await req('POST', '/api/sync-now');
+    check('a screensaver start triggers a sync, which downloads AND imports at once',
+      t1.status === 200 && t1.json.ran && t1.json.changed && fs.existsSync(J('Designs', 'From phone (cccccccc).jpg')) &&
+      db.all(conn, 'designs').some(d => d.source_file === 'Jen/Designs/From phone (cccccccc).jpg'), t1.text);
+    const t2 = await req('POST', '/api/sync-now');
+    check('a second screensaver start within 10 minutes does NOT sync again (debounced)',
+      t2.status === 200 && t2.json.ran === false && requests - before === 2, t2.text + ' requests ' + (requests - before));
+    const t3 = await req('POST', '/api/sync-now', { headers: { 'X-Forwarded-For': '1.2.3.4' } });
+    check('a sync request arriving through a tunnel is refused', t3.status === 403, t3.status);
+    delete process.env.KT_SUPABASE_URL; delete process.env.KT_SUPABASE_KEY;
+    mock.close();
   }
 
   server.close();

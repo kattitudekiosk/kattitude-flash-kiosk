@@ -115,6 +115,34 @@ gets one injected script tag; served by Vercel, nothing changes.
   their own folders". Imported, resized by invariant 3's rules into
   `Designs/_kiosk/`, published; deleting the file unpublishes it
   (`server/folder-sync.js`).
+- **UPLOAD PATH [2 Oct 2026, Joshua approved]: hosted dashboard → Supabase →
+  Mac mini sync → KIOSK MEDIA → wall.** The hosted dashboard writes to
+  Supabase again (`index.html` no longer loads `hosted-notice.js`; only the
+  stale `standalone.html` copy does, so it can never send a link). Since
+  3 Oct 2026 that is Kat's project `hnwyoglbmhvafxnzizqe`, and the sync skips
+  any design whose id the Mac mini already has, so the sheets copied up in
+  the move are never downloaded back as duplicates. `server/supabase-sync.js`
+  pulls published sheets — ONLY on three triggers, never polling (Joshua:
+  "only checks when the screensaver gets activated and then once a day"):
+  the wall's screensaver start (`POST /api/sync-now`, localhost only, at most
+  every 10 min), a daily 09:15 launchd run (`com.kattitude.studio-sync`, the
+  keep-alive), and server start-up. It
+  into `<Artist>/Designs/` and removes ones unpublished/deleted — only files
+  it wrote, only if unchanged. Network trouble = retry at the next trigger,
+  never delete. Every run is a Supabase query (keep-alive, logged daily). Hand drops are NOT
+  pushed up (no write credential on the kiosk), so they are wall-only. The
+  studio server's `/dashboard/` redirects to the hosted dashboard so there is
+  exactly one writable dashboard. Dashboard uploads are all flash sheets.
+- **THE WALL NEEDS NO INTERNET [2 Oct 2026 — Joshua: "if the internet goes out
+  the kiosk doesn't go down with it"].** Everything the wall loads comes from
+  `localhost:8787`: catalog, photos, QR codes (generated locally), and the
+  fonts, which are bundled in `assets/fonts/` (Bebas Neue + Inter, OFL) — the
+  page used to pull them from Google Fonts. Never add a CDN script, web font
+  or remote image to the kiosk; `tools/verify.js` 1h fails if `index.html` or
+  any kiosk stylesheet references another host. Proven offline: studio
+  server inside `sandbox-exec` denying all non-localhost traffic, plus a
+  headless Chrome whose only reachable host is localhost — cover, artists,
+  sheets, screensaver, a folder drop and touch (mouse events) all worked.
 - **The cover reads the live catalog** (`renderCover()` re-reads
   `Catalog.snapshot()`), the same source as the Artists page, so the two can
   never disagree. `tools/verify.js` 1f/1g check it.
@@ -142,6 +170,19 @@ commit fails as "Deployment was blocked" — not a build error. Commit with
 `git -c user.name=Joshua -c user.email=121084994+canyouseeus@users.noreply.github.com commit …`
 (the identity upstream commits use). Found 2 Oct 2026, when all four previews
 of the first push were blocked and all four of the re-authored push built.
+
+## NO EMAIL TO ARTISTS OR KAT — **[HARD RULE, 3 Oct 2026, until Joshua lifts it]**
+
+Joshua: *"I don't want you to send the Artist any emails until I check to
+make sure that it's working. I have a profile for me so send only to me
+first."* No invites, no magic links, no other email to any artist or to
+Kat — not from an agent, a script or a test — and no artist emails added to
+Kat's project. Joshua's hidden admin card (`kiosk_visible = false`) gets the
+first link. `db/kat-project/08-signin-gate.sql` enforces it in the database:
+Supabase Auth cannot create a login for an address that is not on an active
+admin card, so a refused address gets no email. Lift it only when Joshua
+says so: `drop trigger signin_gate on auth.users;`. Never put an email
+address in this repo; it is public.
 
 ## EVIDENCE RULE — every task, no exceptions
 
@@ -404,10 +445,9 @@ customers there. Now:
 - `tools/verify.js` section 1d checks all of this;
   `VERIFY_ALLOW_SEED_LEAK=1` is its negative control and must fail.
 
-**The hosted dashboard does not write to Supabase any more.**
-`dashboard/hosted-notice.js` blocks it (and says the dashboard moved) unless
-`DASH_CONFIG.studioServerUrl` is set, in which case it forwards there. The
-wall reads only the Mac mini; a second writable backend is a split brain.
+**[SUPERSEDED 3 Oct 2026 by the approved upload path above]** The hosted
+dashboard writes to Supabase again; the Mac mini pulls from it, so there is
+one direction of travel and no split brain.
 
 ### 7b. (history) Placeholder content is never presented as artist work
 

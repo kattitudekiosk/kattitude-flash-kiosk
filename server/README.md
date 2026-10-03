@@ -48,6 +48,44 @@ within about a minute (`server/folder-sync.js`). A file loose directly in
 - `server/KIOSK-MEDIA-HOW-TO.txt` is the staff-facing version; it heads the
   README.txt in the KIOSK MEDIA folder.
 
+## The hosted dashboard → Supabase → this Mac (2 Oct 2026)
+
+Artists upload from anywhere through the **hosted dashboard**
+(https://kattitude-flash-kiosk.vercel.app/dashboard/), which saves to Kat's
+Supabase project `hnwyoglbmhvafxnzizqe`. This Mac pulls from there, and skips
+any design it already has (same id), so nothing comes back twice:
+
+- **When it syncs** (Joshua: "only checks when the screensaver gets activated
+  and then once a day") — never on a polling loop:
+  1. the wall's screensaver starts → the page asks `POST /api/sync-now`
+     (localhost only); the server syncs at most once per 10 minutes, and if
+     sheets arrived or left, the page reloads its catalog so the screensaver
+     reshuffles;
+  2. once a day at 09:15, launchd `com.kattitude.studio-sync` runs
+     `node server/cli.js sync-supabase` (log `logs/sync.log`) — the keep-alive;
+  3. when the server starts (a reboot).
+  Offline at a trigger → logged, nothing changes, the next trigger retries.
+- It reads Supabase's `kiosk_catalog` with the public key — published,
+  approved designs only — and downloads each into
+  `KIOSK MEDIA/<Artist>/Designs/<title> (<id>).<ext>`. The folder importer
+  then resizes it and puts it on the wall.
+- Deleted or unpublished in the dashboard → the sync removes its own copy
+  (and the wall drops it). It only ever deletes a file it wrote, and only if
+  the file is unchanged; a hand-dropped or edited file is never deleted.
+- Offline or Supabase down → logs "will retry", changes nothing, exits 0.
+  The wall never depends on it.
+- **Keep-alive:** every run is a real database query. The first success each
+  day is logged: `keep-alive: database query OK`. Supabase says free
+  projects pause "after 1 week of inactivity" but does not define activity,
+  so this is the standard practice, not a guarantee. A paused project can be
+  restored with one click for a year; the wall keeps running either way.
+- **Folder drops are NOT pushed up to Supabase.** Writing there needs a
+  signed-in user or the service-role key, and neither belongs on an
+  unattended kiosk. So a hand-dropped sheet is on the wall but not the phone
+  page; for both, upload through the dashboard.
+- The studio server's own `/dashboard/` redirects to the hosted one: ONE
+  dashboard writes, so nothing saved can miss the phone page.
+
 ## Run it
 
 ```sh

@@ -39,6 +39,7 @@ const SUPABASE_STANDIN = `
   create role anon nologin;
   create role authenticated nologin;
   create role service_role nologin bypassrls;
+  create role supabase_auth_admin nologin;   -- the role Supabase Auth writes logins as
   create schema extensions;
   create schema auth;
   create schema storage;
@@ -56,6 +57,8 @@ const SUPABASE_STANDIN = `
     select coalesce(nullif(current_setting('request.jwt.claim.role', true), ''),
                     (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role'))::text $$;
   grant execute on function auth.uid(), auth.role() to anon, authenticated;
+  grant usage on schema auth to supabase_auth_admin;
+  grant select, insert, update on auth.users to supabase_auth_admin;
 
   create table storage.buckets (
     id text primary key, name text not null, public boolean default false,
@@ -176,6 +179,16 @@ const SABOTAGE_SQL = `
     await val('authenticated', U, 'select public.is_admin()::text'), 'true']);
   windowChecks.push(['07 signed in, he sees all 8 cards in the dashboard',
     await val('authenticated', U, 'select count(*)::text from public.artists'), '8']);
+
+  /* 08/09: the sign-in gate. 09 is the same file Kat's project runs. */
+  windowChecks.push(['08 applies', await runCard(fs.readFileSync(path.join(DIR, '08-signin-gate.sql'), 'utf8')), 'ok']);
+  const gate = await db.exec(fs.readFileSync(path.join(DIR, '09-verify-gate.sql'), 'utf8'));
+  for (const g of gate[gate.length - 1].rows) windowChecks.push(['09 ' + g.check_name, g.got, g.expected]);
+  windowChecks.push(['09 left nothing behind',
+    String((await db.query(`select count(*)::int as n from public.artists where name = 'Gate proof'`)).rows[0].n), '0']);
+  const rerun = (await db.exec(fs.readFileSync(path.join(DIR, '04-verify.sql'), 'utf8'))).pop().rows;
+  windowChecks.push(['04 still runs after the gate (maintenance role passes)',
+    rerun.filter(r => !r.pass).map(r => r.check_name + ': ' + r.got).join('; ') || 'all pass', 'all pass']);
 
   for (const [name, got, want] of windowChecks) {
     total++;

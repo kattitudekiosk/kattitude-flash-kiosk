@@ -1,4 +1,9 @@
-/* Kattitude Flash Dashboard — the hosted copy no longer writes to Supabase
+/* Kattitude Flash Dashboard — read-only stub, now used ONLY by standalone.html
+ *
+ * [3 Oct 2026] index.html no longer loads this: the hosted dashboard talks to
+ * Supabase again (supabase-sync). It is kept solely so dashboard/standalone.html,
+ * an unreferenced August single-file copy Vercel still serves, can never write
+ * to Supabase or ask it to email anybody a sign-in link.
  *
  * WHY (2 Oct 2026). The wall now reads the studio server on the Mac mini.
  * This same dashboard, opened from Vercel, still talked to Supabase — so an

@@ -147,9 +147,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="config.js"></script>
-<!-- hosted-notice.js: on Vercel, stops writes to Supabase and says where the dashboard
-     moved. On the studio server local-backend.js is injected first and this does nothing. -->
-<script src="hosted-notice.js"></script>
 <!-- dash-client.js hands avatar.js and tour.js a Supabase client that shares
      app.js's session without competing to refresh it. It must load first. -->
 <script src="dash-client.js"></script>

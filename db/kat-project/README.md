@@ -29,7 +29,9 @@ record, like `db/schema.sql`. They are not meant to be pasted.
 | 05 | `05-upload-open.sql` | apply_migration `kattitude_upload_window` | Temporary: the public key may insert exactly 12 named files. |
 | — | `node storage-upload.js --upload <publishable key>` | this Mac | Uploads the 12 files and re-downloads each one to compare sha256. |
 | 06 | `06-upload-close.sql` | execute_sql | Drops the temporary policy and checks all 12 files arrived. |
-| 07 | `07-joshua-test-card.sql` | execute_sql | Joshua's hidden admin test card. His address goes on the one marked line, in the copy that runs, never in the repo. |
+| 07 | `07-joshua-test-card.sql` | execute_sql | Joshua's hidden admin test card. His address goes on the one marked line, in the copy that runs, never in the repo. **Ran 3 Oct 2026** (id `81fc4355…`). |
+| 08 | `08-signin-gate.sql` | apply_migration `kattitude_signin_gate` | Supabase Auth may only create a login for an address on an active admin card, so a refused address gets no email. |
+| 09 | `09-verify-gate.sql` | execute_sql | Proves 08 as Supabase Auth's own role, then rolls back. Sends nothing. |
 
 **Done 3 Oct 2026:** 00–06 ran on Kat's project. 04 passed 40/40, and 12/12
 files were stored byte for byte. Auth URL configuration is set.
@@ -47,7 +49,7 @@ mail; the proofs insert fake `@example.invalid` users straight into
 neither can request a link.
 
 Test everything locally first, with no key and no network:
-`node db/kat-project/test.js` (60 checks). Also run
+`node db/kat-project/test.js` (69 checks). Also run
 `node db/kat-project/test.js --sabotage`: it must FAIL its refusal checks.
 
 ## What cannot be done without a key or a click
