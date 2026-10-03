@@ -63,12 +63,18 @@ declare
 begin
   begin
     -- The data as migrated: shape and the kiosk's view of it.
-    res := res || jsonb_build_object('c', 'artists on the wall', 'e', '7',
-      'g', (select count(*) from public.artists where active and kiosk_visible)::text);
-    res := res || jsonb_build_object('c', 'categories migrated', 'e', '11',
-      'g', (select count(*) from public.categories)::text);
-    res := res || jsonb_build_object('c', 'designs migrated', 'e', '4',
-      'g', (select count(*) from public.designs)::text);
+    res := res || jsonb_build_object('c', 'the 7 migrated artists are all still there', 'e', '7',
+      'g', (select count(*) from public.artists where id in (
+              '14045c7d-df79-4361-b5e0-3b1c820990dc', 'fbe23a84-7953-47b1-a272-1731cc4a0d01',
+              'ad5ed37b-ea72-4172-8362-e6d8623c82b1', 'e69eecbc-ae36-447b-b924-a64e201eef6b',
+              '9e767f86-c114-47b4-b7e4-78f780bbdc4f', '3dc3e452-ce74-443d-a01d-60cbacca976f',
+              '5f7e39b9-20a2-4101-8da5-83476636edc3'))::text);
+    res := res || jsonb_build_object('c', 'the 11 migrated categories are all still there', 'e', '11',
+      'g', (select count(*) from public.categories where display_order between 1 and 11)::text);
+    res := res || jsonb_build_object('c', 'the 4 migrated sheets are all still there', 'e', '4',
+      'g', (select count(*) from public.designs where id in (
+              '5874707c-6970-4595-9adc-da3e025d04cb', '91067aeb-04ce-4d55-8968-473e339f880e',
+              '41ea6880-6cd1-41f3-b1fc-c5718878e054', 'eb798318-fbcb-4e96-ac66-119896bccf87'))::text);
     res := res || jsonb_build_object('c', 'no placeholder art in designs', 'e', '0',
       'g', (select count(*) from public.designs where image_url ~* '(placeholder|seed)')::text);
     res := res || jsonb_build_object('c', 'every table has RLS on', 'e', '0',
@@ -77,10 +83,17 @@ begin
                and not relrowsecurity)::text);
 
     -- ANON (the kiosk's publishable key, i.e. anybody on the internet)
-    res := res || jsonb_build_object('c', 'anon sees the 4 live designs in kiosk_catalog', 'e', '4',
+    res := res || jsonb_build_object('c', 'anon sees exactly the live designs in kiosk_catalog',
+      'e', (select count(*) from public.designs d left join public.artists a on a.id = d.artist_id
+             where d.published and d.approved and (d.artist_id is null or (a.active and a.kiosk_visible)))::text,
       'g', pg_temp.kt_val('anon', null, 'select count(*)::text from public.kiosk_catalog'));
-    res := res || jsonb_build_object('c', 'anon sees the 7 artists on the wall', 'e', '7',
+    -- Not a fixed number: the roster grows. anon must see exactly the cards
+    -- that are active AND on the wall, and never a hidden one.
+    res := res || jsonb_build_object('c', 'anon sees exactly the artists on the wall',
+      'e', (select count(*) from public.artists where active and kiosk_visible)::text,
       'g', pg_temp.kt_val('anon', null, 'select count(*)::text from public.artists'));
+    res := res || jsonb_build_object('c', 'anon sees no hidden card', 'e', '0',
+      'g', pg_temp.kt_val('anon', null, 'select count(*)::text from public.artists where not kiosk_visible'));
     res := res || jsonb_build_object('c', 'anon reads display columns', 'e', 'Kat',
       'g', pg_temp.kt_val('anon', null, format('select name from public.artists where id = %L', kat)));
     res := res || jsonb_build_object('c', 'anon CANNOT read email', 'e', 'refused 42501',

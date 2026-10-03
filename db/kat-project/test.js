@@ -180,12 +180,22 @@ const SABOTAGE_SQL = `
   windowChecks.push(['07 signed in, he sees all 8 cards in the dashboard',
     await val('authenticated', U, 'select count(*)::text from public.artists'), '8']);
 
+  /* The roster grows (Marissa joined on 3 Oct 2026, Kat's card got an
+   * email). 04 and 09 must not care: add an on-the-wall artist with an email
+   * and give Kat's card one, then run both. */
+  await db.exec(`insert into public.artists (name, handle, email, role, active, kiosk_visible, display_order)
+                 values ('New artist proof', '@newproof', 'new.artist.proof@example.invalid', 'artist', true, true, 7);
+                 update public.artists set email = 'kat.card.proof@example.invalid' where name = 'Kat';`);
+  windowChecks.push(['roster grown: 9 cards, 8 on the wall',
+    String((await db.query(`select count(*)::int as n from public.artists`)).rows[0].n) + '/' +
+    String((await db.query(`select count(*)::int as n from public.artists where active and kiosk_visible`)).rows[0].n), '9/8']);
+
   /* 08/09: the sign-in gate. 09 is the same file Kat's project runs. */
   windowChecks.push(['08 applies', await runCard(fs.readFileSync(path.join(DIR, '08-signin-gate.sql'), 'utf8')), 'ok']);
   const gate = await db.exec(fs.readFileSync(path.join(DIR, '09-verify-gate.sql'), 'utf8'));
   for (const g of gate[gate.length - 1].rows) windowChecks.push(['09 ' + g.check_name, g.got, g.expected]);
   windowChecks.push(['09 left nothing behind',
-    String((await db.query(`select count(*)::int as n from public.artists where name = 'Gate proof'`)).rows[0].n), '0']);
+    String((await db.query(`select count(*)::int as n from public.artists where name like 'Gate proof%'`)).rows[0].n), '0']);
   const rerun = (await db.exec(fs.readFileSync(path.join(DIR, '04-verify.sql'), 'utf8'))).pop().rows;
   windowChecks.push(['04 still runs after the gate (maintenance role passes)',
     rerun.filter(r => !r.pass).map(r => r.check_name + ': ' + r.got).join('; ') || 'all pass', 'all pass']);
