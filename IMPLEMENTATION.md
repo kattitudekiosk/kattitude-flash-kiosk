@@ -98,9 +98,10 @@ The mix is chosen so every layout state is reachable and reviewable:
 | Ally | 0 | 3 | **sheets only** → linear viewer, no grid |
 | Barbie / Miranda / Jen / Naomi | 9 / 7 / 5 / 6 | 0 | singles only |
 
-⚠ **Sheet attribution is invented.** The four real sheets are assigned to Kat
-and Alena purely so mixed galleries exist to look at. Nobody has said who
-actually drew them — confirm before treating it as fact.
+**Sheet credits confirmed by Joshua, 3 Oct 2026:** Kat 2 (IMG 2120, Untitled
+Artwork), Jen 1 (IMG 1705), Miranda 1 (Untitled Artwork 2). That is how they
+sit in KIOSK MEDIA and in both databases. (The seed's
+Kat/Alena split above is placeholder data and never public.)
 
 ## The hybrid grid
 

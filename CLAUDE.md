@@ -889,9 +889,10 @@ The roster is real people whose names appear on a wall in a shop.
 - Instagram handles are data on the artist record, never hardcoded. Handle and
   `instagram_url` move together — a mismatch sends customers to the wrong
   profile.
-- **Sheet attribution is invented.** The four real sheets were assigned to Kat
-  and Alena so mixed galleries existed to look at. Nobody has said who drew
-  them. Correct before production.
+- **[CORRECTED 3 Oct 2026]** **Sheet credits confirmed by Joshua, 3 Oct 2026:** Kat 2 (IMG 2120, Untitled
+  Artwork), Jen 1 (IMG 1705), Miranda 1 (Untitled Artwork 2). That is how they
+  sit in KIOSK MEDIA and in both databases.
+  (The earlier Kat/Alena split was invented for testing.)
 - Artist emails are personal data. They are not readable by the kiosk's
   publishable key and must stay that way.
 - **Headshots are personal data too, but public by nature** — they go on a wall
@@ -908,7 +909,7 @@ are settled:
 - Sheets-page QR destination — defaulted to the online gallery
 - Whether owner approval gates publishing — defaulted to off; the Review tab
   and the `approved` column already exist, so switching it on needs no migration
-- Attribution of the four original flash sheets — provisional, see above
+- ~~Attribution of the four original flash sheets~~ — **settled 3 Oct 2026**, see CONTENT AND PEOPLE
 - Whether kiosk-identical type is too small on phones — pending Joshua looking
 - Whether per-design videos belong in the grid, or the attract reel is the
   whole video ask — **unanswered**; `screensaver_clips` is deliberately kept
