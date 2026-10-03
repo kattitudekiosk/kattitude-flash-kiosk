@@ -145,6 +145,38 @@ const SABOTAGE_SQL = `
     ['06 shuts the window (a listed file is refused)', await tryAnon(put(...listed[1])), 'refused 42501'],
     ['06 notices the files were not all uploaded', String(closeRows[1].pass), 'false'],
   );
+  /* 07: Joshua's hidden admin card. A fake .invalid address stands in for
+   * his — inserting a row sends nothing, and nothing here asks for a link. */
+  const card = fs.readFileSync(path.join(DIR, '07-joshua-test-card.sql'), 'utf8');
+  const runCard = async (sqlText) => { try { await db.exec(sqlText); return 'ok'; } catch (e) { if (process.env.KT_DEBUG) console.error('07:', e.message); return 'refused'; } };
+  windowChecks.push(['07 has exactly one placeholder', String(card.split('__JOSHUA_EMAIL__').length - 1), '1']);
+  windowChecks.push(['07 refuses to run with the placeholder left in', await runCard(card), 'refused']);
+  const FAKE = 'joshua.proof@example.invalid';
+  windowChecks.push(['07 runs with an address in place', await runCard(card.replace('__JOSHUA_EMAIL__', FAKE)), 'ok']);
+  windowChecks.push(['07 refuses a second card for the same address', await runCard(card.replace('__JOSHUA_EMAIL__', FAKE)), 'refused']);
+  const val = async (role, sub, sqlText) => (await db.query(
+    `select pg_temp.kt_val($1, $2::uuid, $3) as r`, [role, sub, sqlText])).rows[0].r;
+  const j = (await db.query(`select id, role, active, kiosk_visible from public.artists where name = 'Joshua'`)).rows[0];
+  windowChecks.push(['07 card is admin, active, hidden from the wall',
+    `${j.role}/${j.active}/${j.kiosk_visible}`, 'admin/true/false']);
+  windowChecks.push(['07 anon still sees exactly the 7 wall artists',
+    await val('anon', null, 'select count(*)::text from public.artists'), '7']);
+  windowChecks.push(['07 anon cannot see the Joshua card',
+    await val('anon', null, `select count(*)::text from public.artists where name = 'Joshua'`), '0']);
+  windowChecks.push(['07 kiosk_catalog unchanged',
+    await val('anon', null, 'select count(*)::text from public.kiosk_catalog'), '4']);
+  windowChecks.push(['07 only Joshua\'s card has an email',
+    String((await db.query(`select count(*)::int as n from public.artists where email is not null`)).rows[0].n), '1']);
+  const U = '00000000-0000-4000-8000-000000000051';   // his login, as Supabase Auth would create it
+  await db.query(`insert into auth.users (id, email, aud, role)
+                  values ($1, $2, 'authenticated', 'authenticated')`, [U, FAKE]);
+  windowChecks.push(['07 his first sign-in links the card',
+    await val('authenticated', U, 'select public.current_artist_id()::text'), j.id]);
+  windowChecks.push(['07 signed in, he is admin',
+    await val('authenticated', U, 'select public.is_admin()::text'), 'true']);
+  windowChecks.push(['07 signed in, he sees all 8 cards in the dashboard',
+    await val('authenticated', U, 'select count(*)::text from public.artists'), '8']);
+
   for (const [name, got, want] of windowChecks) {
     total++;
     const ok = got === want;
