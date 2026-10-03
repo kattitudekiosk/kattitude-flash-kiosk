@@ -36,7 +36,11 @@ record, like `db/schema.sql`. They are not meant to be pasted.
 **Done 3 Oct 2026:** 00–06 ran on Kat's project. 04 passed 40/40, and 12/12
 files were stored byte for byte. Auth URL configuration is set.
 
-## NO EMAIL TO ARTISTS OR KAT, until Joshua says so
+## NO EMAIL TO ARTISTS OR KAT — LIFTED 3 Oct 2026
+
+Joshua lifted it after testing his own sign-in, and `signin_gate` was dropped
+on Kat's project. What follows is the history.
+
 
 Joshua, 3 Oct 2026: *"I don't want you to send the Artist any emails until I
 check to make sure that it's working. I have a profile for me so send only

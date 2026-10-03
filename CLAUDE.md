@@ -171,18 +171,24 @@ commit fails as "Deployment was blocked" — not a build error. Commit with
 (the identity upstream commits use). Found 2 Oct 2026, when all four previews
 of the first push were blocked and all four of the re-authored push built.
 
-## NO EMAIL TO ARTISTS OR KAT — **[HARD RULE, 3 Oct 2026, until Joshua lifts it]**
+## NO EMAIL TO ARTISTS OR KAT — **[LIFTED 3 Oct 2026]**
 
-Joshua: *"I don't want you to send the Artist any emails until I check to
-make sure that it's working. I have a profile for me so send only to me
-first."* No invites, no magic links, no other email to any artist or to
-Kat — not from an agent, a script or a test — and no artist emails added to
-Kat's project. Joshua's hidden admin card (`kiosk_visible = false`) gets the
-first link. `db/kat-project/08-signin-gate.sql` enforces it in the database:
-Supabase Auth cannot create a login for an address that is not on an active
-admin card, so a refused address gets no email. Lift it only when Joshua
-says so: `drop trigger signin_gate on auth.users;`. Never put an email
-address in this repo; it is public.
+This was a hard rule from earlier the same day. Joshua: *"I don't want you
+to send the Artist any emails until I check to make sure that it's
+working."* He tested sign-in on his own hidden admin card, it worked, and he
+lifted the rule: *"I think we are ready to resend everyone the sign-in links
+after this so you can unlock it."*
+
+- `signin_gate` (`db/kat-project/08-signin-gate.sql`) was **dropped** on Kat's
+  project the same day. Anyone with an email on their card can now request a
+  link. `public.email_on_admin_card()` still exists, but nothing calls it.
+- Artist emails are their Instagram handle @kattitude.com, for example
+  `puratinta_26@kattitude.com` for Naomi. Kat keeps her own address. They live
+  in the database only, **never in this repo**: it is public.
+- 3 Oct 2026: one sign-in link each was sent to the 7 artists (Barbie,
+  Miranda, Jen, Naomi, Ally, Alena, Marissa), not to Kat and not to Joshua.
+- Still true: an agent sends email only when asked to, in so many words, for
+  named people. Inviting someone is a message on the studio's behalf.
 
 ## EVIDENCE RULE — every task, no exceptions
 
