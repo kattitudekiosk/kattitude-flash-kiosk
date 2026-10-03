@@ -205,8 +205,20 @@
   /* ── Splash ─────────────────────────────────────────────────────────────── */
   let galleryEntered = false;
 
+  /* Set when a tap wakes the kiosk from the screensaver. That tap must land
+   * on the splash and stop there: a doubled or trailing event from the same
+   * physical touch (the Touch Up driver turns touch into mouse events) must
+   * not count as a second tap and walk straight past "tap anywhere to
+   * enter". A real customer's next tap comes well after this window. */
+  const WAKE_GUARD_MS = 500;
+  let wokeAt = 0;
+
   function enterGallery(e) {
     if (galleryEntered) return;
+    if (wokeAt && Date.now() - wokeAt < WAKE_GUARD_MS) {
+      if (e && e.cancelable) e.preventDefault();
+      return;
+    }
     galleryEntered = true;
     if (e && e.cancelable) e.preventDefault();
 
@@ -278,6 +290,22 @@
   function exitScreensaver() {
     if (!screensaverActive) return;
     screensaverActive = false;
+    wokeAt = Date.now();
+
+    /* SPLASH FIRST, AND INSTANTLY (Joshua, 3 Oct 2026: "the screen briefly
+     * goes back to the kiosk screen instead of straight to the start page").
+     * The splash normally fades in over 0.55s; the reel and body.screensaver
+     * used to come down before it, so the old kiosk view showed through for
+     * half a second. Now the splash is fully opaque on top (z 1000, above the
+     * reel's 900) before anything underneath changes, and its fade is turned
+     * back on two frames later so entering the gallery still fades out. */
+    splash.classList.add('instant');
+    splash.classList.remove('hidden');
+    void splash.offsetWidth;   // commit the opaque splash before what follows
+    const raf = window.requestAnimationFrame || (cb => setTimeout(cb, 16));
+    raf(() => raf(() => splash.classList.remove('instant')));
+
+    // Everything below now happens out of sight, under the splash.
     clearInterval(screensaverTimer);
     try { if (window.Screensaver) window.Screensaver.stop(); } catch (err) {}
     clearTimeout(idleTimer);
@@ -286,9 +314,6 @@
     // Intentionally does NOT call exitFS() — fullscreen must stay active
     // across the splash reset; Chrome UI should never reappear on the kiosk.
 
-    // Splash must always reappear — do this before the best-effort sheet
-    // reset so a failure there can never leave the kiosk stuck.
-    splash.classList.remove('hidden');
     try {
       if (current === 0) resetZoom(); else loadSheet(0, 'none');
     } catch (err) {

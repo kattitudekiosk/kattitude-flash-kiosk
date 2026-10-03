@@ -121,6 +121,11 @@ html, body {
   pointer-events: none;
 }
 
+/* Coming back from the screensaver the splash appears at once, never fades
+   in: a fade-in would show the old kiosk view through it (script.js,
+   exitScreensaver). Removed again two frames later. */
+#splash.instant { transition: none; }
+
 .splash-content {
   width: 100%;
   display: flex;
