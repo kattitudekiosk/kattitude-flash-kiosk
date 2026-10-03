@@ -35,16 +35,18 @@ Last updated: 3 October 2026
 
 ## Backend
 
-Supabase project `tovydesiocfgmasvzjvt` (`kattitude-flash-gallery`, us-east-1)
-until Kat has her own Supabase account.
+Kat's Supabase project `hnwyoglbmhvafxnzizqe` (`supabase-blue-cave`, Vercel-managed
+org) since 3 Oct 2026. Schema, data and proofs: `db/kat-project/`. Joshua's old
+project `tovydesiocfgmasvzjvt` is retired; only `server/cli.js` (the one-time
+importer) still names it.
 
 | | |
 |---|---|
-| API URL | https://tovydesiocfgmasvzjvt.supabase.co |
-| Project dashboard | https://supabase.com/dashboard/project/tovydesiocfgmasvzjvt |
-| Auth → SMTP (needed so artists can get sign-in links) | https://supabase.com/dashboard/project/tovydesiocfgmasvzjvt/auth/smtp |
-| Auth → URL config | https://supabase.com/dashboard/project/tovydesiocfgmasvzjvt/auth/url-configuration |
-| Auth → users | https://supabase.com/dashboard/project/tovydesiocfgmasvzjvt/auth/users |
+| API URL | https://hnwyoglbmhvafxnzizqe.supabase.co |
+| Project dashboard | https://supabase.com/dashboard/project/hnwyoglbmhvafxnzizqe |
+| Auth → URL config (Site URL still to set) | https://supabase.com/dashboard/project/hnwyoglbmhvafxnzizqe/auth/url-configuration |
+| Auth → SMTP (needed so artists get sign-in links) | https://supabase.com/dashboard/project/hnwyoglbmhvafxnzizqe/auth/smtp |
+| Auth → users | https://supabase.com/dashboard/project/hnwyoglbmhvafxnzizqe/auth/users |
 
 ## Source
 

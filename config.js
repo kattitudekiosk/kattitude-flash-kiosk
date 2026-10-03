@@ -29,7 +29,7 @@ window.KIOSK_CONFIG = {
    * Mac mini's own; served from Vercel they read Supabase (real data). */
   catalogSource: 'live',
 
-  /* Supabase project "kattitude-flash-gallery" (us-east-1), schema applied.
+  /* Kat's Supabase project hnwyoglbmhvafxnzizqe since 3 Oct 2026 (db/kat-project/).
    *
    * The publishable key below is meant to be public — it is in the page source
    * of every kiosk. What keeps the catalog safe is row-level security in the
@@ -40,8 +40,8 @@ window.KIOSK_CONFIG = {
    * The tables are EMPTY. Until real content is imported, catalogSource stays
    * on 'seed'. */
   live: {
-    url: 'https://tovydesiocfgmasvzjvt.supabase.co/rest/v1/kiosk_catalog?select=*',
-    anonKey: 'sb_publishable_2z_wow-2gSEvs4ng-YxyrA_Mytp7XaD',
+    url: 'https://hnwyoglbmhvafxnzizqe.supabase.co/rest/v1/kiosk_catalog?select=*',
+    anonKey: 'sb_publishable_XWA6QYk4ukTcmqvqjnBniw_DfvzQsZh',
     /* Columns are listed explicitly and MUST stay that way. The public role no
      * longer has SELECT on the whole artists row — email, role and
      * auth_user_id are revoked from it, because this key is in the kiosk's
@@ -54,10 +54,10 @@ window.KIOSK_CONFIG = {
      * the dashboard generates, and if it is missing here the kiosk silently
      * falls back to the 1024px original — which works, and is 16x the bytes,
      * and nothing anywhere reports it. */
-    artistsUrl: 'https://tovydesiocfgmasvzjvt.supabase.co/rest/v1/artists'
+    artistsUrl: 'https://hnwyoglbmhvafxnzizqe.supabase.co/rest/v1/artists'
       + '?active=eq.true&order=display_order'
       + '&select=id,name,handle,portrait_url,portrait_thumb_url,bio,instagram_url,seniority,display_order',
-    categoriesUrl: 'https://tovydesiocfgmasvzjvt.supabase.co/rest/v1/categories?order=display_order',
+    categoriesUrl: 'https://hnwyoglbmhvafxnzizqe.supabase.co/rest/v1/categories?order=display_order',
     // Kiosk re-fetches on this interval. On failure the last good catalog is
     // kept and reused — a dropped network mid-shift must never blank the
     // screen (PRD §4.2).

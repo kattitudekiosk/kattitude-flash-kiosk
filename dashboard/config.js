@@ -14,8 +14,8 @@
  * sitting in a static file.
  */
 window.DASH_CONFIG = {
-  supabaseUrl: 'https://tovydesiocfgmasvzjvt.supabase.co',
-  supabaseAnonKey: 'sb_publishable_2z_wow-2gSEvs4ng-YxyrA_Mytp7XaD',
+  supabaseUrl: 'https://hnwyoglbmhvafxnzizqe.supabase.co',
+  supabaseAnonKey: 'sb_publishable_XWA6QYk4ukTcmqvqjnBniw_DfvzQsZh',
 
   storageBucket: 'flash',
 

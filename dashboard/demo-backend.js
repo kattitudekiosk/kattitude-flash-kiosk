@@ -451,7 +451,7 @@
    * this point in the page — this file loads first, deliberately — so the ref
    * is taken from the URL the app is built against and asserted against
    * DASH_CONFIG on the next tick. */
-  var PROJECT_REF = 'tovydesiocfgmasvzjvt';
+  var PROJECT_REF = 'hnwyoglbmhvafxnzizqe';
 
   function writeSession() {
     try {

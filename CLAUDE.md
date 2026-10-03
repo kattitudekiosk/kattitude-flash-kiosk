@@ -35,7 +35,7 @@ is unreliable on this hardware.
 |---|---|---|
 | Kiosk frontend | repo root | Vanilla HTML / CSS / JS — no framework, no build step |
 | Dashboard | `dashboard/` | Vanilla HTML / CSS / JS, Supabase JS client |
-| Database | Supabase `tovydesiocfgmasvzjvt` | PostgreSQL + RLS + Storage + Auth |
+| Database | Supabase `hnwyoglbmhvafxnzizqe` (Kat's, since 3 Oct 2026; was `tovydesiocfgmasvzjvt`) — schema in `db/kat-project/` | PostgreSQL + RLS + Storage + Auth |
 | Deployment | Vercel | **Production builds from git.** See the warning below. |
 | Repo | `kattitudekiosk/kattitude-flash-kiosk` | **public** (since 3 Oct 2026 — never commit a secret, an email or a database) |
 
