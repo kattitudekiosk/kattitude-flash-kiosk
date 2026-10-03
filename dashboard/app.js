@@ -55,6 +55,22 @@
   const KIND_LABEL = { style: 'Styles', theme: 'Themes', subject: 'Subjects' };
 
   /* == State == */
+  /* Whose card a new upload is credited to. An artist: always their own. An
+   * admin: their own card too — UNLESS that card is hidden from the wall
+   * (Joshua's test card, kiosk_visible = false). kiosk_catalog drops designs
+   * whose artist is not on the wall, so crediting one to a hidden card would
+   * upload it straight into nowhere. Then the first artist who IS on the wall
+   * (Kat, display_order 0) is the default, as it was when Joshua signed in on
+   * Kat's card. The picker below still lets an admin choose anyone. */
+  function defaultUploadArtist(me, artists, isAdmin) {
+    if (!me) return '';
+    if (!isAdmin || me.kiosk_visible !== false) return me.id;
+    const onWall = (artists || []).filter(a => a.active && a.kiosk_visible !== false)
+      .sort((x, y) => (x.display_order || 0) - (y.display_order || 0));
+    return onWall.length ? onWall[0].id : me.id;
+  }
+  window.DashHelpers = { defaultUploadArtist };   // for tools/verify-dashboard.js
+
   const state = {
     user: null,
     me: null,          // the artists row for this user
@@ -715,7 +731,7 @@
         w, h, type,
         error: type ? null : specError(w, h),
         title: file.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').trim(),
-        artistId: state.isAdmin ? (state.me ? state.me.id : '') : state.me.id,
+        artistId: defaultUploadArtist(state.me, state.artists, state.isAdmin),
         categories: [],
         publish: false,
         status: 'ready',
@@ -786,7 +802,8 @@
     if (state.isAdmin) {
       const sel = el('select', 'input');
       state.artists.forEach(a => {
-        const o = el('option', null, a.name + ' ' + (a.handle || ''));
+        const o = el('option', null, a.name + ' ' + (a.handle || '') +
+          (a.kiosk_visible === false ? ' (hidden — not on the wall)' : ''));
         o.value = a.id;
         if (a.id === item.artistId) o.selected = true;
         sel.appendChild(o);
