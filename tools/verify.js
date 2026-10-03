@@ -18,6 +18,13 @@ const { JSDOM, VirtualConsole } = require(process.env.JSDOM_PATH || 'jsdom');
 
 const ROOT = path.resolve(__dirname, '..');
 
+// jsdom keeps timers alive, so a stuck page would hang this forever. Never let it.
+const HARD_TIMEOUT_MS = 120000;
+setTimeout(() => {
+  console.error(`verify.js: timed out after ${HARD_TIMEOUT_MS / 1000}s`);
+  process.exit(2);
+}, HARD_TIMEOUT_MS).unref();
+
 let passed = 0, failed = 0;
 const failures = [];
 
@@ -100,6 +107,31 @@ function tap(window, node) {
 }
 
 (async () => {
+  /* ══ 0. PUBLIC REPO — no retired address, no personal email ═════════════
+   * First, and needs no jsdom, so a later section crashing cannot skip it. */
+  console.log('\npublic repository hygiene');
+  {
+    const cfgSrc = fs.readFileSync(path.join(ROOT, 'config.js'), 'utf8');
+    check('wall QR opens Kat\'s phone gallery',
+      /galleryUrl:\s*'https:\/\/kattitude-flash-kiosk\.vercel\.app'/.test(cfgSrc));
+
+    const RETIRED = /flash-gallery(-[a-z0-9]+)*\.vercel\.app|joshua-greenes-projects|kattitude-flash-dashboard[a-z0-9.-]*\.vercel\.app|[A-Za-z0-9._%+-]+@gmail\.com/;
+    const SKIP_DIRS = new Set(['.git', 'node_modules', 'seed']);
+    const TEXT = /\.(js|cjs|mjs|html|css|md|json|sh|py|sql|txt)$/;
+    const hits = [];
+    (function walk(dir) {
+      for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
+        if (ent.name.startsWith('.') && ent.name !== '.claude') continue;
+        const full = path.join(dir, ent.name);
+        if (ent.isDirectory()) { if (!SKIP_DIRS.has(ent.name)) walk(full); continue; }
+        if (!TEXT.test(ent.name) || full === __filename) continue;
+        const m = RETIRED.exec(fs.readFileSync(full, 'utf8'));
+        if (m) hits.push(path.relative(ROOT, full) + ' → ' + m[0]);
+      }
+    })(ROOT);
+    check('no retired Joshua URL or Gmail address in any file', hits.length === 0, hits.join('; '));
+  }
+
   /* ══ 1. SHEETS-ONLY — the state the studio is in today ══════════════════ */
   console.log('\nsheets-only fallback (zero individual designs)');
   {
@@ -999,4 +1031,5 @@ function tap(window, node) {
     failures.forEach(f => console.log('  - ' + f));
     process.exit(1);
   }
+  process.exit(0);   // every jsdom window above would otherwise keep node alive
 })().catch(err => { console.error(err); process.exit(1); });

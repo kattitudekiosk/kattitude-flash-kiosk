@@ -44,7 +44,7 @@
 (function () {
   'use strict';
 
-  var SHEETS = 'https://flash-gallery.vercel.app/assets/sheets/';
+  var SHEETS = 'https://kattitude-flash-kiosk.vercel.app/assets/sheets/';
   var ART = [
     SHEETS + 'IMG_1705.JPEG',
     SHEETS + 'IMG_2120.JPEG',

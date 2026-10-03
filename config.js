@@ -67,7 +67,7 @@ window.KIOSK_CONFIG = {
   /* Destination for the QR badge in the sheet viewer when no artist is in
    * scope. Defaults to the online gallery so a customer scanning it lands on
    * the flash they are looking at. Not confirmed by Joshua — change freely. */
-  galleryUrl: 'https://flash-gallery.vercel.app',
+  galleryUrl: 'https://kattitude-flash-kiosk.vercel.app',   // Kat's Vercel (kattitudekiosk) since 3 Oct 2026
 
   /* Sheets always come from data.js — they are real content that exists
    * today and predates the catalog. Set false only if sheets should stop

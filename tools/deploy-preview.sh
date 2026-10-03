@@ -4,7 +4,7 @@
 #   bash tools/deploy-preview.sh
 #
 # Ships to the `flash-gallery-preview` project. The live kiosk site
-# (flash-gallery.vercel.app) is a DIFFERENT project and is never touched by
+# (kattitude-flash-kiosk.vercel.app) is a DIFFERENT project and is never touched by
 # this script — there is no --prod flag anywhere in it, and it deploys from a
 # directory named flash-gallery-preview so Vercel cannot link it to the live
 # project by name.
@@ -38,4 +38,4 @@ cd "$STAGE"
 npx --yes vercel@latest deploy --yes --scope "$TEAM"
 
 echo
-echo "Live kiosk site is untouched: https://flash-gallery.vercel.app"
+echo "Live kiosk site is untouched: https://kattitude-flash-kiosk.vercel.app"

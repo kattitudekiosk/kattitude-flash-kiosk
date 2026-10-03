@@ -147,7 +147,7 @@ window.KIOSK_ROUTER = (function () {
    * Defaults to the online gallery. Joshua has never specified a destination,
    * so this is a chosen default, not a confirmed one — change galleryUrl in
    * config.js if it should be the studio site or the booking page. */
-  const DEFAULT_QR_URL = (cfg.galleryUrl || 'https://flash-gallery.vercel.app');
+  const DEFAULT_QR_URL = (cfg.galleryUrl || 'https://kattitude-flash-kiosk.vercel.app');
   const DEFAULT_QR_LABEL = 'Browse on your phone';
 
   const GRID_GAP = 12;       // must match .g-grid gap in gallery.css

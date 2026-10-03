@@ -6,6 +6,19 @@ dist/
 build/
 .DS_Store
 
+# The repository is public. The studio database, its backups and any key file
+# live on the Mac mini (~/KattitudeData) and must never be committed.
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+*.bak
+*.pem
+*.key
+KattitudeData/
+backups/
+
 # Generated placeholder content — rebuild with tools/generate-seed.py.
 # Never committed: it is disposable, it is large, and real artist names sit
 # beside machine-drawn art in it.

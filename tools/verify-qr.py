@@ -35,6 +35,7 @@ SURFACES = [
     ("artist card", 180, 19),
     ("sheet corner", 138, 15),
 ]
+EXPECTED_GALLERY_URL = "https://kattitude-flash-kiosk.vercel.app"   # Kat's Vercel
 SCALE = 4   # oversample, so the decode tests the shape rather than one AA pass
 
 
@@ -104,8 +105,54 @@ def main():
         if not label_ok:
             print(f"      FAIL label {label!r} != {handle_in_url!r}")
 
+    # The studio-wide "Browse on your phone" codes. They must decode to the
+    # phone gallery, and config.js must name Kat's address — a code that
+    # faithfully encodes a retired URL is still a broken code on the wall.
+    studio = data.get("studio", [])
+    gallery_url = data.get("galleryUrl")
+    print(f"\nbrowse-on-your-phone codes ({len(studio)}) -> {gallery_url}")
+    if gallery_url != EXPECTED_GALLERY_URL:
+        failures.append(f"config.js galleryUrl is {gallery_url!r}, expected {EXPECTED_GALLERY_URL!r}")
+        print(f"  FAIL galleryUrl is {gallery_url!r}, expected {EXPECTED_GALLERY_URL!r}")
+    if len(studio) < 2:
+        failures.append(f"expected 2 browse-on-your-phone codes, got {len(studio)}")
+    for entry in studio:
+        name = entry.get("artist", "?")
+        if "error" in entry:
+            failures.append(f"{name}: {entry['error']}")
+            print(f"  FAIL {name}: {entry['error']}")
+            continue
+        if (entry.get("label") or "").strip() != "Browse on your phone":
+            failures.append(f"{name}: caption {entry.get('label')!r}")
+        img = rasterise(entry["svg"], entry["cssPx"], entry["padPx"])
+        decoded, _, _ = detector.detectAndDecode(img)
+        good = decoded == EXPECTED_GALLERY_URL
+        print(f"  {'ok  ' if good else 'FAIL'} {name:<26} {entry['cssPx']}px  -> {decoded or '<undecodable>'}")
+        if not good:
+            failures.append(f"{name}: decoded {decoded!r}, expected {EXPECTED_GALLERY_URL!r}")
+
+    # The artist cards on the Artists index carry their own, separately drawn
+    # code. Decode those — not the follow panel's code re-rasterised small.
+    cards = data.get("cards", [])
+    print(f"\nartist-card codes on the Artists index ({len(cards)})")
+    if not cards:
+        failures.append("no artist-card codes found on the Artists index")
+    for entry in cards:
+        name = entry.get("artist", "?")
+        if "error" in entry:
+            failures.append(f"{name}: {entry['error']}")
+            print(f"  FAIL {name}: {entry['error']}")
+            continue
+        decoded, _, _ = detector.detectAndDecode(
+            rasterise(entry["svg"], entry["cssPx"], entry["padPx"]))
+        good = decoded == entry["expected"]
+        print(f"  {'ok  ' if good else 'FAIL'} {name:<14} -> {decoded or '<undecodable>'}")
+        if not good:
+            failures.append(f"{name}: decoded {decoded!r}, expected {entry['expected']!r}")
+
     print("\nscoping")
     for key, msg in [
+        ("artistsIndexHasStrayBadge", "Artists index carries no stray studio/follow badge"),
         ("homeHasQr", "home screen carries no artist QR"),
         ("studioGridHasQr", "studio-wide grid carries no artist QR"),
         ("tilesHaveQr", "grid tiles carry no QR"),

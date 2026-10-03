@@ -370,7 +370,8 @@
     if (!badge || typeof qrcode !== 'function') return;
 
     const qr = qrcode(0, 'M');
-    qr.addData('https://flash-gallery.vercel.app');
+    /* One place decides where the wall's QR codes point: KIOSK_CONFIG.galleryUrl. */
+    qr.addData((window.KIOSK_CONFIG && window.KIOSK_CONFIG.galleryUrl) || 'https://kattitude-flash-kiosk.vercel.app');
     qr.make();
 
     const count   = qr.getModuleCount();

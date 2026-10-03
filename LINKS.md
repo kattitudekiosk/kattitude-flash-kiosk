@@ -1,123 +1,53 @@
 # LINKS
 
-Every live URL for the Kattitude flash gallery, in one place. Joshua works
-from his phone and should never have to dig back through a conversation for a
-link. **Update this file whenever a URL changes.**
+Every live URL for the Kattitude flash gallery, in one place. **Update this
+file whenever a URL changes.** No personal email addresses in this file — the
+repository is public.
 
-Last updated: 2 October 2026
+Last updated: 3 October 2026
 
 ---
 
-## 🖥️ MAC MINI STUDIO SERVER — branch `mac-mini-storage`
-
-The studio's data and photos on the kiosk Mac mini (`server/README.md`).
-**Not on the wall yet** — the wall still shows production below.
+## The wall (the kiosk in the shop)
 
 | | |
 |---|---|
-| Branch | `mac-mini-storage` (off `main` @ `94826a6`) |
-| Kiosk, served by the Mac mini | http://localhost:8787 — **on the Mac mini only** |
-| Dashboard, served by the Mac mini | http://localhost:8787/dashboard/ — **on the Mac mini only** |
-| From a phone (temporary tunnel) | https://largely-legacy-boots-varies.trycloudflare.com/dashboard/ — **DIES when the tunnel or session stops, and the address changes every restart.** Testing only; never give it to artists. |
-| Photos on disk | `~/Desktop/KIOSK MEDIA/<Artist>/Designs` and `/Headshots` |
-| Database on disk | `~/KattitudeData/` (database, `backups/`, `logs/`) |
-| Vercel previews of this branch | built **READY**, and unchanged for Vercel visitors — they still talk to Supabase: |
-| ↳ dashboard | https://kattitude-flash-dashboard-cvbl5az74-joshua-greenes-projects.vercel.app |
-| ↳ kiosk | https://flash-gallery-7wth7fuss-joshua-greenes-projects.vercel.app (behind Vercel login) |
+| **The wall** | http://localhost:8787 — served by the Mac mini itself; works with the internet down. The desktop **KIOSK** icon opens this. |
+| Photos | `~/Desktop/KIOSK MEDIA/<Artist>/Designs/` on the Mac mini |
+| Data | `~/KattitudeData/` (database, backups, logs) on the Mac mini |
 
-**Still to come:** a permanent tunnel address (needs Kat's Cloudflare account
-and her domain), and switching the wall from Vercel to `localhost:8787`
-(a production change — waits for Joshua).
-
----
-
-## ⏳ AWAITING DEPLOY — no preview URL yet
+## Online (Kat's Vercel, team `kattitudekiosk-1141`)
 
 | | |
 |---|---|
-| Branch | `tutorials-and-avatars` |
-| Head commit | `c4065e9` |
-| Branched from | `category-requests` @ `ba0327e` |
-| Contains | guided tutorial (per role) + profile photos as circle avatars |
+| **Gallery for phones** (the wall's QR codes) | https://kattitude-flash-kiosk.vercel.app — project `kattitude-flash-kiosk`, builds from `main` |
+| Dashboard files | https://kattitude-flash-kiosk.vercel.app/dashboard/ — served (200) because `main` carries `dashboard/`, but **signing in there waits on the Supabase move** to Kat's project `hnwyoglbmhvafxnzizqe`. Not yet a separate Vercel project. |
 
-**There is no URL for this yet, and that is not a formality.** The session
-that built it had no Vercel connector at all, so nothing was deployed and
-nothing was fetched back. Deploying `kattitude-flash-dashboard` from this
-branch is what makes it viewable.
-
-The database side IS live — migration `artist_avatars_and_tutorial_state` is
-applied to `tovydesiocfgmasvzjvt`, so the columns and the `avatars` bucket
-exist regardless of when the front end ships.
-
----
-
-## 🔴 PRODUCTION — do not deploy without Joshua's explicit say-so
+## Old addresses (Joshua's Vercel) — being retired
 
 | | |
 |---|---|
-| **Kiosk (live on the shop wall)** | https://flash-gallery.vercel.app |
-
-This is running on the shop's wall panel right now, in a working business.
-Every build goes to a preview project instead. Promoting to production is a
-decision Joshua makes out loud, never an assumption.
-
----
-
-## Kiosk previews
-
-| Project | URL | Notes |
-|---|---|---|
-| **flash-gallery-mobilefix** (newest) | https://flash-gallery-mobilefix-canyouseeus-joshua-greenes-projects.vercel.app | **Stable alias — always the latest build. Use this one.** Does NOT yet include the circle avatars. |
-| flash-gallery-mobilefix (this build) | https://flash-gallery-mobilefix-6lhxupsnl-joshua-greenes-projects.vercel.app | Rounded-module QRs, card QRs, new Follow copy |
-| flash-gallery-mobilefix (previous) | https://flash-gallery-mobilefix-23izi0eyz-joshua-greenes-projects.vercel.app | **STALE** — artist QR hidden on phones. Do not use. |
-| flash-gallery-preview | https://flash-gallery-preview-fm9ssbqlg-joshua-greenes-projects.vercel.app | Holds the **images**. mobilefix loads assets from here via `<base href>`, so this must stay up. Its CSS/JS are older than the repo. |
-
-`flash-gallery-mobilefix` is a thin overlay: one `index.html` that pulls
-images and most scripts from `flash-gallery-preview`. That is why a change can
-be correct in the repo and absent from the preview — the images are far too
-large to re-upload through the deploy connector, so the base deployment's
-`gallery.js` and `styles.css` stay frozen and the overlay patches on top.
-
----
-
-## Dashboard
-
-| Project | URL | Notes |
-|---|---|---|
-| **kattitude-flash-dashboard** | https://kattitude-flash-dashboard-canyouseeus-joshua-greenes-projects.vercel.app | **Stable alias. This is the sign-in URL.** Also the Supabase Site URL. Currently serving `category-requests` — the tutorial and avatars are NOT on it yet. |
-| kattitude-dash-assets | https://kattitude-dash-assets-gvzde9o00-joshua-greenes-projects.vercel.app | `dashboard.css` + `config.js` only |
-
-Sign in with **thelostandunfounds@gmail.com** — that address is attached to
-Kat's artist card with the admin role, and the card is already claimed.
+| `flash-gallery` (old production) | **STALE.** Nothing in the code or on the wall points at it any more. |
+| `kattitude-flash-dashboard` (old hosted dashboard) | **STALE** once Kat's Supabase is live. Do not give either address to anyone. |
+| `flash-gallery-mobilefix-…`, `flash-gallery-preview-…`, `kattitude-dash-assets-…` | **STALE** previews and overlays. |
 
 ---
 
 ## Backend
 
+Supabase project `tovydesiocfgmasvzjvt` (`kattitude-flash-gallery`, us-east-1)
+until Kat has her own Supabase account.
+
 | | |
 |---|---|
-| Supabase project ref | `tovydesiocfgmasvzjvt` (`kattitude-flash-gallery`, us-east-1) |
 | API URL | https://tovydesiocfgmasvzjvt.supabase.co |
 | Project dashboard | https://supabase.com/dashboard/project/tovydesiocfgmasvzjvt |
-| Storage → avatars bucket | https://supabase.com/dashboard/project/tovydesiocfgmasvzjvt/storage/buckets/avatars |
+| Auth → SMTP (needed so artists can get sign-in links) | https://supabase.com/dashboard/project/tovydesiocfgmasvzjvt/auth/smtp |
 | Auth → URL config | https://supabase.com/dashboard/project/tovydesiocfgmasvzjvt/auth/url-configuration |
 | Auth → users | https://supabase.com/dashboard/project/tovydesiocfgmasvzjvt/auth/users |
-| Auth → SMTP | https://supabase.com/dashboard/project/tovydesiocfgmasvzjvt/auth/smtp |
-| Auth → rate limits | https://supabase.com/dashboard/project/tovydesiocfgmasvzjvt/auth/rate-limits |
-
----
 
 ## Source
 
 | | |
 |---|---|
-| GitHub (private) | https://github.com/canyouseeus/kattitude-flash-kiosk |
-| This branch | https://github.com/canyouseeus/kattitude-flash-kiosk/tree/tutorials-and-avatars |
-
----
-
-## Vercel projects that are NOT this product
-
-`sheets`, `mobile`, `thelostandunfounds`, and the auto-named ones
-(`determined-wright-a062d9`, `admiring-mcnulty-0f3292`, and similar) are
-unrelated. Listed only so nobody deploys the kiosk into one by accident.
+| GitHub (**public**) | https://github.com/kattitudekiosk/kattitude-flash-kiosk |

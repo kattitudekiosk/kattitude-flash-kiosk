@@ -37,7 +37,7 @@ is unreliable on this hardware.
 | Dashboard | `dashboard/` | Vanilla HTML / CSS / JS, Supabase JS client |
 | Database | Supabase `tovydesiocfgmasvzjvt` | PostgreSQL + RLS + Storage + Auth |
 | Deployment | Vercel | **Production builds from git.** See the warning below. |
-| Repo | `canyouseeus/kattitude-flash-kiosk` | private |
+| Repo | `kattitudekiosk/kattitude-flash-kiosk` | **public** (since 3 Oct 2026 — never commit a secret, an email or a database) |
 
 ### ⚠️ **[CORRECTED]** Production deploys from git — pushing to `main` ships to the wall
 
@@ -55,7 +55,8 @@ for a full deploy. See "Deploying" below.
 
 | Project | Role |
 |---|---|
-| `flash-gallery` | **PRODUCTION — live on the shop wall.** Builds from `main`. |
+| `kattitude-flash-kiosk` (Kat's Vercel, `kattitudekiosk-1141`) | **The phone gallery** the wall's QR codes open: https://kattitude-flash-kiosk.vercel.app. Builds from `main`. **[3 Oct 2026]** The wall itself is `http://localhost:8787` on the Mac mini. |
+| `flash-gallery` (Joshua's Vercel) | **STALE / retiring** — the old production. Nothing points here now. |
 | `flash-gallery-preview` | preview; holds the image assets other previews borrow |
 | `flash-gallery-mobilefix` | preview; currently a `<base href>` overlay |
 | `kattitude-flash-dashboard` | dashboard app |
@@ -123,8 +124,9 @@ gets one injected script tag; served by Vercel, nothing changes.
 **[CORRECTED 2 Oct 2026] — the wall runs Chrome, not Safari.** The Hardware
 table above says Safari. As found on 2 Oct 2026, launchd agent
 `com.kattitude.kiosk.chrome` runs `~/kiosk-setup/chrome-kiosk.sh`, which
-starts Chrome `--kiosk` at `https://flash-gallery.vercel.app`, alongside
-`com.kattitude.kiosk.touchup`. Both were installed that day by another
+started Chrome `--kiosk` at the old Vercel production, alongside
+`com.kattitude.kiosk.touchup`. **[3 Oct 2026]** It now opens
+`http://localhost:8787` (line 4 of that script). Both were installed that day by another
 session. Check `launchctl list | grep kattitude` before assuming either.
 
 **[CORRECTED 2 Oct 2026] — a session can run ON the Mac mini.** "Terminal on
@@ -341,7 +343,7 @@ section 1b checks it, and fails if the old rule comes back.
 
 ### 5. Production is sacred
 
-`flash-gallery.vercel.app` is live in a working business. **Never deploy to it
+`kattitude-flash-kiosk.vercel.app` (and the wall at `localhost:8787`) are live in a working business. **Never deploy to it
 without Joshua saying to promote.** Because production builds from `main`,
 this means never pushing `main`. After any deploy, re-fetch production and
 confirm it is unchanged.
@@ -385,7 +387,7 @@ insert is refused before calling auth work done.
 ### 7. NO PLACEHOLDER DATA ANYWHERE THE PUBLIC CAN SEE — **[HARD RULE, 2 Oct 2026]**
 
 Joshua: *"No more placeholder data please it should be live."* After the
-wall had moved to the Mac mini, `flash-gallery.vercel.app` was still on
+wall had moved to the Mac mini, the old Vercel production was still on
 `catalogSource: 'seed'`: fake counts, letter circles for everyone, a
 PLACEHOLDER banner — and the wall's own "browse on your phone" QR sends
 customers there. Now:

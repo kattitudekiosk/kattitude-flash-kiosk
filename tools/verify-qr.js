@@ -15,6 +15,32 @@ const { JSDOM, VirtualConsole } = require(process.env.JSDOM_PATH || 'jsdom');
 
 const ROOT = path.resolve(__dirname, '..');
 
+// jsdom keeps timers alive, so a stuck page would hang this forever. Never let it.
+const HARD_TIMEOUT_MS = 30000;
+setTimeout(() => {
+  console.error(`verify-qr.js: timed out after ${HARD_TIMEOUT_MS / 1000}s`);
+  process.exit(2);
+}, HARD_TIMEOUT_MS).unref();
+
+/* The "Browse on your phone" code drawn by script.js alone — the linear sheet
+ * viewer a roster with no artists falls back to, before gallery.js exists. */
+async function bareViewerQr(html) {
+  const dom = new JSDOM(html, {
+    url: 'http://localhost/', runScripts: 'outside-only',
+    pretendToBeVisual: true, virtualConsole: new VirtualConsole(),
+  });
+  const w = dom.window;
+  w.matchMedia = () => ({ matches: false, addListener() {}, removeListener() {} });
+  w.eval(['assets/lib/qrcode.js', 'config.js', 'data.js', 'script.js']
+    .map(rel => fs.readFileSync(path.join(ROOT, rel), 'utf8')).join('\n'));
+  w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
+  await new Promise(r => setTimeout(r, 50));
+  const svg = w.document.querySelector('#qrBadge svg');
+  const galleryUrl = w.KIOSK_CONFIG.galleryUrl;
+  w.close();
+  return svg ? { svg: svg.outerHTML, galleryUrl } : { error: 'no QR rendered', galleryUrl };
+}
+
 (async () => {
   const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
   const vc = new VirtualConsole();
@@ -111,8 +137,54 @@ const ROOT = path.resolve(__dirname, '..');
   const allQr = !!gallery.querySelector('.qr-badge.qr-inline');
   const tileQr = !!gallery.querySelector('.g-tile .qr-badge');
 
+  /* The studio-wide "Browse on your phone" codes. Both must open the phone
+   * gallery named in config.js — never an artist, never an old address. */
+  const galleryUrl = window.KIOSK_CONFIG.galleryUrl;
+  const studio = [];
+  const studioEntry = (surface, badge, caption, cssPx, padPx) => {
+    const svg = badge && badge.querySelector('svg');
+    if (!svg) return { artist: surface, error: 'no QR rendered' };
+    return {
+      artist: surface, studio: true, expected: galleryUrl,
+      declared: badge.getAttribute('data-qr-url'), label: caption,
+      size: parseInt(svg.getAttribute('viewBox').split(' ')[2], 10),
+      svg: svg.outerHTML, cssPx, padPx,
+    };
+  };
+  /* The Artists index: each card's own code must open that card's artist, and
+   * no studio/follow badge may be stranded on the page. */
+  window.KIOSK_ROUTER.renderArtists();
+  const indexStrayBadge = !!gallery.querySelector('.qr-badge');
+  const cards = [...gallery.querySelectorAll('.g-card-artist')].map(card => {
+    const a = artists.find(x => card.textContent.indexOf(x.name) !== -1
+                             && card.textContent.indexOf(x.handle) !== -1);
+    const svg = card.querySelector('.g-card-qr svg');
+    if (!a || !a.instagram) return null;
+    if (!svg) return { artist: a.name + ' card', error: 'no card QR rendered' };
+    return { artist: a.name + ' card', expected: a.instagram, svg: svg.outerHTML,
+             size: parseInt(svg.getAttribute('viewBox').split(' ')[2], 10), cssPx: 180, padPx: 19 };
+  }).filter(Boolean);
+
+  window.KIOSK_ROUTER.goHome();
+  gallery.querySelector('.g-mode-sheets')
+    .dispatchEvent(new window.Event('click', { bubbles: true, cancelable: true }));
+  await new Promise(r => setTimeout(r, 20));
+  studio.push(studioEntry('Full Flash Sheets corner', doc.getElementById('qrBadge'),
+    (doc.getElementById('qrCaption') || {}).textContent, 138, 15));
+
+  const bare = await bareViewerQr(html);
+  studio.push(bare.error ? { artist: 'no-artists sheet viewer', error: bare.error } : {
+    artist: 'no-artists sheet viewer', studio: true, expected: bare.galleryUrl,
+    label: 'Browse on your phone',
+    size: parseInt(/viewBox="0 0 (\d+)/.exec(bare.svg)[1], 10), svg: bare.svg, cssPx: 138, padPx: 15,
+  });
+
   process.stdout.write(JSON.stringify({
     codes: out,
-    scoping: { homeHasQr: homeQr, studioGridHasQr: allQr, tilesHaveQr: tileQr },
-  }));
+    studio,
+    cards,
+    galleryUrl,
+    scoping: { homeHasQr: homeQr, studioGridHasQr: allQr, tilesHaveQr: tileQr,
+               artistsIndexHasStrayBadge: indexStrayBadge },
+  }), () => process.exit(0));   // exit once flushed; jsdom's timers would keep node alive
 })().catch(e => { console.error(e); process.exit(1); });
