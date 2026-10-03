@@ -117,10 +117,14 @@ gets one injected script tag; served by Vercel, nothing changes.
 - **UPLOAD PATH [2 Oct 2026, Joshua approved]: hosted dashboard → Supabase →
   Mac mini sync → KIOSK MEDIA → wall.** The hosted dashboard writes to
   Supabase again (`hosted-notice.js` is gone). `server/supabase-sync.js`
-  (launchd `com.kattitude.studio-sync`, every 5 min) pulls published sheets
+  pulls published sheets — ONLY on three triggers, never polling (Joshua:
+  "only checks when the screensaver gets activated and then once a day"):
+  the wall's screensaver start (`POST /api/sync-now`, localhost only, at most
+  every 10 min), a daily 09:15 launchd run (`com.kattitude.studio-sync`, the
+  keep-alive), and server start-up. It
   into `<Artist>/Designs/` and removes ones unpublished/deleted — only files
-  it wrote, only if unchanged. Network trouble = retry, never delete. Every
-  run is a Supabase query (keep-alive, logged daily). Hand drops are NOT
+  it wrote, only if unchanged. Network trouble = retry at the next trigger,
+  never delete. Every run is a Supabase query (keep-alive, logged daily). Hand drops are NOT
   pushed up (no write credential on the kiosk), so they are wall-only. The
   studio server's `/dashboard/` redirects to the hosted dashboard so there is
   exactly one writable dashboard. Dashboard uploads are all flash sheets.

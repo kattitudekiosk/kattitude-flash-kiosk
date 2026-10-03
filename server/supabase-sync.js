@@ -5,8 +5,10 @@
  *   hosted dashboard (Vercel) → Supabase → THIS SYNC → KIOSK MEDIA/<Artist>/Designs
  *                                                    → folder-sync.js → the wall
  *
- * Artists upload from anywhere through the hosted dashboard. Every few
- * minutes launchd runs `node server/cli.js sync-supabase`, which:
+ * Artists upload from anywhere through the hosted dashboard. A sync runs
+ * when the wall's screensaver starts (at most every 10 minutes), when the
+ * server starts, and once a day from launchd (`node server/cli.js
+ * sync-supabase`) — never on a polling loop. Each run:
  *
  *   1. reads Supabase's kiosk_catalog with the PUBLIC key. That view is
  *      exactly the published, approved designs — a draft, an unpublished

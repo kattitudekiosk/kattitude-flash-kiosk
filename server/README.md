@@ -54,8 +54,16 @@ Artists upload from anywhere through the **hosted dashboard**
 (https://kattitude-flash-dashboard.vercel.app), which saves to Supabase
 `tovydesiocfgmasvzjvt`. This Mac pulls from there:
 
-- `com.kattitude.studio-sync` (launchd, every 5 min, log `logs/sync.log`)
-  runs `node server/cli.js sync-supabase` (`server/supabase-sync.js`).
+- **When it syncs** (Joshua: "only checks when the screensaver gets activated
+  and then once a day") — never on a polling loop:
+  1. the wall's screensaver starts → the page asks `POST /api/sync-now`
+     (localhost only); the server syncs at most once per 10 minutes, and if
+     sheets arrived or left, the page reloads its catalog so the screensaver
+     reshuffles;
+  2. once a day at 09:15, launchd `com.kattitude.studio-sync` runs
+     `node server/cli.js sync-supabase` (log `logs/sync.log`) — the keep-alive;
+  3. when the server starts (a reboot).
+  Offline at a trigger → logged, nothing changes, the next trigger retries.
 - It reads Supabase's `kiosk_catalog` with the public key — published,
   approved designs only — and downloads each into
   `KIOSK MEDIA/<Artist>/Designs/<title> (<id>).<ext>`. The folder importer

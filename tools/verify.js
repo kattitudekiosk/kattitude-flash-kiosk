@@ -335,6 +335,25 @@ function tap(window, node) {
       files.every(f => fs.existsSync(path.join(ROOT, 'assets/fonts', f))), files.join(', '));
   }
 
+  /* ══ 1i. SCREENSAVER START TRIGGERS THE SUPABASE SYNC — Joshua, 2 Oct 2026 ═
+   * "only checks when the screensaver gets activated and then once a day".
+   * On the studio server the screensaver asks /api/sync-now; anywhere else
+   * (Vercel) it must not. */
+  console.log('\nscreensaver start asks the server to sync');
+  {
+    for (const [label, studio] of [['studio server', true], ['Vercel', false]]) {
+      const calls = [];
+      const w = await boot({ catalogSource: 'seed', studioServer: studio }, (cat, win) => {
+        win.fetch = (u, o) => { calls.push([String(u), o && o.method]); return Promise.resolve({ json: () => Promise.resolve({ ran: true, changed: false }) }); };
+      });
+      w.Screensaver.start(w.document.body);
+      w.Screensaver.stop();
+      const pinged = calls.filter(c => c[0] === '/api/sync-now' && c[1] === 'POST').length;
+      check(`${label}: screensaver start ${studio ? 'sends one' : 'sends no'} sync request`, pinged === (studio ? 1 : 0),
+        JSON.stringify(calls));
+    }
+  }
+
   /* ══ 2. SEED — full hybrid experience ═══════════════════════════════════ */
   console.log('\nseed catalog (hybrid grid)');
   {

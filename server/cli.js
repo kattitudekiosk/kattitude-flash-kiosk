@@ -10,7 +10,7 @@
  *        rows are matched by id and updated, never duplicated.
  *   node server/cli.js backup
  *   node server/cli.js sync-supabase
- *        Pull the hosted dashboard's published sheets into KIOSK MEDIA (launchd, every 5 min).
+ *        Pull the hosted dashboard's published sheets into KIOSK MEDIA (launchd, daily 09:15).
  *        Snapshot the database into <data>/backups/, keeping the last 30.
  *
  * Works while the server is running — SQLite in WAL mode allows it.
@@ -171,7 +171,7 @@ function status() {
   } else if (cmd === 'import-supabase') {
     await importSupabase();
   } else if (cmd === 'sync-supabase') {
-    /* Run by launchd every 5 minutes (com.kattitude.studio-sync). Pulls the
+    /* Run by launchd once a day (com.kattitude.studio-sync). Pulls the
      * hosted dashboard's published sheets into KIOSK MEDIA; see
      * server/supabase-sync.js. Exits 0 even when offline — it just retries. */
     const c = conn();

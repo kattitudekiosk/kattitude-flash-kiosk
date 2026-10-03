@@ -7,8 +7,10 @@
 # Installs two per-user LaunchAgents (no admin password, nothing system-wide):
 #   com.kattitude.studio-server   starts at login, restarted if it ever exits
 #   com.kattitude.studio-backup   snapshots the database every night at 03:30
-#   com.kattitude.studio-sync     every 5 min: pull the hosted dashboard's sheets
-#                                 from Supabase into KIOSK MEDIA (logs/sync.log)
+#   com.kattitude.studio-sync     once a day at 09:15: pull the hosted dashboard's
+#                                 sheets from Supabase (the logged keep-alive; logs/sync.log).
+#                                 The server also syncs at start-up and when the
+#                                 wall's screensaver starts (at most every 10 min).
 #
 # The server binds to 127.0.0.1 only. Installing this exposes nothing to the
 # network; the tunnel is a separate, deliberate step (server/README.md).
@@ -61,8 +63,7 @@ cat > "$AGENTS/com.kattitude.studio-sync.plist" <<EOF
   <key>ProgramArguments</key><array><string>$NODE</string><string>$REPO/server/cli.js</string><string>sync-supabase</string></array>
   <key>WorkingDirectory</key><string>$REPO</string>
   <key>EnvironmentVariables</key><dict><key>KT_DATA_DIR</key><string>$DATA</string></dict>
-  <key>RunAtLoad</key><true/>
-  <key>StartInterval</key><integer>300</integer>
+  <key>StartCalendarInterval</key><dict><key>Hour</key><integer>9</integer><key>Minute</key><integer>15</integer></dict>
   <key>StandardOutPath</key><string>$DATA/logs/sync.log</string>
   <key>StandardErrorPath</key><string>$DATA/logs/sync.log</string>
 </dict></plist>

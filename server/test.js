@@ -478,6 +478,23 @@ const PNG = Buffer.from('89504e470d0a1a0a0000000d4948445200000001000000010806000
       r5.kept.includes('Jen/Designs/Rose sheet (aaaaaaaa).jpg') && fs.existsSync(J('Designs', 'Rose sheet (aaaaaaaa).jpg')), JSON.stringify(r5));
     check('a hand-dropped file is never touched by the sync', md5f(J('Designs', 'hand-drop.jpg')) === handMd5);
     check('every run reached the database (that is the keep-alive traffic)', requests >= 7, requests + ' requests');
+
+    /* ── triggers: the screensaver start → POST /api/sync-now ── */
+    process.env.KT_SUPABASE_URL = SB; process.env.KT_SUPABASE_KEY = 'test';
+    files['/storage/v1/object/public/flash/x/c.jpg'] = img(2160, 2795, 'c');
+    catalog = [{ id: 'cccccccc-3333', artist_id: jen.id, title: 'From phone', type: 'sheet',
+                 image_url: SB + '/storage/v1/object/public/flash/x/c.jpg' }];
+    const before = requests;
+    const t1 = await req('POST', '/api/sync-now');
+    check('a screensaver start triggers a sync, which downloads AND imports at once',
+      t1.status === 200 && t1.json.ran && t1.json.changed && fs.existsSync(J('Designs', 'From phone (cccccccc).jpg')) &&
+      db.all(conn, 'designs').some(d => d.source_file === 'Jen/Designs/From phone (cccccccc).jpg'), t1.text);
+    const t2 = await req('POST', '/api/sync-now');
+    check('a second screensaver start within 10 minutes does NOT sync again (debounced)',
+      t2.status === 200 && t2.json.ran === false && requests - before === 2, t2.text + ' requests ' + (requests - before));
+    const t3 = await req('POST', '/api/sync-now', { headers: { 'X-Forwarded-For': '1.2.3.4' } });
+    check('a sync request arriving through a tunnel is refused', t3.status === 403, t3.status);
+    delete process.env.KT_SUPABASE_URL; delete process.env.KT_SUPABASE_KEY;
     mock.close();
   }
 
