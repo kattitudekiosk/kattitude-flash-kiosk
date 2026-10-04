@@ -39,6 +39,7 @@
   const sb = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, {
     auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
   });
+  window.__ktDashSb = sb;   // the ONE auth client; dash-client.js lends it out
 
   /* Categories are two different kinds of thing wearing one label. `style` is
    * how a piece is drawn (Fine Line, Blackwork). `theme` is what it evokes
@@ -70,6 +71,8 @@
     return onWall.length ? onWall[0].id : me.id;
   }
   window.DashHelpers = { defaultUploadArtist };   // for tools/verify-dashboard.js
+
+  const SIGNED_OUT_MSG = 'Your sign-in has expired. Sign out, then sign in again with a new link.';
 
   const state = {
     user: null,
@@ -841,6 +844,13 @@
   async function uploadAll(publish) {
     const usable = state.queue.filter(i => !i.error);
     if (!usable.length) { toast('Nothing uploadable staged.', 'error'); return; }
+
+    // A token issued just now, so no file in this batch can reach Storage as
+    // anon (3 Oct 2026: every upload was refused by RLS as role anon).
+    if (!(await window.DashClient.fresh())) {
+      toast(SIGNED_OUT_MSG, 'error');
+      return;
+    }
 
     let ok = 0;
     for (const item of usable) {

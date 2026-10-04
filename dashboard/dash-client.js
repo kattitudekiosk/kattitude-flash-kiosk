@@ -17,56 +17,47 @@
 window.DashClient = (function () {
   'use strict';
 
-  const cfg = window.DASH_CONFIG;
-  const sb = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, {
-    auth: {
-      persistSession: false,      // app.js is the only writer of the session
-      autoRefreshToken: false,    // see above
-      detectSessionInUrl: false,  // app.js already consumed the magic link
-    },
-  });
+  /* [CHANGED 3 Oct 2026] ONE auth client per page: app.js's.
+   *
+   * This used to build a second Supabase client and copy app.js's session
+   * into it with setSession(). Two auth clients holding one session race for
+   * its refresh token, and Supabase rotates refresh tokens — each works once —
+   * so when the hour-long access token expired, one of the two was refused
+   * and signed out (tools/verify-storage-auth.js, KT_RACE=1). Uploads were
+   * reaching Storage as anon and being refused by RLS. Now every module
+   * borrows the client app.js made, and nothing copies a session. */
+  function app() { return window.__ktDashSb || null; }
 
-  /* app.js stores the session under supabase-js's default key. Reading it
-   * here and handing it to this client keeps both talking to the same user
-   * without either of them owning the other. */
-  function storageKey() {
+  async function ready() {
+    for (let i = 0; i < 200 && !app(); i++) await new Promise(r => setTimeout(r, 50));
+    return app();
+  }
+
+  /** The dashboard's client if somebody is signed in, else null. Never
+   *  throws — callers are UI. */
+  async function client() {
+    const sb = await ready();
+    if (!sb) return null;
     try {
-      return 'sb-' + new URL(cfg.supabaseUrl).hostname.split('.')[0] + '-auth-token';
+      const { data } = await sb.auth.getSession();
+      return data && data.session ? sb : null;
     } catch (e) { return null; }
   }
 
-  let adopted = false;
-
-  /** Returns the supabase client with the current session attached, or null
-   *  if nobody is signed in. Never throws — callers are UI. */
-  async function client() {
-    if (!adopted) {
-      const key = storageKey();
-      let raw = null;
-      try { raw = key && window.localStorage.getItem(key); } catch (e) { raw = null; }
-      if (!raw) return null;
-
-      let parsed;
-      try { parsed = JSON.parse(raw); } catch (e) { return null; }
-
-      // supabase-js has stored this both bare and wrapped in { currentSession }
-      // across versions. Accept either rather than pinning to one shape.
-      const s = parsed && (parsed.access_token ? parsed : parsed.currentSession);
-      if (!s || !s.access_token) return null;
-
-      const { error } = await sb.auth.setSession({
-        access_token: s.access_token,
-        refresh_token: s.refresh_token,
-      });
-      if (error) return null;
-      adopted = true;
-    }
-    return sb;
+  /** Before a storage write: a token the server issued a moment ago, so an
+   *  expired or stale one (or a phone whose clock is wrong) can never send an
+   *  upload out as anon. null means the sign-in is gone — say so. */
+  async function fresh() {
+    const sb = await ready();
+    if (!sb) return null;
+    // The studio server's stand-in client (local-backend.js) has no refresh
+    // tokens to rotate; there the session check is the whole job.
+    if (typeof sb.auth.refreshSession !== 'function') return client();
+    try {
+      const { data, error } = await sb.auth.refreshSession();
+      return !error && data && data.session ? sb : null;
+    } catch (e) { return null; }
   }
 
-  /* The session changes (sign out, magic-link landing) invalidate what we
-   * adopted, so drop it and re-read on the next call. */
-  window.addEventListener('storage', () => { adopted = false; });
-
-  return { client, raw: sb };
+  return { client, fresh };
 })();

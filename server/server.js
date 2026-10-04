@@ -101,7 +101,8 @@ const INJECT = {
     add: '\n<script src="local-backend.js"></script><!-- injected by server/server.js -->',
     tail: '</body>',
     tailAdd: '<script src="local-links.js"></script><!-- injected by server/server.js -->\n',
-    drop: '<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>',
+    // Any version: index.html's supabase-js tag changes when it is upgraded.
+    drop: /<script src="https:\/\/cdn\.jsdelivr\.net\/npm\/@supabase\/supabase-js@[\d.]+\/dist\/umd\/supabase\.js"><\/script>/,
   },
 };
 

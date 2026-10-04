@@ -287,8 +287,8 @@ window.AvatarKit = (function () {
   /* ── Writes ─────────────────────────────────────────────────────────── */
 
   async function upload(artistId, img, pan) {
-    const sb = await window.DashClient.client();
-    if (!sb) throw new Error('You are signed out. Sign in again and retry.');
+    const sb = await window.DashClient.fresh();   // a token issued just now (see dash-client.js)
+    if (!sb) throw new Error('Your sign-in has expired. Sign out, then sign in again with a new link.');
 
     const stamp = Date.now().toString(36);
     const bigPath = artistId + '/avatar-' + stamp + '.webp';

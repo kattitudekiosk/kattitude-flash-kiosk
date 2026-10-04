@@ -339,6 +339,10 @@ window.FlashSales = (function () {
 
   async function upload(s, files) {
     if (!files.length) return;
+    // A token issued just now (see dash-client.js), or stop and say so.
+    var fresh = await window.DashClient.fresh();
+    if (!fresh) { toast('Your sign-in has expired. Sign out, then sign in again with a new link.', 'error'); return; }
+    sb = fresh;
     var ok = 0;
     for (var i = 0; i < files.length; i++) {
       var f = files[i];
