@@ -41,16 +41,24 @@ const HOST = process.env.KT_HOST || '127.0.0.1';
 const JSON_LIMIT = 2 * 1024 * 1024;
 /* Supabase sync triggers (Joshua, 2 Oct 2026: "maybe it only checks when the
  * screensaver gets activated and then once a day"): the wall's screensaver
- * start (POST /api/sync-now, at most every SYNC_GAP_MS), server start-up, and
- * a daily launchd run (com.kattitude.studio-sync). Never polled. */
-const SYNC_GAP_MS = parseInt(process.env.KT_SYNC_GAP_MS || String(10 * 60 * 1000), 10);
-let lastSyncAt = 0, syncing = null;
+ * start (POST /api/sync-now), server start-up, and a daily launchd run
+ * (com.kattitude.studio-sync). Never polled.
+ *
+ * [CHANGED 3 Oct 2026] The screensaver start used to be debounced to once per
+ * 10 minutes, and that is why Naomi's first four sheets did not reach the
+ * wall: the server synced at start-up at 00:16:52, she uploaded at 00:20, and
+ * the screensaver's pings at 00:22 and 00:25 were both turned away unchecked.
+ * Now EVERY screensaver start makes the cheap check — one small request for
+ * the published designs' ids and images — and the full sync (downloads +
+ * import) runs only when that differs from what the last sync saw. A short
+ * guard (KT_CHECK_GAP_MS, 30s) only stops back-to-back pings. */
+let lastFingerprint = null, lastCheckAt = 0, syncing = null;
 function runSync(conn, why) {
   if (syncing) return syncing;
-  lastSyncAt = Date.now();
   syncing = (async () => {
     try {
       const r = await require('./supabase-sync').syncOnce(conn);
+      if (r.ok) lastFingerprint = r.fingerprint;
       const fs2 = require('./folder-sync').syncOnce(conn);   // import what arrived, now
       const changed = !!(r.ok && (r.downloaded.length || r.removed.length));
       console.log(`[studio-server] ${db.nowIso()} sync (${why}): ` +
@@ -251,9 +259,15 @@ function makeServer(conn) {
         const local = /^(::ffff:)?127\.0\.0\.1$|^::1$/.test(req.socket.remoteAddress || '') &&
           !req.headers['x-forwarded-for'] && !req.headers['cf-connecting-ip'];
         if (!local) throw db.httpError(403, 'Only the kiosk on this Mac can ask for a sync');
-        const wait = lastSyncAt + SYNC_GAP_MS - Date.now();
-        if (wait > 0 && !syncing) return send(res, 200, { ran: false, reason: 'recently synced', retryInMs: wait });
-        return send(res, 200, await runSync(conn, 'screensaver started'));
+        if (syncing) return send(res, 200, await syncing);
+        const gap = parseInt(process.env.KT_CHECK_GAP_MS || '30000', 10);
+        const wait = lastCheckAt + gap - Date.now();
+        if (wait > 0) return send(res, 200, { ran: false, reason: 'just checked', retryInMs: wait });
+        lastCheckAt = Date.now();
+        const fp = await require('./supabase-sync').remoteFingerprint();
+        if (!fp) return send(res, 200, { ran: false, ok: false, reason: 'Supabase unreachable — the next screensaver start tries again' });
+        if (fp === lastFingerprint) return send(res, 200, { ran: false, ok: true, changed: false, reason: 'nothing new' });
+        return send(res, 200, await runSync(conn, 'screensaver started, something new'));
       }
 
       if (p === '/healthz') {

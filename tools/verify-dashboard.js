@@ -25,6 +25,12 @@ function check(name, cond, detail) {
 const UID = '872f6936-2509-43af-a605-0ca72d903f0a';
 const KAT = { id: 'kat', name: 'Kat', role: 'admin', active: true, kiosk_visible: true, display_order: 0 };
 const JEN = { id: 'jen', name: 'Jen', role: 'artist', active: true, kiosk_visible: true, display_order: 3 };
+/* What a too-broad policy would hand ANY signed-in artist: their own design
+ * and a colleague's. The client must still show only its own. */
+const DESIGNS = [
+  { id: 'd-own', artist_id: 'naomi', title: 'Own sheet', type: 'sheet', published: true, approved: true, display_order: 0, design_categories: [] },
+  { id: 'd-jen', artist_id: 'jen', title: 'Jen sheet', type: 'sheet', published: true, approved: true, display_order: 0, design_categories: [] },
+];
 
 /* signedIn: the card the session resolves to, or null for the sign-in screen.
  * otpError: what signInWithOtp answers. */
@@ -33,7 +39,7 @@ async function boot({ card, otpError }) {
   const dom = new JSDOM(html, { url: 'https://kattitude-flash-kiosk.vercel.app/dashboard/',
     runScripts: 'outside-only', pretendToBeVisual: true, virtualConsole: new VirtualConsole() });
   const w = dom.window;
-  const otp = [];
+  const otp = [], queries = [];
   const roster = card ? [KAT, JEN, card] : [];
   const q = (table) => {
     const f = {}, s = {};
@@ -42,7 +48,8 @@ async function boot({ card, otpError }) {
     s.eq = (k, v) => { f[k] = v; return s; };
     s.maybeSingle = s.single = () => ({ then: ok => Promise.resolve({
       data: card && f.auth_user_id === UID ? card : null, error: null }).then(ok) });
-    s.then = ok => Promise.resolve({ data: table === 'artists' ? roster : [], error: null }).then(ok);
+    if (table === 'designs') queries.push(f);
+    s.then = ok => Promise.resolve({ data: table === 'artists' ? roster : table === 'designs' ? DESIGNS : [], error: null }).then(ok);
     return s;
   };
   const session = card ? { access_token: 't', user: { id: UID, email: 'test@example.invalid' } } : null;
@@ -66,7 +73,7 @@ async function boot({ card, otpError }) {
   }
   w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
   await new Promise(r => setTimeout(r, 800));
-  return { w, d: w.document, otp, errors };
+  return { w, d: w.document, otp, errors, queries };
 }
 
 (async () => {
@@ -115,6 +122,34 @@ async function boot({ card, otpError }) {
     await new Promise(r => setTimeout(r, 300));
     const shown = d.getElementById('signinMsg').textContent;
     check(`"${err}" → ${want}`, otp.length === 1 && want.test(shown), shown);
+  }
+
+  console.log('\nMy designs is the artist\'s own; All designs is the admin\'s');
+  {
+    const naomi = { id: 'naomi', name: 'Naomi', role: 'artist', active: true, kiosk_visible: true,
+                    display_order: 4, auth_user_id: UID, tutorial_seen: [], tutorial_seen_at: '2026-10-03T21:45:00Z' };
+    const { d, queries } = await boot({ card: naomi });
+    d.querySelector('.tab[data-view="designs"]').click();
+    await new Promise(r => setTimeout(r, 200));
+    check('an artist asks only for artist_id = their own card', queries.length > 0 && queries.every(f => f.artist_id === 'naomi'),
+      JSON.stringify(queries));
+    const cards = [...d.querySelectorAll('#view-designs .card.design')];
+    const titles = cards.map(c => c.querySelector('.design-title').textContent);
+    check('...and sees only their own design, even if the server returned more', titles.join() === 'Own sheet', titles.join());
+    check('...with its controls (Publish/Unpublish, Delete)',
+      cards.length === 1 && /Unpublish/.test(cards[0].textContent) && /Delete/.test(cards[0].textContent));
+    check('the tab says My designs', /My designs/i.test(d.querySelector('#view-designs h2').textContent));
+  }
+  {
+    const { d, queries } = await boot({ card: hidden });
+    d.querySelector('.tab[data-view="designs"]').click();
+    await new Promise(r => setTimeout(r, 200));
+    const cards = [...d.querySelectorAll('#view-designs .card.design')];
+    check('an admin asks for every design (no artist filter)', queries.length > 0 && queries.every(f => !('artist_id' in f)),
+      JSON.stringify(queries));
+    check('...sees every artist\'s design, each with controls',
+      cards.length === 2 && cards.every(c => c.dataset.editable === 'yes' && /Publish|Unpublish/.test(c.textContent)));
+    check('the tab says All designs', /All designs/i.test(d.querySelector('#view-designs h2').textContent));
   }
 
   console.log('\nthe link comes back to the dashboard');

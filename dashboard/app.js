@@ -218,14 +218,24 @@
     state.categories = data || [];
   }
 
+  /* May this person change this design? Their own, or anything for an admin.
+   * Mirrors the designs_own_* policies; the database is still what enforces it. */
+  function canEditDesign(d) {
+    return !!(state.isAdmin || (state.me && d && d.artist_id === state.me.id));
+  }
+
   async function loadDesigns() {
-    // RLS already limits an artist to their own rows, so no client-side
-    // filter is needed — and none should be relied on.
-    const { data, error } = await sb.from('designs')
-      .select('*, design_categories(category_id)')
-      .order('display_order').order('created_at', { ascending: false });
+    // [FIXED 3 Oct 2026] An artist's tab is "My designs": their own rows only.
+    // The old comment here said RLS already limited an artist to their own
+    // rows; it does not — designs_member_read lets any signed-in artist read
+    // every PUBLISHED design — so Naomi saw the whole studio, with Publish
+    // buttons that RLS then quietly refused. Ask for exactly what this person
+    // owns, and filter again in case a broader policy ever returns more.
+    let q = sb.from('designs').select('*, design_categories(category_id)');
+    if (!state.isAdmin) q = q.eq('artist_id', state.me ? state.me.id : '00000000-0000-0000-0000-000000000000');
+    const { data, error } = await q.order('display_order').order('created_at', { ascending: false });
     if (error) return fail('Loading designs', error);
-    state.designs = data || [];
+    state.designs = (data || []).filter(canEditDesign);
   }
 
   async function loadRequests() {
@@ -963,6 +973,8 @@
 
   function designCard(d) {
     const card = el('div', 'card design');
+    const editable = canEditDesign(d);
+    card.dataset.editable = editable ? 'yes' : 'no';
 
     const img = el('img', 'design-thumb');
     img.src = d.thumb_url || d.image_url;
@@ -987,6 +999,15 @@
     if (!d.approved) status.appendChild(el('span', 'pill warn', 'Awaiting approval'));
     if (d.featured) status.appendChild(el('span', 'pill', 'Featured'));
     body.appendChild(status);
+
+    // Somebody else's design: show it, change nothing. No button that the
+    // database would refuse — a control that silently does nothing is worse
+    // than no control.
+    if (!editable) {
+      body.appendChild(el('div', 'muted small', 'Not yours to change.'));
+      card.appendChild(body);
+      return card;
+    }
 
     // Categories. Adding and removing are both always allowed — including
     // taking the last one off a published design. The kiosk keeps showing it

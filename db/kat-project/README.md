@@ -31,12 +31,17 @@ record, like `db/schema.sql`. They are not meant to be pasted.
 | 06 | `06-upload-close.sql` | execute_sql | Drops the temporary policy and checks all 12 files arrived. |
 | 07 | `07-joshua-test-card.sql` | execute_sql | Joshua's hidden admin test card. His address goes on the one marked line, in the copy that runs, never in the repo. **Ran 3 Oct 2026** (id `81fc4355…`). |
 | 08 | `08-signin-gate.sql` | apply_migration `kattitude_signin_gate` | Supabase Auth may only create a login for an address on an active admin card, so a refused address gets no email. |
+| 10 | `10-designs-own-only.sql` | apply_migration `kattitude_designs_own_only` | A signed-in artist reads only their own designs (admins: all). The phone page and Mac sync read as anon and are unaffected. |
 | 09 | `09-verify-gate.sql` | execute_sql | Proves 08 as Supabase Auth's own role, then rolls back. Sends nothing. |
 
 **Done 3 Oct 2026:** 00–06 ran on Kat's project. 04 passed 40/40, and 12/12
 files were stored byte for byte. Auth URL configuration is set.
 
-## NO EMAIL TO ARTISTS OR KAT, until Joshua says so
+## NO EMAIL TO ARTISTS OR KAT — LIFTED 3 Oct 2026
+
+Joshua lifted it after testing his own sign-in, and `signin_gate` was dropped
+on Kat's project. What follows is the history.
+
 
 Joshua, 3 Oct 2026: *"I don't want you to send the Artist any emails until I
 check to make sure that it's working. I have a profile for me so send only

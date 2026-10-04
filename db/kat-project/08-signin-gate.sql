@@ -1,5 +1,8 @@
 -- 08 — SIGN-IN GATE, migration name `kattitude_signin_gate`.
 --
+-- [LIFTED 3 Oct 2026] Joshua lifted the rule; the trigger was dropped on Kat's
+-- project. Kept as the record, and in case a gate is ever wanted again.
+--
 -- Joshua, 3 Oct 2026: no email to any artist or to Kat until he has checked
 -- sign-in works on his own card. Enforced in the database, not the page,
 -- because anybody can ask Supabase Auth for a link with the public key.

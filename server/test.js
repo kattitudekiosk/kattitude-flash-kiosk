@@ -505,9 +505,40 @@ const PNG = Buffer.from('89504e470d0a1a0a0000000d4948445200000001000000010806000
     check('a screensaver start triggers a sync, which downloads AND imports at once',
       t1.status === 200 && t1.json.ran && t1.json.changed && fs.existsSync(J('Designs', 'From phone (cccccccc).jpg')) &&
       db.all(conn, 'designs').some(d => d.source_file === 'Jen/Designs/From phone (cccccccc).jpg'), t1.text);
+    // Every screensaver start now asks the cheap question; the full sync runs
+    // only when the answer changed. The 30s guard is off here (it has its own
+    // check below).
+    process.env.KT_CHECK_GAP_MS = '0';
+    const r0 = requests;
     const t2 = await req('POST', '/api/sync-now');
-    check('a second screensaver start within 10 minutes does NOT sync again (debounced)',
-      t2.status === 200 && t2.json.ran === false && requests - before === 2, t2.text + ' requests ' + (requests - before));
+    check('a screensaver start with nothing new makes ONE small request and downloads nothing',
+      t2.status === 200 && t2.json.ran === false && t2.json.reason === 'nothing new' && requests - r0 === 1,
+      t2.text + ' requests ' + (requests - r0));
+
+    // Naomi's case: something is published straight after a sync. The very
+    // next screensaver start must bring it in — no 10-minute wait.
+    files['/storage/v1/object/public/flash/x/d.jpg'] = img(2160, 2795, 'd');
+    catalog.push({ id: 'dddddddd-4444', artist_id: jen.id, title: 'Just uploaded', type: 'sheet',
+                   image_url: SB + '/storage/v1/object/public/flash/x/d.jpg' });
+    const t2b = await req('POST', '/api/sync-now');
+    check('an upload published right after a sync reaches the wall at the NEXT screensaver start',
+      t2b.status === 200 && t2b.json.ran && t2b.json.changed && fs.existsSync(J('Designs', 'Just uploaded (dddddddd).jpg')) &&
+      db.all(conn, 'designs').some(d => d.source_file === 'Jen/Designs/Just uploaded (dddddddd).jpg'), t2b.text);
+
+    // Unpublished in the dashboard → the next start takes it off the wall.
+    catalog = catalog.filter(d => d.id !== 'dddddddd-4444');
+    const t2c = await req('POST', '/api/sync-now');
+    check('...and an unpublish is picked up at the next start too',
+      t2c.json.ran && !fs.existsSync(J('Designs', 'Just uploaded (dddddddd).jpg')), t2c.text);
+
+    // Back-to-back pings (the screensaver flapping) are answered without asking Supabase.
+    process.env.KT_CHECK_GAP_MS = '30000';
+    await req('POST', '/api/sync-now');
+    const rGuard = requests;
+    const t2d = await req('POST', '/api/sync-now');
+    check('a second ping within 30 seconds does not even make the small request',
+      t2d.json.ran === false && t2d.json.reason === 'just checked' && requests === rGuard, t2d.text);
+    delete process.env.KT_CHECK_GAP_MS;
     const t3 = await req('POST', '/api/sync-now', { headers: { 'X-Forwarded-For': '1.2.3.4' } });
     check('a sync request arriving through a tunnel is refused', t3.status === 403, t3.status);
     delete process.env.KT_SUPABASE_URL; delete process.env.KT_SUPABASE_KEY;

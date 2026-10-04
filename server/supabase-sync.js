@@ -65,6 +65,26 @@ function fileName(d) {
   return `${title} (${String(d.id).slice(0, 8)}).${ext}`;
 }
 
+/* What the catalog looks like from here: every published design's id and
+ * image. Changes when anything is published, unpublished, deleted or
+ * re-uploaded — and only then. */
+function fingerprint(list) {
+  return crypto.createHash('sha1')
+    .update(list.map(d => d.id + '|' + d.image_url).sort().join('\n')).digest('hex');
+}
+
+/* The cheap "anything new?" check (Joshua, 3 Oct 2026: new uploads must show
+ * up the next time the screensaver comes on). One small request — ids and
+ * image URLs only, no files. null when Supabase cannot be reached. */
+async function remoteFingerprint(opts) {
+  opts = opts || {};
+  const base = (opts.url || process.env.KT_SUPABASE_URL || DEFAULTS.url).replace(/\/+$/, '');
+  const key = opts.key || process.env.KT_SUPABASE_KEY || DEFAULTS.key;
+  try {
+    return fingerprint(await getJson(opts.fetch || fetch, `${base}/rest/v1/kiosk_catalog?select=id,image_url`, key));
+  } catch (e) { return null; }
+}
+
 async function getJson(fetchFn, url, key) {
   const r = await fetchFn(url, { headers: { apikey: key, Authorization: `Bearer ${key}` } });
   if (!r.ok) throw new Error(`HTTP ${r.status} from ${url.replace(/\?.*/, '')}`);
@@ -93,6 +113,7 @@ async function syncOnce(conn, opts) {
     return out;
   }
   out.ok = true;
+  out.fingerprint = fingerprint(remote);
 
   /* Keep-alive: the query above reached Postgres. Log the first one a day. */
   const today = db.nowIso().slice(0, 10);
@@ -174,4 +195,4 @@ function removeOurs(conn, media, s, out, why) {
   conn.prepare('DELETE FROM synced_files WHERE remote_id = ?').run(s.remote_id);
 }
 
-module.exports = { syncOnce, fileName };
+module.exports = { syncOnce, fileName, remoteFingerprint, fingerprint };
