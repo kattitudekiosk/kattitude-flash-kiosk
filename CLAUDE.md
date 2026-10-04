@@ -368,6 +368,27 @@ square — and shows the artist exactly what will be kept, with a slider, and
 makes them press a button before anything uploads. Cropping is fine here.
 Cropping silently is not, and that distinction is the whole of the rule.
 
+**[CHANGED 3 Oct 2026 — Joshua: "supposed to be two different sizes" …
+"Square sheets can be both"] — this supersedes the dashboard half of the
+paragraph above.** Dashboard uploads:
+
+- **SQUARE 2048×2048** (within 1% of square): a **single design** (grid +
+  no-zoom lightbox) **or** a **flash sheet** — the artist picks per file on
+  the staged card, or for all squares at once; default flash sheet. A square
+  design can be switched either way later in My Designs.
+- **TALL 2160×3840**: always a flash sheet.
+- **Any other shape** (wide, or between square and 9:16): a flash sheet fitted
+  INSIDE 2160×3840, shape kept, never cropped or padded.
+- Bigger files are resized down to their box, original kept. Smaller ones are
+  refused with the exact size: a square needs 2048×2048; anything else must
+  reach the 2160×3840 box on one side (2160 wide or 3840 tall) — never enlarged.
+- The box follows the SHAPE, not the type: a square sheet is 2048×2048 too.
+- **The type travels to the wall**: the Mac's sync records each download's
+  type (`synced_files.type`) and the folder importer honours it; a later
+  single↔sheet switch is carried over at the next screensaver check (the
+  fingerprint includes type). Files dropped into `Designs/` by hand are still
+  always flash sheets. `tools/verify-two-sizes.js`, `server/test.js`.
+
 ### 4. Sheets-only artists bypass the grid
 
 An artist with only full sheets routes straight into the linear sheet viewer.

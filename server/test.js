@@ -443,8 +443,13 @@ const PNG = Buffer.from('89504e470d0a1a0a0000000d4948445200000001000000010806000
       r1b.ok && !r1b.keepalive && r1b.downloaded.length === 0, JSON.stringify(r1b));
     folderSync.syncOnce(conn);
     const onWall = db.all(conn, 'designs').filter(d => d.artist_id === jen.id);
-    check('the folder importer puts them on the wall as sheets (the 2048 square too)',
-      onWall.length === 3 && onWall.every(d => d.type === 'sheet' && d.published), onWall.map(d => d.source_file + ':' + d.type).join(', '));
+    // [CHANGED 3 Oct 2026, two sizes] The square was uploaded as a single
+    // ('design') and stays one; the tall upload and the hand drop are sheets.
+    const typeOf = name => (onWall.find(d => d.source_file === 'Jen/Designs/' + name) || {}).type;
+    check('the folder importer puts them on the wall with the type the dashboard chose',
+      onWall.length === 3 && onWall.every(d => d.published) && typeOf('Rose sheet (aaaaaaaa).jpg') === 'sheet' &&
+      typeOf('Square (bbbbbbbb).jpg') === 'design' && typeOf('hand-drop.jpg') === 'sheet',
+      onWall.map(d => d.source_file + ':' + d.type).join(', '));
 
     // Offline: Supabase unreachable. Nothing may be deleted.
     down = true;
@@ -494,6 +499,35 @@ const PNG = Buffer.from('89504e470d0a1a0a0000000d4948445200000001000000010806000
       !fs.existsSync(J('Designs', `Studio sheet (${homegrown.id.slice(0, 8)}).jpg`)) &&
       db.all(conn, 'designs').length === wallBefore, JSON.stringify(r6));
     catalog = [];
+
+    /* ── two sizes (3 Oct 2026): a square can be a single OR a sheet ── */
+    files['/storage/v1/object/public/flash/x/sq.jpg'] = img(2048, 2048, 'sq');
+    catalog = [{ id: 'eeeeeeee-5555', artist_id: jen.id, title: 'Square single', type: 'design',
+                 image_url: SB + '/storage/v1/object/public/flash/x/sq.jpg' }];
+    const sq = () => db.all(conn, 'designs').find(d => d.source_file === 'Jen/Designs/Square single (eeeeeeee).jpg');
+    await sync.syncOnce(conn, opts);
+    folderSync.syncOnce(conn);
+    check('a square SINGLE from the dashboard lands on the wall as a single design (2048×2048)',
+      sq() && sq().type === 'design' && sq().width === 2048 && sq().height === 2048, JSON.stringify(sq() && { type: sq().type, w: sq().width }));
+    catalog[0].type = 'sheet';
+    const r8 = await sync.syncOnce(conn, opts);
+    folderSync.syncOnce(conn);
+    check('switched to a flash sheet in My Designs → the wall follows, with no re-download',
+      r8.retyped.length === 1 && r8.downloaded.length === 0 && sq().type === 'sheet', JSON.stringify({ retyped: r8.retyped, type: sq().type }));
+    catalog[0].type = 'design';
+    await sync.syncOnce(conn, opts);
+    folderSync.syncOnce(conn);
+    check('...and back to a single', sq().type === 'design');
+    check('a type switch changes the cheap-check fingerprint (so the next screensaver start sees it)',
+      sync.fingerprint([{ id: 'a', image_url: 'u', type: 'design' }]) !== sync.fingerprint([{ id: 'a', image_url: 'u', type: 'sheet' }]));
+    fs.writeFileSync(J('Designs', 'hand-square.jpg'), img(2048, 2048, 'hand-square'));
+    { const t = new Date(Date.now() - 10000); fs.utimesSync(J('Designs', 'hand-square.jpg'), t, t); }
+    folderSync.syncOnce(conn);
+    const hs = db.all(conn, 'designs').find(d => d.source_file === 'Jen/Designs/hand-square.jpg');
+    check('a square dropped into Designs/ by hand is still a flash sheet (folder drops unchanged)',
+      hs && hs.type === 'sheet', JSON.stringify(hs && hs.type));
+    catalog = [];
+    await sync.syncOnce(conn, opts);
 
     /* ── triggers: the screensaver start → POST /api/sync-now ── */
     process.env.KT_SUPABASE_URL = SB; process.env.KT_SUPABASE_KEY = 'test';

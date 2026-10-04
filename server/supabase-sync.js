@@ -54,6 +54,11 @@ function ensureTables(conn) {
   conn.exec(`CREATE TABLE IF NOT EXISTS synced_files (
     remote_id TEXT PRIMARY KEY, artist_id TEXT NOT NULL, local_rel TEXT NOT NULL,
     remote_url TEXT NOT NULL, md5 TEXT NOT NULL, synced_at TEXT NOT NULL)`);
+  /* type: 'design' (a square single) or 'sheet', as the dashboard set it.
+   * Added 3 Oct 2026 — the folder importer would otherwise call every
+   * download a sheet. Older databases get the column here. */
+  const cols = conn.prepare('PRAGMA table_info(synced_files)').all().map(c => c.name);
+  if (!cols.includes('type')) conn.exec('ALTER TABLE synced_files ADD COLUMN type TEXT');
   conn.exec('CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)');
 }
 
@@ -65,12 +70,12 @@ function fileName(d) {
   return `${title} (${String(d.id).slice(0, 8)}).${ext}`;
 }
 
-/* What the catalog looks like from here: every published design's id and
- * image. Changes when anything is published, unpublished, deleted or
- * re-uploaded — and only then. */
+/* What the catalog looks like from here: every published design's id, image
+ * and type. Changes when anything is published, unpublished, deleted,
+ * re-uploaded or switched between single and sheet — and only then. */
 function fingerprint(list) {
   return crypto.createHash('sha1')
-    .update(list.map(d => d.id + '|' + d.image_url).sort().join('\n')).digest('hex');
+    .update(list.map(d => d.id + '|' + d.image_url + '|' + (d.type || '')).sort().join('\n')).digest('hex');
 }
 
 /* The cheap "anything new?" check (Joshua, 3 Oct 2026: new uploads must show
@@ -81,7 +86,7 @@ async function remoteFingerprint(opts) {
   const base = (opts.url || process.env.KT_SUPABASE_URL || DEFAULTS.url).replace(/\/+$/, '');
   const key = opts.key || process.env.KT_SUPABASE_KEY || DEFAULTS.key;
   try {
-    return fingerprint(await getJson(opts.fetch || fetch, `${base}/rest/v1/kiosk_catalog?select=id,image_url`, key));
+    return fingerprint(await getJson(opts.fetch || fetch, `${base}/rest/v1/kiosk_catalog?select=id,image_url,type`, key));
   } catch (e) { return null; }
 }
 
@@ -100,7 +105,7 @@ async function syncOnce(conn, opts) {
   const key = opts.key || process.env.KT_SUPABASE_KEY || DEFAULTS.key;
   const fetchFn = opts.fetch || fetch;
   const media = storage.mediaDir();
-  const out = { ok: false, downloaded: [], removed: [], kept: [], skipped: [] };
+  const out = { ok: false, downloaded: [], removed: [], kept: [], skipped: [], retyped: [] };
   ensureTables(conn);
 
   let remote;
@@ -145,7 +150,18 @@ async function syncOnce(conn, opts) {
     const have = synced[d.id];
     const rel = `${folder}/Designs/${fileName(d)}`;
     const full = path.join(media, ...rel.split('/'));
-    if (have && have.remote_url === d.image_url && have.local_rel === rel && fs.existsSync(full)) continue;   // up to date
+    const rtype = d.type === 'design' ? 'design' : 'sheet';
+    if (have && have.remote_url === d.image_url && have.local_rel === rel && fs.existsSync(full)) {
+      /* Same file, switched between single and sheet in My Designs: no
+       * download, just carry the new type onto the wall's copy. */
+      if ((have.type || 'sheet') !== rtype) {
+        conn.prepare('UPDATE synced_files SET type = ? WHERE remote_id = ?').run(rtype, d.id);
+        conn.prepare('UPDATE designs SET type = ? WHERE source_file = ?').run(rtype, rel);
+        out.retyped.push(rel);
+        log(`${rel} is now a ${rtype === 'design' ? 'single design' : 'flash sheet'}`);
+      }
+      continue;   // up to date
+    }
 
     let buf;
     try {
@@ -167,8 +183,8 @@ async function syncOnce(conn, opts) {
     fs.renameSync(tmp, full);                         // atomic: the importer never sees half a file
     const old = new Date(Date.now() - 5000);          // already settled for the importer
     fs.utimesSync(full, old, old);
-    conn.prepare(`INSERT OR REPLACE INTO synced_files (remote_id, artist_id, local_rel, remote_url, md5, synced_at)
-                  VALUES (?,?,?,?,?,?)`).run(d.id, d.artist_id, rel, d.image_url, md5(buf), db.nowIso());
+    conn.prepare(`INSERT OR REPLACE INTO synced_files (remote_id, artist_id, local_rel, remote_url, md5, synced_at, type)
+                  VALUES (?,?,?,?,?,?,?)`).run(d.id, d.artist_id, rel, d.image_url, md5(buf), db.nowIso(), rtype);
     out.downloaded.push(rel);
     log(`downloaded ${rel} (${buf.length} bytes)`);
   }
@@ -195,4 +211,4 @@ function removeOurs(conn, media, s, out, why) {
   conn.prepare('DELETE FROM synced_files WHERE remote_id = ?').run(s.remote_id);
 }
 
-module.exports = { syncOnce, fileName, remoteFingerprint, fingerprint };
+module.exports = { syncOnce, fileName, remoteFingerprint, fingerprint, ensureTables };

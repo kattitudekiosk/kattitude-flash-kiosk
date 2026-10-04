@@ -287,20 +287,51 @@
    * NOTHING IS EVER CROPPED and nothing is upscaled — the original upload is
    * kept untouched next to the resized copy. Smaller files are still refused:
    * stretched, they would look soft on the wall. */
-  /* [CHANGED 2 Oct 2026 — Joshua: "designs are sheets".] Every upload is a
-   * flash sheet, exactly as a file dropped into KIOSK MEDIA is — so the
-   * phone page and the wall always agree on what something is. Too small to
-   * read on the 1080-wide wall (long side under 1080) is still refused. */
-  function classify(w, h) {
-    return Math.max(w, h) >= 1080 ? 'sheet' : null;
+  /* TWO SIZES (Joshua, 3 Oct 2026: "supposed to be two different sizes" …
+   * "Square sheets can be both").
+   *
+   *   SQUARE 2048×2048 — a single design OR a flash sheet; the artist picks
+   *                      per file (default: flash sheet).
+   *   TALL   2160×3840 — always a flash sheet.
+   *
+   * Square means within 1% of square. Anything else — tall, wide or in
+   * between — is a flash sheet fitted INSIDE 2160×3840, shape kept, never
+   * cropped or padded. Bigger files are resized down to their size and the
+   * original is kept; a file smaller than its size is refused, because it
+   * would have to be enlarged and would look soft on the wall. For a shape
+   * that is not 9:16, "its size" means reaching the box on at least one side
+   * (2160 wide or 3840 tall), which is exactly "never enlarged". */
+  const SQUARE_TOLERANCE = 0.01;
+  function shapeOf(w, h) {
+    return Math.abs(w - h) / Math.max(w, h) <= SQUARE_TOLERANCE ? 'square' : 'tall';
+  }
+  function boxFor(shape) { return shape === 'square' ? cfg.spec.design : cfg.spec.sheet; }
+
+  /** { shape, type, error } for a w×h upload. type is the default choice. */
+  function plan(w, h) {
+    const shape = shapeOf(w, h);
+    const box = boxFor(shape);
+    if (shape === 'square') {
+      if (Math.min(w, h) < box.w) {
+        return { shape, type: null, error: `${w}×${h} is too small. A square design or sheet needs to be at ` +
+          `least ${box.w}×${box.h}. Bigger files are resized for you — never cropped.` };
+      }
+      return { shape, type: 'sheet', error: null };
+    }
+    if (w < box.w && h < box.h) {
+      return { shape, type: null, error: `${w}×${h} is too small. A flash sheet needs to be ${box.w}×${box.h} ` +
+        `(any other shape: at least ${box.w} wide or ${box.h} tall). Bigger files are resized for you — never cropped.` };
+    }
+    return { shape, type: 'sheet', error: null };
   }
 
-  function specError(w, h) {
-    const d = cfg.spec.design;
-    return `${w}×${h} is too small for the wall. A flash sheet needs at ` +
-           `least 1080 pixels on its long side. Bigger files are resized for ` +
-           `you — never cropped.`;
+  /** The size the wall copy will be: fitted inside the shape's box, never enlarged. */
+  function fittedSize(w, h) {
+    const box = boxFor(shapeOf(w, h));
+    const k = Math.min(1, box.w / w, box.h / h);
+    return { w: Math.round(w * k), h: Math.round(h * k) };
   }
+  window.DashHelpers = Object.assign(window.DashHelpers || {}, { plan, fittedSize, shapeOf });
 
   /** The copy the kiosk shows: the whole image scaled to fit inside maxW×maxH,
    *  aspect kept, no padding, never larger than the original. */
@@ -690,11 +721,13 @@
     const head = el('div', 'card');
     head.appendChild(el('h2', null, 'Upload flash'));
     const p = el('p', 'muted');
-    p.textContent = 'Pick as many files as you like. Tagging is optional — you ' +
-      'can tag them all at once below, or upload now and tag later. Every ' +
-      'upload is a flash sheet: any shape, at least 1080 pixels on the long ' +
-      'side. Big files are resized to fit the wall — never cropped, and your ' +
-      'original is kept.';
+    p.textContent = 'Pick as many files as you like. Two sizes: square ' +
+      cfg.spec.design.w + '×' + cfg.spec.design.h + ', which you can show as a ' +
+      'single design or a flash sheet (you choose for each file), and tall ' +
+      cfg.spec.sheet.w + '×' + cfg.spec.sheet.h + ', which is always a flash ' +
+      'sheet. Bigger files are resized to fit — never cropped, and your ' +
+      'original is kept. Smaller files are turned away. Tagging is optional: ' +
+      'tag them all at once below, or later.';
     head.appendChild(p);
 
     const pick = el('label', 'dropzone');
@@ -736,13 +769,13 @@
       catch (e) { toast(`${file.name}: ${e.message}`, 'error'); continue; }
 
       const w = info.img.naturalWidth, h = info.img.naturalHeight;
-      const type = classify(w, h);
+      const p = plan(w, h);
 
       state.queue.push({
         id: Math.random().toString(36).slice(2),
         file, url: info.url, img: info.img,
-        w, h, type,
-        error: type ? null : specError(w, h),
+        w, h, type: p.type, shape: p.shape,
+        error: p.error,
         title: file.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').trim(),
         artistId: defaultUploadArtist(state.me, state.artists, state.isAdmin),
         categories: [],
@@ -775,6 +808,20 @@
       toast(`Tagged all ${state.queue.length} with ${c.name}`);
     }));
 
+    // Set every staged SQUARE at once. Tall files are always sheets.
+    const squares = state.queue.filter(i => !i.error && i.shape === 'square');
+    if (squares.length) {
+      const allType = squares.every(i => i.type === 'design') ? 'design'
+                    : squares.every(i => i.type === 'sheet') ? 'sheet' : null;
+      const setAll = el('div', 'set-all');
+      setAll.appendChild(el('div', 'muted small', `All ${squares.length} square file${squares.length === 1 ? '' : 's'}:`));
+      setAll.appendChild(typeToggle(allType, t => {
+        squares.forEach(i => { i.type = t; });
+        renderQueue();
+      }));
+      bulk.appendChild(setAll);
+    }
+
     const actions = el('div', 'row');
     const draftBtn = el('button', 'btn btn-quiet', 'Save all as drafts');
     draftBtn.onclick = () => uploadAll(false);
@@ -789,6 +836,23 @@
     state.queue.forEach(item => list.appendChild(queueCard(item)));
   }
 
+  /* "Single design" / "Flash sheet" — the two things a square can be.
+   * current: 'design' | 'sheet' | null (mixed). onPick(type). */
+  function typeToggle(current, onPick) {
+    const wrap = el('div', 'type-toggle');
+    wrap.setAttribute('role', 'group');
+    wrap.setAttribute('aria-label', 'Single design or flash sheet');
+    [['design', 'Single design'], ['sheet', 'Flash sheet']].forEach(([t, label]) => {
+      const b = el('button', 'btn btn-quiet type-opt' + (current === t ? ' is-on' : ''), label);
+      b.type = 'button';
+      b.dataset.type = t;
+      b.setAttribute('aria-pressed', current === t ? 'true' : 'false');
+      b.onclick = () => onPick(t);
+      wrap.appendChild(b);
+    });
+    return wrap;
+  }
+
   function queueCard(item) {
     const card = el('div', 'card item' + (item.error ? ' is-bad' : ''));
 
@@ -801,9 +865,15 @@
     if (item.error) {
       body.appendChild(el('div', 'error', item.error));
     } else {
-      const badge = el('span', 'pill', item.type === 'sheet' ? 'Flash sheet' : 'Single design');
-      body.appendChild(badge);
-      body.appendChild(el('span', 'muted small', ` ${item.w}×${item.h}`));
+      const out = fittedSize(item.w, item.h);
+      if (item.shape === 'square') {
+        // A square can be either — the artist says which.
+        body.appendChild(typeToggle(item.type, t => { item.type = t; renderQueue(); }));
+      } else {
+        body.appendChild(el('span', 'pill', 'Flash sheet'));
+      }
+      body.appendChild(el('span', 'muted small size-note',
+        ` ${item.w}×${item.h}` + (out.w !== item.w || out.h !== item.h ? ` → resized to ${out.w}×${out.h}` : '')));
     }
 
     const title = el('input', 'input');
@@ -900,9 +970,11 @@
 
     /* Off-spec sizes: the kiosk shows a resized copy; the original upload
      * stays alongside it, untouched. Exact-spec files are shown as uploaded. */
-    const spec = cfg.spec[item.type];
+    // The box follows the SHAPE, not the type: a square is 2048×2048 whether
+    // it is a single or a sheet; everything else fits inside 2160×3840.
+    const spec = boxFor(item.shape || shapeOf(item.w, item.h));
     if (item.w !== spec.w || item.h !== spec.h) {
-      const fit = await fitInside(item.img, spec.w, item.type === 'sheet' ? cfg.spec.sheet.h : spec.h);
+      const fit = await fitInside(item.img, spec.w, spec.h);
       if (!fit.blob) throw new Error('This browser could not resize the image. Try Safari or Chrome.');
       const kioskPath = `${base}/kiosk.webp`;
       await put(kioskPath, fit.blob, 'image/webp');
@@ -1025,6 +1097,17 @@
       }
       await loadDesigns(); renderDesigns();
     }));
+
+    // A square can be shown either way; switch it here at any time.
+    if (d.width && d.height && shapeOf(d.width, d.height) === 'square') {
+      body.appendChild(typeToggle(d.type, async t => {
+        if (t === d.type) return;
+        const { error } = await sb.from('designs').update({ type: t }).eq('id', d.id);
+        if (error) return fail('Switching single/sheet', error);
+        toast(t === 'design' ? 'Now a single design.' : 'Now a flash sheet.');
+        await loadDesigns(); renderDesigns();
+      }));
+    }
 
     const row = el('div', 'row');
 

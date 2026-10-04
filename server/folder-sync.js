@@ -50,9 +50,11 @@ function dims(file) {
   return { w, h };
 }
 
-/* Same decision the dashboard makes (classify() in dashboard/app.js). */
-/* Everything is a flash sheet. Only a picture too small to read on the
- * 1080-wide wall (long side under 1080) is skipped, with the reason logged. */
+/* A file dropped into Designs/ by hand is a flash sheet. Only a picture too
+ * small to read on the 1080-wide wall (long side under 1080) is skipped, with
+ * the reason logged. A file the Supabase sync downloaded may instead be a
+ * square SINGLE design — see syncedType() below; the dashboard's two sizes
+ * are plan() in dashboard/app.js. */
 function classify(w, h) {
   return Math.max(w, h) >= MIN_SHEET_W ? 'sheet' : null;
 }
@@ -168,9 +170,20 @@ function migrateSheets(conn, media, byFolder) {
   return moved;
 }
 
+/* A file the Supabase sync downloaded carries the type its artist chose in
+ * the dashboard (a square can be a single design). Anything dropped in by
+ * hand has no record and stays a flash sheet, as before. */
+function syncedType(conn, rel) {
+  try {
+    const r = conn.prepare('SELECT type FROM synced_files WHERE local_rel = ?').get(rel);
+    return r && r.type === 'design' ? 'design' : null;
+  } catch (e) { return null; }   // no sync has ever run: no table yet
+}
+
 function importOne(conn, media, f) {
   const { w, h } = dims(f.full);
-  const type = classify(w, h);
+  let type = classify(w, h);
+  if (type && syncedType(conn, f.rel) === 'design') type = 'design';
   if (!type) {
     log(`skipped ${f.rel}: ${w}×${h} is too small for the wall ` +
         `(a flash sheet needs at least ${MIN_SHEET_W} pixels on its long side)`);

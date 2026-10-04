@@ -102,10 +102,11 @@ window.Tour = (function () {
     {
       id: 'upload-sizes',
       view: 'upload', sel: '#view-upload > .card',
-      title: 'We resize for you',
-      body: 'Everything you upload is a flash sheet — any shape, at least ' +
-            '1080 pixels on the long side. Big ones are resized to fit the ' +
-            'wall. Nothing is ever cropped, and your original is kept.',
+      title: 'Two sizes',
+      body: 'Square 2048×2048: show it as a single design or a flash sheet — ' +
+            'tap which on each file. Tall 2160×3840: always a flash sheet. ' +
+            'Bigger files are resized for you; nothing is ever cropped, and ' +
+            'your original is kept.',
     },
     {
       id: 'upload-tagging',

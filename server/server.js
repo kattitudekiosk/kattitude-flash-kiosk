@@ -60,9 +60,10 @@ function runSync(conn, why) {
       const r = await require('./supabase-sync').syncOnce(conn);
       if (r.ok) lastFingerprint = r.fingerprint;
       const fs2 = require('./folder-sync').syncOnce(conn);   // import what arrived, now
-      const changed = !!(r.ok && (r.downloaded.length || r.removed.length));
+      const changed = !!(r.ok && (r.downloaded.length || r.removed.length || (r.retyped || []).length));
       console.log(`[studio-server] ${db.nowIso()} sync (${why}): ` +
-        (r.ok ? `${r.downloaded.length} new, ${r.removed.length} removed` : 'offline, will retry at the next trigger'));
+        (r.ok ? `${r.downloaded.length} new, ${r.removed.length} removed` +
+          ((r.retyped || []).length ? `, ${r.retyped.length} switched single/sheet` : '') : 'offline, will retry at the next trigger'));
       return { ran: true, ok: r.ok, changed, imported: (fs2.imported || []).length };
     } finally { syncing = null; }
   })();

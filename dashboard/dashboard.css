@@ -550,3 +550,12 @@ p.muted { line-height: 1.5; margin: 0 0 12px; }
 /* The suggestion chip carries its kind as a quiet suffix — "Floral · style".
    The name shouts, the classification does not. */
 .chip .muted { text-transform: none; }
+
+/* "Single design" / "Flash sheet" — what a square upload is shown as.
+ * Inverted active state (deep pink fill, white type, 5.78:1), never a ring;
+ * corners are square.css's business. */
+.type-toggle { display: inline-flex; gap: 0; margin: 6px 0; }
+.type-toggle .type-opt { padding: 6px 12px; font-size: 13px; }
+.type-toggle .type-opt.is-on { background: #C2156F; color: #fff; }
+.set-all { margin: 10px 0 4px; }
+.size-note { margin-left: 6px; }
