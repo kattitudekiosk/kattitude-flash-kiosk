@@ -312,15 +312,18 @@ function tap(window, node) {
       return { singles: n(t('g-mode-all'), 'designs?'), sheets: n(t('g-mode-all'), 'sheets?'),
                artists: n(t('g-mode-artist'), 'artists?'), sheetCard: n(t('g-mode-sheets'), 'sheets?') };
     };
-    const matches = (c, s) => c.singles === s.singleCount && c.sheets === s.sheetCount &&
-      c.artists === s.artists.length && (!s.hasSheets || c.sheetCard === s.sheetCount);
+    // The Full Flash Sheets card left the cover on 9 Oct 2026 (coverSheetsCard
+    // false); its count is only checked while the card exists.
+    const matches = (c, s, w) => c.singles === s.singleCount && c.sheets === s.sheetCount &&
+      c.artists === s.artists.length &&
+      (!s.hasSheets || w.KIOSK_CONFIG.coverSheetsCard === false || c.sheetCard === s.sheetCount);
 
     for (const [label, mut] of [['full seed catalog', null],
                                 ['catalog with most designs removed', cat => { cat.designs = cat.designs.slice(0, 5); }]]) {
       const w = await boot({ catalogSource: 'seed' }, mut || undefined);
       w.KIOSK_ROUTER.goHome();
       const s = w.Catalog.snapshot(), c = coverNumbers(w.document);
-      check(`${label}: cover counts equal the catalog`, matches(c, s),
+      check(`${label}: cover counts equal the catalog`, matches(c, s, w),
         JSON.stringify(c) + ' vs ' + JSON.stringify({ singles: s.singleCount, sheets: s.sheetCount, artists: s.artists.length }));
       // Negative control: the same comparison against a catalog one sheet
       // bigger must NOT match, or this check could not catch a wrong count.
@@ -543,13 +546,16 @@ function tap(window, node) {
     const doc = w.document;
     const gallery = doc.getElementById('gallery');
 
-    // Path A: home → "Full Flash Sheets" card
-    tap(w, gallery.querySelector('.g-mode-sheets'));
-    check('home→sheets enters sheet viewer', doc.body.classList.contains('mode-sheets'));
-    check('home→sheets shows a back control', doc.body.classList.contains('sheets-has-back'));
-    tap(w, doc.getElementById('sheetBackBtn'));
-    check('cover→sheets back returns to the cover',
-      doc.body.classList.contains('mode-gallery') && !!gallery.querySelector('.g-covergrid'));
+    // Path A used to be the cover's "Full Flash Sheets" card. Joshua, 9 Oct
+    // 2026: "the full flash sheets tab is redundant" — the cover offers View
+    // All and Browse by Artist only, and nothing may still point at the card.
+    check('the cover has no Full Flash Sheets card', !gallery.querySelector('.g-mode-sheets'));
+    check('the cover offers exactly View All and Browse by Artist (no categories in this catalog) or plus By Category',
+      [...gallery.querySelectorAll('.g-covergrid .g-card-mode')].map(c => c.className.match(/g-mode-(\w+)/)[1])
+        .filter(m => m !== 'category').join() === 'all,artist');
+    const help = (gallery.querySelector('.g-home-help') || {}).textContent || '';
+    check('the cover\'s subtitle names the options it shows, and not sheets',
+      /everything at once/.test(help) && /by artist/.test(help) && !/sheet/i.test(help), help);
 
     // Path B: grid tile → sheet
     tap(w, gallery.querySelector('.g-mode-all'));
@@ -605,11 +611,14 @@ function tap(window, node) {
     check('cover is not scrollable',
       !gallery.querySelector('.g-covergrid[data-native-scroll]')
       && !gallery.querySelector('.g-home[data-native-scroll]'));
-    check('cover shows 4 mode cards',
-      gallery.querySelectorAll('.g-card-mode').length === 4,
+    // 3 since 9 Oct 2026: View All, Browse by Artist, Browse by Category (this
+    // catalog has categories). Full Flash Sheets left the cover.
+    check('cover shows 3 mode cards',
+      gallery.querySelectorAll('.g-card-mode').length === 3,
       'got ' + gallery.querySelectorAll('.g-card-mode').length);
     check('cover rows match the card count',
-      gallery.querySelector('.g-covergrid').style.getPropertyValue('--cover-rows') === '4');
+      gallery.querySelector('.g-covergrid').style.getPropertyValue('--cover-rows') ===
+        String(gallery.querySelectorAll('.g-card-mode').length));
 
     // Then the artists page, which is the one that has to adapt.
     tap(w, gallery.querySelector('.g-mode-artist'));

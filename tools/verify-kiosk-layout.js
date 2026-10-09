@@ -95,11 +95,27 @@ async function run(W, H) {
       return { x: a.left, y: a.top, w: a.width, h: a.height, hits };
     });
     if (!b) { check(`${page}: Back is on the page`, false); return; }
-    const shot = await p.screenshot({ clip: { x: Math.round(b.x + 6 * scale), y: Math.round(b.y + b.h / 2), width: 1, height: 1 } });
-    const rgb = pixel(Buffer.from(shot));
-    check(`${page}: Back at the bottom-right, painted pink, overlapping nothing`,
-      b.x + b.w > W * 0.75 && b.y + b.h > H * 0.9 && isPink(rgb) && !b.hits.length,
-      `at (${Math.round(b.x)},${Math.round(b.y)}) rgb(${rgb}) hits ${b.hits.join(',')}`);
+    /* The WHOLE button, not one spot: five points — four corners and the
+     * middle of the bottom edge. The tray bug (9 Oct 2026) covered only the
+     * lower half, and a single mid-height sample passed straight over it.
+     * At each point: painted pink (catches coverings that ignore taps) and
+     * the topmost element is the button (catches anything that takes the tap). */
+    const inset = 8 * scale;
+    const pts = [[b.x + inset, b.y + inset], [b.x + b.w - inset, b.y + inset], [b.x + inset, b.y + b.h - inset],
+                 [b.x + b.w - inset, b.y + b.h - inset], [b.x + b.w / 2, b.y + b.h - inset]];
+    const bad = [];
+    for (const [x, y] of pts) {
+      const rgb = pixel(Buffer.from(await p.screenshot({ clip: { x: Math.round(x), y: Math.round(y), width: 1, height: 1 } })));
+      const top = await p.evaluate((x, y) => {
+        const bk = [...document.querySelectorAll('.g-back, #sheetBackBtn')].find(e => e.getBoundingClientRect().height > 0);
+        const t = document.elementFromPoint(x, y);
+        return bk && t && (bk === t || bk.contains(t)) ? null : (t ? (t.id || t.className || t.tagName).toString().slice(0, 40) : 'nothing');
+      }, x, y);
+      if (!isPink(rgb) || top) bad.push(`(${Math.round(x)},${Math.round(y)}) rgb(${rgb})${top ? ' under ' + top : ''}`);
+    }
+    check(`${page}: Back at the bottom-right, fully visible and tappable (5 points), overlapping no QR/dots/arrows`,
+      b.x + b.w > W * 0.75 && b.y + b.h > H * 0.9 && !bad.length && !b.hits.length,
+      `at (${Math.round(b.x)},${Math.round(b.y)}) ${bad.join('; ')} ${b.hits.length ? 'hits ' + b.hits.join(',') : ''}`);
   };
 
   await p.goto('http://kiosk.test/index.html', { waitUntil: 'networkidle2' });
@@ -107,6 +123,8 @@ async function run(W, H) {
   await p.mouse.click(W / 2, H * 0.68);
   await wait(1200);
 
+  const cover = await p.evaluate(() => [...document.querySelectorAll('.g-covergrid .g-card-mode')].map(c => c.querySelector('.g-card-all-title').textContent));
+  check('the cover offers View All and Browse by Artist — no Full Flash Sheets', !cover.some(t => /sheet/i.test(t)) && cover.includes('View All') && cover.includes('Browse by Artist'), cover.join(' | '));
   await p.evaluate(() => window.KIOSK_ROUTER.renderArtists());
   await backCheck('Artists');
   const cards = await p.evaluate(() => [...document.querySelectorAll('.g-card-artist')].map(c => {
@@ -177,6 +195,10 @@ async function run(W, H) {
   if (await p.evaluate(() => { const t = document.querySelector('.g-tile-sheet'); if (t) t.dispatchEvent(new Event('click', { bubbles: true })); return !!t; })) {
     await wait(1200);
     await backCheck('Sheet viewer');
+    const lum = await p.evaluate(() => { const c = getComputedStyle(document.getElementById('sheetLabel')).color.match(/\d+/g).map(Number);
+      const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+      return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); });
+    check('the SHEET n / N counter is dark type (readable on the light header), not yellow', lum < 0.05, 'luminance ' + lum.toFixed(3));
   }
   await browser.close();
 }

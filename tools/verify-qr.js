@@ -166,10 +166,15 @@ async function bareViewerQr(html) {
   }).filter(Boolean);
 
   window.KIOSK_ROUTER.goHome();
-  gallery.querySelector('.g-mode-sheets')
+  // Full Flash Sheets left the cover (9 Oct 2026); the studio-wide sheet
+  // viewer is now reached by opening a sheet from View All.
+  gallery.querySelector('.g-mode-all')
     .dispatchEvent(new window.Event('click', { bubbles: true, cancelable: true }));
   await new Promise(r => setTimeout(r, 20));
-  studio.push(studioEntry('Full Flash Sheets corner', doc.getElementById('qrBadge'),
+  gallery.querySelector('.g-tile-sheet')
+    .dispatchEvent(new window.Event('click', { bubbles: true, cancelable: true }));
+  await new Promise(r => setTimeout(r, 20));
+  studio.push(studioEntry('View All → sheet, corner', doc.getElementById('qrBadge'),
     (doc.getElementById('qrCaption') || {}).textContent, 138, 15));
 
   const bare = await bareViewerQr(html);

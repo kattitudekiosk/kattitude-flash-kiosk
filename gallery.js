@@ -247,9 +247,10 @@ window.KIOSK_ROUTER = (function () {
     const pane = el('div', 'g-home');
     pane.appendChild(el('h1', 'g-home-title', 'Browse our flash'));
 
+    // Says exactly the ways the cover offers (filled in once the cards are
+    // known): "everything at once or by artist", plus "or by style" only when
+    // there is a category card.
     const help = el('p', 'g-home-help');
-    help.innerHTML = 'Choose how you would like to look — everything at once, ' +
-      'by artist, or by style.';
     pane.appendChild(help);
 
     const grid = el('div', 'g-covergrid');
@@ -292,6 +293,12 @@ window.KIOSK_ROUTER = (function () {
         go: () => { view.artistId = null; openSheetViewer(0, false, window.Catalog.sheets()); },
       });
     }
+
+    const ways = ['everything at once', 'by artist'];
+    if (modes.some(m => /g-mode-category/.test(m.cls))) ways.push('by style');
+    help.textContent = 'Choose how you would like to look — ' +
+      (ways.length > 2 ? ways.slice(0, -1).join(', ') + ', or ' + ways[ways.length - 1]
+                       : ways.join(' or ')) + '.';
 
     modes.forEach(m => {
       const card = el('button', 'g-card ' + m.cls);

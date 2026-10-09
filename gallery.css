@@ -596,7 +596,7 @@ body.mode-gallery #gallery:has(.g-back) { padding-bottom: 144px; box-sizing: bor
 .g-detail-counter {
   font-size: 17px;
   font-weight: 600;
-  color: var(--gold);
+  color: var(--text);   /* black type, was yellow — same reason as .sheet-label */
   letter-spacing: 0.1em;
 }
 

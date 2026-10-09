@@ -96,10 +96,11 @@ window.KIOSK_CONFIG = {
    * leaving on until real content lands. */
   showSeedBanner: false,   // retired: there is no placeholder data to label
 
-  /* Keep "Full Flash Sheets" as a fourth card on the cover. Set false to fold
-   * sheets into View All only — they already appear there as tiles.
-   * TODO(joshua): confirm which he wants. */
-  coverSheetsCard: true,
+  /* "Full Flash Sheets" on the cover — decided 9 Oct 2026, Joshua: "i feel
+   * like the full flash sheets tab is redundant. Let's go with the browse by
+   * all and then the artists tab only". Sheets stay in View All (as tiles that
+   * open the sheet viewer) and on every artist's page. */
+  coverSheetsCard: false,
 
   /* Show "Studio Owner" / "Senior Artist" / "Junior Artist" on artist cards.
    * Off by default: the data is real and useful for ordering, but labelling

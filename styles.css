@@ -177,7 +177,11 @@ html, body {
 /* ─── Layout skeleton: header / viewer / footer ─────────────────────────── */
 #header {
   position: relative;
-  z-index: 10;
+  /* 11, not 10: the header holds the sheet viewer's Back button, which sits
+     at the bottom of the canvas. At 10 the tray (#footer, also 10, later in
+     the DOM) painted over its lower half — Joshua, 9 Oct 2026: "back button
+     is behind the 'use the arrows to browse' tray". */
+  z-index: 11;
   flex: 0 0 auto;
   padding: 12px 20px 10px;
   background: var(--surface);
@@ -201,6 +205,7 @@ html, body {
   z-index: 10;
   flex: 0 0 auto;
   padding: 10px 20px 14px;
+  box-sizing: border-box;
   background: var(--surface);
   display: flex;
   flex-direction: column;
@@ -271,7 +276,9 @@ body.screensaver .nav-btn {
   font-family: 'Inter', sans-serif;
   font-weight: 600;
   font-size: 16px;
-  color: var(--gold);
+  /* Black type, was yellow (9 Oct 2026: hard to read on the light-grey
+     header — ~1.4:1). Ink on the header surface is ~17:1. */
+  color: var(--text);
   letter-spacing: 0.12em;
   white-space: nowrap;
 }
@@ -363,6 +370,10 @@ body.screensaver .nav-btn {
   background: var(--pink);
   transform: scale(1.35);
 }
+
+/* When Back is shown, the tray is tall enough to hold it on the right — fully
+ * inside the tray, never over the sheet and never under the tray. */
+body.sheets-has-back #footer { min-height: 144px; justify-content: center; }
 
 .footer-hint {
   font-family: 'Inter', sans-serif;
