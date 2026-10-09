@@ -69,7 +69,10 @@ body.sheets-has-back #sheetBackBtn { display: inline-flex; }
    Absolutely positioning the back control keeps the logo optically centred
    instead of shoved off-axis by a button on one side only. */
 .g-topbar-logo {
-  height: 128px;
+  /* 104px, was 128: the old logo's 128 included a "Studio" line; the 2026
+     logo has none and is wider, so 104 keeps the script and cheetah the same
+     size and the header no heavier. */
+  height: 104px;
   width: auto;
   max-width: 76%;
   object-fit: contain;

@@ -39,7 +39,8 @@
      a metre away. This clears 5.78:1 for white and 4.51:1 for the logo yellow. */
   --pink-card: #C2156F;
 
-  /* The logo's yellow, sampled from assets/brand/kattitude-logo.png. */
+  /* The logo's yellow. Sampled from the old logo; the 2026 logo's own yellow
+     is #FFE448 — near-identical, kept as-is for the UI. */
   --yellow:    #FDE446;
   --gold:      #FDE446;
 
@@ -137,7 +138,10 @@ html, body {
 }
 
 .splash-logo {
-  width: 620px;
+  /* 720px, was 620. The 2026 logo (9 Oct) is wider — 2.35:1 against the old
+     1.68:1 — and has no "Studio" line, so at the old width it read small;
+     720 keeps about the same area on the splash. */
+  width: 720px;
   height: auto;
   animation: logo-breathe 4s ease-in-out infinite;
 }

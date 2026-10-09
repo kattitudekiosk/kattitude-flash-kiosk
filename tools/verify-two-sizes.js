@@ -34,7 +34,7 @@ function check(name, cond, detail) {
 
 // Real images of each shape, made from the studio logo with sips.
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'kt-two-sizes-'));
-const LOGO = path.join(ROOT, 'assets/brand/kattitude-logo.png');
+const LOGO = path.join(ROOT, 'assets/brand/kattitude-logo-2026.png');
 function make(name, w, h) {
   const out = path.join(TMP, name + '.png');
   execFileSync('/usr/bin/sips', ['-s', 'format', 'png', '-z', String(h), String(w), LOGO, '--out', out], { stdio: 'ignore' });

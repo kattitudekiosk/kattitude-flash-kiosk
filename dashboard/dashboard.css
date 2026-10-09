@@ -125,6 +125,11 @@ body {
 /* The eyebrow. This is the one pink thing in the header and it is the same
  * move the sign-in card makes — a 10px tracked-out label over a black
  * wordmark. It was rgba white on black, which does not survive the repaint. */
+/* The studio logo in place of the KATTITUDE wordmark (9 Oct 2026 — the
+ * CLAUDE.md open decision "a logo mark in the dashboard header", waiting on the
+ * file; this is the file). On white, like everything else in the header. */
+.brand-logo { display: block; height: 30px; width: auto; }
+
 .brand span {
   display: block;
   font-family: 'Inter', sans-serif;
@@ -384,6 +389,9 @@ p.muted { line-height: 1.5; margin: 0 0 12px; }
 /* ── Sign in ────────────────────────────────────────────────────────────── */
 /* THE REFERENCE SCREEN. Everything above is this, repeated. */
 .signin-card { max-width: 420px; margin: 40px auto; }
+/* The same logo opens the sign-in card — the reference screen of the palette
+ * rule: white card, black type, one pink accent. */
+.signin-logo { display: block; width: 220px; max-width: 70%; height: auto; margin: 0 0 14px; }
 .msg { min-height: 20px; font-size: 13px; color: var(--pink); }
 
 /* ── Upload ─────────────────────────────────────────────────────────────── */

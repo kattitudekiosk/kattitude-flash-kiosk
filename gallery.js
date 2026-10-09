@@ -116,8 +116,8 @@ window.KIOSK_ROUTER = (function () {
     // identity on a wall-mounted panel, and dropping it on inner screens made
     // them look like a different application.
     const logo = el('img', 'g-topbar-logo');
-    logo.src = 'assets/brand/kattitude-logo.png';
-    logo.alt = 'Kattitude Tattoo Studio';
+    logo.src = 'assets/brand/kattitude-logo-2026.svg';   // the 2026 logo (vector)
+    logo.alt = 'Kattitude Tattoo';
     bar.appendChild(logo);
 
     if (title) bar.appendChild(el('div', 'g-topbar-title', title));

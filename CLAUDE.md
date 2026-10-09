@@ -1004,6 +1004,8 @@ are settled:
 - Whether the dashboard's `1px solid var(--line)` borders should be retired to
   match `no-border-design` — **unanswered**, and not to be acted on without
   Joshua saying so; see DESIGN RULES
-- Whether a logo mark belongs in the dashboard header next to the KATTITUDE
-  wordmark — Joshua has asked for it; **no asset path exists** under
-  `dashboard/`, so it is waiting on the file rather than on a decision
+- ~~Whether a logo mark belongs in the dashboard header~~ — **settled 9 Oct
+  2026**: the studio's 2026 logo (`assets/brand/kattitude-logo-2026.svg`, vector,
+  from "Kattitude Tattoo Studio Bold.pdf") replaces the KATTITUDE wordmark in
+  the header and opens the sign-in card. It replaced the old logo on the kiosk
+  too (splash, headers); the icons are its cheetah. `tools/verify-logo.js`.
