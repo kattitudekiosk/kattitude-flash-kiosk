@@ -32,6 +32,7 @@ record, like `db/schema.sql`. They are not meant to be pasted.
 | 07 | `07-joshua-test-card.sql` | execute_sql | Joshua's hidden admin test card. His address goes on the one marked line, in the copy that runs, never in the repo. **Ran 3 Oct 2026** (id `81fc4355…`). |
 | 08 | `08-signin-gate.sql` | apply_migration `kattitude_signin_gate` | Supabase Auth may only create a login for an address on an active admin card, so a refused address gets no email. |
 | 10 | `10-designs-own-only.sql` | apply_migration `kattitude_designs_own_only` | A signed-in artist reads only their own designs (admins: all). The phone page and Mac sync read as anon and are unaffected. |
+| 11 | `11-clear-auto-titles.sql` | execute_sql | Preview, then clear design titles made up from file names ("IMG 1185", "Untitled Artwork…"); typed names kept. Same rule as `server/titles.js`. |
 | 09 | `09-verify-gate.sql` | execute_sql | Proves 08 as Supabase Auth's own role, then rolls back. Sends nothing. |
 
 **Done 3 Oct 2026:** 00–06 ran on Kat's project. 04 passed 40/40, and 12/12

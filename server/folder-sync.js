@@ -83,9 +83,6 @@ function thumb(src, out, w, h) {
 function slug(name) {
   return name.replace(/\.[^.]+$/, '').replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^[-.]+/, '').slice(0, 80) || 'file';
 }
-function titleOf(name) {
-  return name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
-}
 
 /* Every loose image under <Artist>/Designs and <Artist>/Sheets. */
 function scanFiles(media, artistsByFolder) {
@@ -173,6 +170,17 @@ function migrateSheets(conn, media, byFolder) {
 /* A file the Supabase sync downloaded carries the type its artist chose in
  * the dashboard (a square can be a single design). Anything dropped in by
  * hand has no record and stays a flash sheet, as before. */
+/* The title a downloaded design's ARTIST gave it (null when none). A file
+ * dropped in by hand has no record, and gets no title: a file name is not a
+ * name (Joshua, 9 Oct 2026: "Only add a title/name if they add it to the
+ * form when they upload"). */
+function syncedTitle(conn, rel) {
+  try {
+    const r = conn.prepare('SELECT title FROM synced_files WHERE local_rel = ?').get(rel);
+    return (r && r.title) || null;
+  } catch (e) { return null; }
+}
+
 function syncedType(conn, rel) {
   try {
     const r = conn.prepare('SELECT type FROM synced_files WHERE local_rel = ?').get(rel);
@@ -197,7 +205,7 @@ function importOne(conn, media, f) {
   thumb(path.join(dir, 'kiosk.jpg'), path.join(dir, 'thumb.jpg'), k.w, k.h);
 
   const row = {
-    artist_id: f.artist.id, title: titleOf(f.name), type,
+    artist_id: f.artist.id, title: syncedTitle(conn, f.rel), type,
     image_url: urlFor(f, 'kiosk.jpg'), thumb_url: urlFor(f, 'thumb.jpg'),
     width: k.w, height: k.h, published: true, approved: true,
     source_file: f.rel, source_sig: f.sig,

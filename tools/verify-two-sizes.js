@@ -135,11 +135,15 @@ const JWT = b64u({ alg: 'HS256', typ: 'JWT' }) + '.' + b64u({ sub: UID, role: 'a
   await input.uploadFile(...Object.values(FILES));
   await page.waitForFunction(n => document.querySelectorAll('#queue .card.item').length === n, { timeout: 20000 }, Object.keys(FILES).length);
   const cards = await page.evaluate(() => [...document.querySelectorAll('#queue .card.item')].map(c => ({
-    title: c.querySelector('input.input').value, bad: c.classList.contains('is-bad'),
+    title: c.dataset.file.replace(/\.png$/, ''), name: c.querySelector('input.input').value,
+    placeholder: c.querySelector('input.input').placeholder, bad: c.classList.contains('is-bad'),
     error: (c.querySelector('.error') || {}).textContent || null,
     toggle: !!c.querySelector('.type-toggle'), on: (c.querySelector('.type-opt.is-on') || {}).textContent || null,
     size: (c.querySelector('.size-note') || {}).textContent || null })));
-  const card = t => cards.find(c => c.title.replace(/\s/g, '-') === t) || {};
+  const card = t => cards.find(c => c.title === t) || {};
+  // 9 Oct 2026: a file name is not a name. The field starts empty.
+  check('every name field starts EMPTY (no title made from the file name), placeholder "Name (optional)"',
+    cards.every(c => c.name === '' && c.placeholder === 'Name (optional)'), JSON.stringify(cards.map(c => [c.name, c.placeholder])));
   check('squares get the Single design / Flash sheet toggle, set to Flash sheet',
     card('square-big').toggle && card('square-big').on === 'Flash sheet' && card('square-exact').toggle);
   check('tall and other shapes get no toggle (always a flash sheet)',
@@ -157,8 +161,13 @@ const JWT = b64u({ alg: 'HS256', typ: 'JWT' }) + '.' + b64u({ sub: UID, role: 'a
     .filter(c => c.querySelector('.type-toggle')).map(c => (c.querySelector('.type-opt.is-on') || {}).textContent));
   check('"set all" makes every square a single design', afterAll.length === 2 && afterAll.every(t => t === 'Single design'), afterAll.join());
   await page.evaluate(() => {
-    const c = [...document.querySelectorAll('#queue .card.item')].find(x => x.querySelector('input.input').value === 'square exact');
+    const c = [...document.querySelectorAll('#queue .card.item')].find(x => x.dataset.file === 'square-exact.png');
     c.querySelector('.type-opt[data-type="sheet"]').click();
+  });
+  // The artist names ONE file; the rest stay unnamed.
+  await page.evaluate(() => {
+    const inp = [...document.querySelectorAll('#queue .card.item')].find(x => x.dataset.file === 'square-big.png').querySelector('input.input');
+    inp.value = '  Rose sheet  '; inp.dispatchEvent(new Event('input', { bubbles: true }));
   });
 
   // What My Designs will list when the dashboard reloads it after this upload.
@@ -169,7 +178,17 @@ const JWT = b64u({ alg: 'HS256', typ: 'JWT' }) + '.' + b64u({ sub: UID, role: 'a
   const pub = await page.evaluateHandle(() => [...document.querySelectorAll('#queue button')].find(b => b.textContent === 'Publish all'));
   await pub.click();
   await page.waitForFunction(() => !document.querySelector('#queue .card.item:not(.is-bad)'), { timeout: 30000 }).catch(() => {});
-  const ins = t => inserts.find(i => i.title === t) || {};
+  // Found by what was saved, not by title: only one design has a name now.
+  const ins = t => ({
+    'square big': inserts.find(i => i.title === 'Rose sheet'),
+    'square exact': inserts.find(i => i.width === 2048 && i.type === 'sheet'),
+    'tall exact': inserts.find(i => i.height === 3840),
+    'scan': inserts.find(i => i.height === 2795),
+    'wide': inserts.find(i => i.height === 1620),
+  }[t] || {});
+  check('only the name the artist typed is saved (trimmed); every other design is saved with NO title',
+    inserts.filter(i => i.title).map(i => i.title).join() === 'Rose sheet' && inserts.filter(i => i.title === null).length === 4,
+    JSON.stringify(inserts.map(i => i.title)));
   check('5 good files uploaded, the 2 small ones not', inserts.length === 5, inserts.map(i => i.title).join(', '));
   check('square-big saved as a SINGLE design, 2048×2048',
     ins('square big').type === 'design' && ins('square big').width === 2048 && ins('square big').height === 2048, JSON.stringify(ins('square big')));

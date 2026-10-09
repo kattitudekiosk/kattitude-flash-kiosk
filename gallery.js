@@ -1113,7 +1113,7 @@ window.KIOSK_ROUTER = (function () {
     const shell = el('div', 'g-tile-img');
     const img = el('img');
     img.src = item.thumb || item.image;
-    img.alt = item.title || '';
+    img.alt = item.title || (item.artistName ? 'Flash by ' + item.artistName : 'Flash');
     img.loading = 'lazy';
     img.decoding = 'async';
     img.draggable = false;
@@ -1124,12 +1124,15 @@ window.KIOSK_ROUTER = (function () {
     if (item.type === 'sheet') t.appendChild(el('div', 'g-tile-badge', 'FULL SHEET'));
     else if (item.featured) t.appendChild(el('div', 'g-tile-badge g-tile-badge-featured', 'FEATURED'));
 
+    // A name only if the artist gave one (9 Oct 2026: file names were showing
+    // as titles); the artist's name on the studio-wide grids. No caption at
+    // all when there is neither — an empty bar is clutter.
     const cap = el('div', 'g-tile-cap');
-    cap.appendChild(el('div', 'g-tile-title', item.title || ''));
+    if (item.title) cap.appendChild(el('div', 'g-tile-title', item.title));
     if (!view.artistId && item.artistName) {
       cap.appendChild(el('div', 'g-tile-artist', item.artistName));
     }
-    t.appendChild(cap);
+    if (cap.children.length) t.appendChild(cap);
 
     onTap(t, () => {
       if (item.type === 'sheet') {
@@ -1209,11 +1212,11 @@ window.KIOSK_ROUTER = (function () {
     if (!item || !detailEls) return;
 
     detailEls.img.src = item.image || item.thumb;
-    detailEls.img.alt = item.title || '';
+    detailEls.img.alt = item.title || (item.artistName ? 'Flash by ' + item.artistName : 'Flash');
     detailEls.counter.textContent = (view.index + 1) + ' / ' + view.items.length;
 
     clear(detailEls.meta);
-    detailEls.meta.appendChild(el('div', 'g-detail-title', item.title || ''));
+    if (item.title) detailEls.meta.appendChild(el('div', 'g-detail-title', item.title));
     const sub = [];
     if (item.artistName) sub.push(item.artistName);
     if (item.categories.length) sub.push(item.categories.join(' • '));

@@ -62,7 +62,8 @@ function runSync(conn, why) {
       const fs2 = require('./folder-sync').syncOnce(conn);   // import what arrived, now
       const artistChanges = (r.artistsAdded || []).length + (r.artistsUpdated || []).length +
                             (r.artistsHidden || []).length + (r.photos || []).length;
-      const changed = !!(r.ok && (r.downloaded.length || r.removed.length || (r.retyped || []).length || artistChanges));
+      const changed = !!(r.ok && (r.downloaded.length || r.removed.length || (r.retyped || []).length ||
+                                  (r.retitled || []).length || artistChanges));
       console.log(`[studio-server] ${db.nowIso()} sync (${why}): ` +
         (r.ok ? `${r.downloaded.length} new, ${r.removed.length} removed` +
           ((r.retyped || []).length ? `, ${r.retyped.length} switched single/sheet` : '') +

@@ -75,7 +75,10 @@ async function run(W, H) {
       const rows = await r.json();
       // Test browser only: show the first square as a single, so the lightbox is reachable.
       const sq = rows.find(x => x.width && x.width === x.height);
-      const out = rows.map(x => (sq && x.id === sq.id ? Object.assign({}, x, { type: 'design' }) : x));
+      // ...and only ONE design has a name (9 Oct 2026: no names made from file names).
+      const named = rows.find(x => !(sq && x.id === sq.id));
+      const out = rows.map(x => Object.assign({}, x, sq && x.id === sq.id ? { type: 'design' } : {},
+                                              { title: named && x.id === named.id ? 'Named For Test' : null }));
       return req.respond({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(out) });
     }
     req.continue();
@@ -166,6 +169,11 @@ async function run(W, H) {
     return t && bk ? { tile: t.getBoundingClientRect().bottom, back: bk.getBoundingClientRect().top } : null;
   });
   check('scrolled to the end, the last row sits above Back (never hidden behind it)', last && last.tile <= last.back, JSON.stringify(last));
+  const caps = await p.evaluate(() => [...document.querySelectorAll('.g-tile')].map(t => ({
+    title: (t.querySelector('.g-tile-title') || {}).textContent || null, artist: (t.querySelector('.g-tile-artist') || {}).textContent || null })));
+  check('View All: a title line only where the artist gave a name — never a file name or "Untitled"',
+    caps.filter(c => c.title).map(c => c.title).join() === 'Named For Test' && caps.every(c => c.artist),
+    JSON.stringify(caps.slice(0, 4)));
 
   await p.evaluate(() => window.KIOSK_ROUTER.renderArtists());
   await wait(500);
@@ -187,6 +195,9 @@ async function run(W, H) {
   await wait(800);
   if (await p.evaluate(() => { const t = document.querySelector('.g-tile-design'); if (t) t.dispatchEvent(new Event('click', { bubbles: true })); return !!t; })) {
     await backCheck('Single-design lightbox');
+    const meta = await p.evaluate(() => ({ title: (document.querySelector('.g-detail-title') || {}).textContent || null,
+      sub: (document.querySelector('.g-detail-sub') || {}).textContent || null }));
+    check('lightbox: an unnamed design shows the artist and no title line', meta.title === null && !!meta.sub, JSON.stringify(meta));
   }
   await p.evaluate(() => { window.KIOSK_ROUTER.goHome(); });
   await wait(400);

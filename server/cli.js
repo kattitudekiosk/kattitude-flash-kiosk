@@ -8,6 +8,8 @@
  *   node server/cli.js import-supabase
  *        Copy the studio's data off Supabase onto this machine. Safe to re-run:
  *        rows are matched by id and updated, never duplicated.
+ *   node server/cli.js clear-auto-titles [--dry-run]
+ *        Clear design titles made up from file names; keep typed ones (server/titles.js).
  *   node server/cli.js backup
  *   node server/cli.js sync-supabase
  *        Pull the hosted dashboard's published sheets into KIOSK MEDIA (launchd, daily 09:15).
@@ -181,6 +183,23 @@ function status() {
         !r.artistsAdded.length && !r.artistsUpdated.length && !r.artistsHidden.length && !r.photos.length) {
       console.log(`[supabase-sync] ${db.nowIso()} up to date`);
     }
+  } else if (cmd === 'clear-auto-titles') {
+    /* 9 Oct 2026: clear design titles that were made up from a file name
+     * ("IMG 1185", "Untitled Artwork 2 web", "IMG 0709 (725b96b5)"), keep any
+     * a person typed. --dry-run lists them and changes nothing. The rule is
+     * server/titles.js — the same one the Supabase SQL follows. */
+    const dry = process.argv.includes('--dry-run');
+    const c = conn();
+    const { isAutoTitle } = require('./titles');
+    const rows = c.prepare('SELECT id, title, source_file FROM designs WHERE title IS NOT NULL').all();
+    const hit = rows.filter(r => isAutoTitle(r.title, r.source_file));
+    for (const r of hit) console.log(`  ${dry ? 'would clear' : 'cleared'}  "${r.title}"  (${r.source_file || r.id})`);
+    for (const r of rows.filter(r => !hit.includes(r))) console.log(`  kept         "${r.title}"  (${r.source_file || r.id})`);
+    if (!dry) {
+      const u = c.prepare('UPDATE designs SET title = NULL WHERE id = ?');
+      db.tx(c, () => hit.forEach(r => u.run(r.id)));
+    }
+    console.log(`${hit.length} made-up title${hit.length === 1 ? '' : 's'} ${dry ? 'would be' : ''} cleared, ${rows.length - hit.length} kept`);
   } else if (cmd === 'backup') {
     backup();
   } else if (cmd === 'status') {

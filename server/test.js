@@ -614,6 +614,59 @@ const PNG = Buffer.from('89504e470d0a1a0a0000000d4948445200000001000000010806000
       remoteArtists = null;
     }
 
+    /* ── titles: only a name the artist typed (9 Oct 2026) ── */
+    {
+      const titleOf = rel => (db.all(conn, 'designs').find(d => d.source_file === rel) || {}).title;
+      // A file dropped in by hand: no title, whatever it is called.
+      fs.writeFileSync(J('Designs', 'IMG_4242.jpg'), img(2160, 2795, 'img4242'));
+      { const t = new Date(Date.now() - 10000); fs.utimesSync(J('Designs', 'IMG_4242.jpg'), t, t); }
+      folderSync.syncOnce(conn);
+      check('a file dropped into Designs/ gets NO title (not "IMG 4242")', titleOf('Jen/Designs/IMG_4242.jpg') === null,
+        JSON.stringify(titleOf('Jen/Designs/IMG_4242.jpg')));
+      // From the dashboard: the row's own title, or none — never the file name.
+      files['/storage/v1/object/public/flash/x/t1.jpg'] = img(2160, 2795, 't1');
+      files['/storage/v1/object/public/flash/x/t2.jpg'] = img(2160, 2795, 't2');
+      catalog = [
+        { id: 'tttt1111-aaaa', artist_id: jen.id, title: null, type: 'sheet', image_url: SB + '/storage/v1/object/public/flash/x/t1.jpg' },
+        { id: 'tttt2222-bbbb', artist_id: jen.id, title: 'Rose', type: 'sheet', image_url: SB + '/storage/v1/object/public/flash/x/t2.jpg' },
+      ];
+      await sync.syncOnce(conn, opts);
+      folderSync.syncOnce(conn);
+      const relOf = id => conn.prepare('SELECT local_rel FROM synced_files WHERE remote_id = ?').get(id).local_rel;
+      check('a synced design with no name gets NO title on the Mac (not its file name "sheet (tttt1111)")',
+        titleOf(relOf('tttt1111-aaaa')) === null, JSON.stringify(titleOf(relOf('tttt1111-aaaa'))));
+      check('a synced design the artist named keeps exactly that name ("Rose", not "Rose (tttt2222)")',
+        titleOf(relOf('tttt2222-bbbb')) === 'Rose', JSON.stringify(titleOf(relOf('tttt2222-bbbb'))));
+      // Named later in the dashboard: carried over, file not re-downloaded or renamed.
+      const before = relOf('tttt1111-aaaa');
+      catalog[0].title = 'Golden Hour';
+      const rt = await sync.syncOnce(conn, opts);
+      folderSync.syncOnce(conn);
+      check('a name added later in the dashboard reaches the wall, with no re-download and the file left where it is',
+        rt.retitled.length === 1 && rt.downloaded.length === 0 && relOf('tttt1111-aaaa') === before && titleOf(before) === 'Golden Hour',
+        JSON.stringify({ retitled: rt.retitled, downloaded: rt.downloaded, title: titleOf(before) }));
+      check('a title change alone changes the cheap-check fingerprint',
+        sync.fingerprint([{ id: 'a', image_url: 'u', type: 'sheet', title: null }]) !== sync.fingerprint([{ id: 'a', image_url: 'u', type: 'sheet', title: 'Rose' }]));
+      catalog = [];
+      await sync.syncOnce(conn, opts);
+
+      // The rule, and the clean-up command.
+      const { isAutoTitle } = require('./titles');
+      const made = ['IMG 1185', 'IMG_1185', 'IMG 1185 2', 'IMG 0709 (725b96b5)', 'Untitled Artwork', 'Untitled Artwork 2 web', 'PXL_20261009_1', 'Screenshot 2026-10-09'];
+      const typed = ['Rose', 'Golden Hour', 'Ride For Life', 'IMG of a rose', 'Friday the 13th'];
+      check('made-up titles are recognised', made.every(t => isAutoTitle(t)), made.filter(t => !isAutoTitle(t)).join(', '));
+      check('typed titles are never recognised as made up', typed.every(t => !isAutoTitle(t)), typed.filter(t => isAutoTitle(t)).join(', '));
+      check('a title equal to its own file name counts as made up', isAutoTitle('Moto Is Life', 'Naomi/Designs/moto_is_life.png') && !isAutoTitle('Moto Is Life', 'Naomi/Designs/IMG_1.png'));
+      db.insertRow(conn, 'designs', { artist_id: jen.id, title: 'IMG 5555', image_url: '/x/a.jpg', published: true });
+      db.insertRow(conn, 'designs', { artist_id: jen.id, title: 'Snake & Dagger', image_url: '/x/b.jpg', published: true });
+      const { execFileSync } = require('node:child_process');
+      const out = execFileSync(process.execPath, [path.join(__dirname, 'cli.js'), 'clear-auto-titles'], { env: Object.assign({}, process.env, { KT_DATA_DIR: DATA }), encoding: 'utf8' });
+      const titles = db.all(conn, 'designs').map(d => d.title);
+      check('clear-auto-titles clears the made-up ones and keeps the typed ones',
+        !titles.includes('IMG 5555') && titles.includes('Snake & Dagger') && titles.includes('Rose') && titles.includes('Golden Hour'),
+        out.trim().split('\n').pop());
+    }
+
     /* ── triggers: the screensaver start → POST /api/sync-now ── */
     process.env.KT_SUPABASE_URL = SB; process.env.KT_SUPABASE_KEY = 'test';
     process.env.KT_CHECK_GAP_MS = '0';   // the 30s guard has its own check below

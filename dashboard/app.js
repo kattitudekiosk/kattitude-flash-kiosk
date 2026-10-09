@@ -776,7 +776,9 @@
         file, url: info.url, img: info.img,
         w, h, type: p.type, shape: p.shape,
         error: p.error,
-        title: file.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').trim(),
+        // Empty: a file name is not a name. Joshua, 9 Oct 2026: "Only add a
+        // title/name if they add it to the form when they upload."
+        title: '',
         artistId: defaultUploadArtist(state.me, state.artists, state.isAdmin),
         categories: [],
         publish: false,
@@ -855,6 +857,7 @@
 
   function queueCard(item) {
     const card = el('div', 'card item' + (item.error ? ' is-bad' : ''));
+    card.dataset.file = item.file.name;   // which file this card is (the name field starts empty)
 
     const thumb = el('img', 'item-thumb');
     thumb.src = item.url;
@@ -878,7 +881,7 @@
 
     const title = el('input', 'input');
     title.value = item.title;
-    title.placeholder = 'Title (optional)';
+    title.placeholder = 'Name (optional)';
     title.oninput = () => { item.title = title.value; };
     body.appendChild(title);
 
@@ -997,7 +1000,7 @@
     // published or not, and the categories (if any) follow.
     const { data: row, error } = await sb.from('designs').insert({
       artist_id: artistId,
-      title: item.title || null,
+      title: (item.title || '').trim() || null,   // only a name the artist typed
       type: item.type,
       image_url: urls.image_url,
       thumb_url: urls.thumb_url || null,
@@ -1054,7 +1057,7 @@
     card.appendChild(img);
 
     const body = el('div');
-    body.appendChild(el('div', 'design-title', d.title || 'Untitled'));
+    body.appendChild(el('div', 'design-title' + (d.title ? '' : ' muted'), d.title || 'No name'));
 
     const meta = el('div', 'muted small');
     const artist = state.artists.find(a => a.id === d.artist_id);
@@ -1298,7 +1301,7 @@
       img.src = d.thumb_url || d.image_url; img.loading = 'lazy';
       c.appendChild(img);
       const body = el('div');
-      body.appendChild(el('div', 'design-title', d.title || 'Untitled'));
+      body.appendChild(el('div', 'design-title' + (d.title ? '' : ' muted'), d.title || 'No name'));
       const a = state.artists.find(x => x.id === d.artist_id);
       body.appendChild(el('div', 'muted small', a ? a.name : 'Unassigned'));
       const ok = el('button', 'btn btn-primary', 'Approve');

@@ -54,7 +54,7 @@ window.Catalog = (function () {
       artistId: sheet.artistId || null,
       artistName: null,
       artistHandle: null,
-      title: sheet.title || `Flash Sheet ${i + 1}`,
+      title: sheet.title || '',   // no made-up names (9 Oct 2026)
       image: sheet.file,
       thumb: sheet.thumb || sheet.file,
       categories: Array.isArray(sheet.categories) ? sheet.categories.slice() : [],
@@ -85,7 +85,7 @@ window.Catalog = (function () {
           artistId: d.artistId || null,
           artistName: artist ? artist.name : null,
           artistHandle: artist ? artist.handle : null,
-          title: d.title || 'Untitled',
+          title: d.title || '',
           image: d.image,
           thumb: d.thumb || d.image,
           categories: Array.isArray(d.categories) ? d.categories.slice() : [],
@@ -141,7 +141,7 @@ window.Catalog = (function () {
       artistId: r.artist_id || null,
       artistName: r.artist_name || null,
       artistHandle: r.artist_handle || null,
-      title: r.title || 'Untitled',
+      title: r.title || '',   // no "Untitled": a design with no name shows none
       image: r.image_url,
       thumb: r.thumb_url || r.image_url,
       categories: Array.isArray(r.categories) ? r.categories.slice() : [],

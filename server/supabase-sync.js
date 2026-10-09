@@ -59,6 +59,10 @@ function ensureTables(conn) {
    * download a sheet. Older databases get the column here. */
   const cols = conn.prepare('PRAGMA table_info(synced_files)').all().map(c => c.name);
   if (!cols.includes('type')) conn.exec('ALTER TABLE synced_files ADD COLUMN type TEXT');
+  /* title: the design row's own title (null when the artist typed none) —
+   * 9 Oct 2026. The folder importer used to read a title back off the
+   * download's FILE name, "IMG 1185 (1af602c9)"; now it takes this. */
+  if (!cols.includes('title')) conn.exec('ALTER TABLE synced_files ADD COLUMN title TEXT');
   conn.exec('CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)');
 }
 
@@ -82,7 +86,7 @@ function combinedFingerprint(designs, artists) {
 
 function fingerprint(list) {
   return crypto.createHash('sha1')
-    .update(list.map(d => d.id + '|' + d.image_url + '|' + (d.type || '')).sort().join('\n')).digest('hex');
+    .update(list.map(d => d.id + '|' + d.image_url + '|' + (d.type || '') + '|' + (d.title || '')).sort().join('\n')).digest('hex');
 }
 
 /* The cheap "anything new?" check (Joshua, 3 Oct 2026: new uploads must show
@@ -94,7 +98,7 @@ async function remoteFingerprint(opts) {
   const key = opts.key || process.env.KT_SUPABASE_KEY || DEFAULTS.key;
   try {
     const f = opts.fetch || fetch;
-    const designs = await getJson(f, `${base}/rest/v1/kiosk_catalog?select=id,image_url,type`, key);
+    const designs = await getJson(f, `${base}/rest/v1/kiosk_catalog?select=id,image_url,type,title`, key);
     // Designs decide whether Supabase is reachable; an artists list that
     // fails on its own counts as "unknown", the same way syncOnce records it.
     let artists = null;
@@ -220,7 +224,7 @@ async function syncOnce(conn, opts) {
   const key = opts.key || process.env.KT_SUPABASE_KEY || DEFAULTS.key;
   const fetchFn = opts.fetch || fetch;
   const media = storage.mediaDir();
-  const out = { ok: false, downloaded: [], removed: [], kept: [], skipped: [], retyped: [],
+  const out = { ok: false, downloaded: [], removed: [], kept: [], skipped: [], retyped: [], retitled: [],
                 artistsAdded: [], artistsUpdated: [], artistsHidden: [], photos: [] };
   ensureTables(conn);
 
@@ -271,14 +275,23 @@ async function syncOnce(conn, opts) {
     const rel = `${folder}/Designs/${fileName(d)}`;
     const full = path.join(media, ...rel.split('/'));
     const rtype = d.type === 'design' ? 'design' : 'sheet';
-    if (have && have.remote_url === d.image_url && have.local_rel === rel && fs.existsSync(full)) {
-      /* Same file, switched between single and sheet in My Designs: no
-       * download, just carry the new type onto the wall's copy. */
+    const rtitle = (d.title && String(d.title).trim()) || null;   // the row's title; never the file's
+    /* The same image already here: no download. A title or type changed in
+     * the dashboard is carried onto the wall's copy, and the file keeps the
+     * name it was downloaded under — renaming it would re-import the design. */
+    if (have && have.remote_url === d.image_url && fs.existsSync(path.join(media, ...have.local_rel.split('/')))) {
       if ((have.type || 'sheet') !== rtype) {
         conn.prepare('UPDATE synced_files SET type = ? WHERE remote_id = ?').run(rtype, d.id);
-        conn.prepare('UPDATE designs SET type = ? WHERE source_file = ?').run(rtype, rel);
-        out.retyped.push(rel);
-        log(`${rel} is now a ${rtype === 'design' ? 'single design' : 'flash sheet'}`);
+        conn.prepare('UPDATE designs SET type = ? WHERE source_file = ?').run(rtype, have.local_rel);
+        out.retyped.push(have.local_rel);
+        log(`${have.local_rel} is now a ${rtype === 'design' ? 'single design' : 'flash sheet'}`);
+      }
+      const cur = conn.prepare('SELECT title FROM designs WHERE source_file = ?').get(have.local_rel);
+      if ((have.title || null) !== rtitle || (cur && (cur.title || null) !== rtitle)) {
+        conn.prepare('UPDATE synced_files SET title = ? WHERE remote_id = ?').run(rtitle, d.id);
+        conn.prepare('UPDATE designs SET title = ? WHERE source_file = ?').run(rtitle, have.local_rel);
+        out.retitled.push(have.local_rel);
+        log(`${have.local_rel}: name ${rtitle ? `"${rtitle}"` : 'cleared (none given)'}`);
       }
       continue;   // up to date
     }
@@ -296,15 +309,15 @@ async function syncOnce(conn, opts) {
     /* A hand-made file already sitting at this exact name is not ours to
      * overwrite. (The id in the name makes this practically impossible.) */
     if (!have && fs.existsSync(full)) { out.skipped.push(d.id); log(`skipped ${rel}: a file by that name is already there`); continue; }
-    if (have && have.local_rel !== rel) removeOurs(conn, media, have, out, 'renamed');   // title changed
+    if (have && have.local_rel !== rel) removeOurs(conn, media, have, out, 'replaced');   // a new image
     fs.mkdirSync(path.dirname(full), { recursive: true });
     const tmp = path.join(path.dirname(full), `.sync-${process.pid}-${Date.now()}`);
     fs.writeFileSync(tmp, buf);
     fs.renameSync(tmp, full);                         // atomic: the importer never sees half a file
     const old = new Date(Date.now() - 5000);          // already settled for the importer
     fs.utimesSync(full, old, old);
-    conn.prepare(`INSERT OR REPLACE INTO synced_files (remote_id, artist_id, local_rel, remote_url, md5, synced_at, type)
-                  VALUES (?,?,?,?,?,?,?)`).run(d.id, d.artist_id, rel, d.image_url, md5(buf), db.nowIso(), rtype);
+    conn.prepare(`INSERT OR REPLACE INTO synced_files (remote_id, artist_id, local_rel, remote_url, md5, synced_at, type, title)
+                  VALUES (?,?,?,?,?,?,?,?)`).run(d.id, d.artist_id, rel, d.image_url, md5(buf), db.nowIso(), rtype, rtitle);
     out.downloaded.push(rel);
     log(`downloaded ${rel} (${buf.length} bytes)`);
   }
