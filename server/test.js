@@ -662,6 +662,30 @@ const PNG = Buffer.from('89504e470d0a1a0a0000000d4948445200000001000000010806000
     delete process.env.KT_CHECK_GAP_MS;
     const t3 = await req('POST', '/api/sync-now', { headers: { 'X-Forwarded-For': '1.2.3.4' } });
     check('a sync request arriving through a tunnel is refused', t3.status === 403, t3.status);
+    /* ── hourly, for insurance (9 Oct 2026) ── */
+    {
+      process.env.KT_CHECK_GAP_MS = '0';
+      const logs = [], realLog = console.log;
+      console.log = (...a) => { logs.push(a.join(' ')); realLog(...a); };
+      const before = requests;
+      process.env.KT_HOURLY_MS = '120';
+      const timer = require('./server').startHourly(conn);
+      await new Promise(r => setTimeout(r, 420));
+      const quietRuns = logs.filter(l => /hourly check: nothing new \(Supabase saw activity\)/.test(l)).length;
+      files['/storage/v1/object/public/flash/x/h.jpg'] = img(2160, 2795, 'h');
+      catalog.push({ id: 'hhhhhhhh-8888', artist_id: jen.id, title: 'Hourly', type: 'sheet',
+                     image_url: SB + '/storage/v1/object/public/flash/x/h.jpg' });
+      await new Promise(r => setTimeout(r, 400));
+      clearInterval(timer);
+      console.log = realLog;
+      delete process.env.KT_HOURLY_MS;
+      check('the hourly check logs a line every run, "nothing new" included', quietRuns >= 2, quietRuns + ' quiet runs logged');
+      check('...and every run queries Supabase (keep-alive activity)', requests - before >= quietRuns * 2, (requests - before) + ' requests');
+      check('...and a new upload is pulled at the next hourly run, without any screensaver',
+        logs.some(l => /sync \(hourly check, something new\): 1 new/.test(l)) && fs.existsSync(J('Designs', 'Hourly (hhhhhhhh).jpg')),
+        logs.filter(l => /hourly/.test(l)).slice(-3).join(' | '));
+    }
+
     delete process.env.KT_SUPABASE_URL; delete process.env.KT_SUPABASE_KEY;
     mock.close();
   }

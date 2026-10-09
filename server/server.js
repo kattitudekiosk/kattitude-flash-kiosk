@@ -73,6 +73,41 @@ function runSync(conn, why) {
   })();
   return syncing;
 }
+/* The cheap check, shared by the screensaver ping and the hourly timer: one
+ * small request for designs + artist cards, compared with what the last sync
+ * saw; the full sync only when they differ. Every call is a real query, so it
+ * also counts as Supabase activity (free projects pause after a week without). */
+async function checkAndSync(conn, why) {
+  if (syncing) return await syncing;
+  lastCheckAt = Date.now();
+  const fp = await require('./supabase-sync').remoteFingerprint();
+  if (!fp) return { ran: false, ok: false, reason: 'Supabase unreachable — the next check tries again' };
+  if (fp === lastFingerprint) return { ran: false, ok: true, changed: false, reason: 'nothing new' };
+  return await runSync(conn, why + ', something new');
+}
+
+/* HOURLY, for insurance (Joshua, 9 Oct 2026: "can we set it up that it will
+ * run upload checks every hour please? Just for insurance?"). A timer in this
+ * server rather than a separate launchd job: launchd already keeps this
+ * process alive, and only this process remembers what the last sync saw — a
+ * separate job would have to do a FULL sync every hour. One log line per run,
+ * "nothing new" included, so the log shows it is alive. KT_HOURLY_MS
+ * overrides the hour (tests). */
+function startHourly(conn) {
+  const every = parseInt(process.env.KT_HOURLY_MS || String(60 * 60 * 1000), 10);
+  const timer = setInterval(async () => {
+    try {
+      const r = await checkAndSync(conn, 'hourly check');
+      if (!r.ran) console.log(`[studio-server] ${db.nowIso()} hourly check: ${r.reason}` +
+        (r.ok ? ' (Supabase saw activity)' : ''));
+    } catch (e) {
+      console.log(`[studio-server] ${db.nowIso()} hourly check failed: ${e.message} — next hour tries again`);
+    }
+  }, every);
+  if (timer.unref) timer.unref();
+  return timer;
+}
+
 const HOSTED_DASHBOARD = process.env.KT_DASHBOARD_URL || 'https://kattitude-flash-kiosk.vercel.app/dashboard/';
 
 /* ── static files ────────────────────────────────────────────────────── *
@@ -268,11 +303,7 @@ function makeServer(conn) {
         const gap = parseInt(process.env.KT_CHECK_GAP_MS || '30000', 10);
         const wait = lastCheckAt + gap - Date.now();
         if (wait > 0) return send(res, 200, { ran: false, reason: 'just checked', retryInMs: wait });
-        lastCheckAt = Date.now();
-        const fp = await require('./supabase-sync').remoteFingerprint();
-        if (!fp) return send(res, 200, { ran: false, ok: false, reason: 'Supabase unreachable — the next screensaver start tries again' });
-        if (fp === lastFingerprint) return send(res, 200, { ran: false, ok: true, changed: false, reason: 'nothing new' });
-        return send(res, 200, await runSync(conn, 'screensaver started, something new'));
+        return send(res, 200, await checkAndSync(conn, 'screensaver started'));
       }
 
       if (p === '/healthz') {
@@ -413,6 +444,7 @@ function start() {
   require('./folder-sync').start(conn);
   /* (c) A reboot: pull anything uploaded while the Mac was off. */
   setTimeout(() => runSync(conn, 'server start').catch(() => {}), 3000);
+  startHourly(conn);
   const server = makeServer(conn);
   server.listen(PORT, HOST, () => {
     console.log(`[studio-server] ${db.nowIso()} listening on http://${HOST}:${PORT}  data=${DATA}`);
@@ -425,4 +457,4 @@ function start() {
 
 if (require.main === module) start();
 
-module.exports = { makeServer, injected, staticPath, linkUrl, KIOSK_OVERRIDE };
+module.exports = { makeServer, injected, staticPath, linkUrl, KIOSK_OVERRIDE, startHourly };

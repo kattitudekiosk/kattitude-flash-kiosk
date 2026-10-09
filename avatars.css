@@ -20,7 +20,7 @@
  */
 
 /* ── Artist card portrait (home hub) ───────────────────────────────────
- * gallery.css already sizes this 104x104 (84x84 when the card carries a QR)
+ * gallery.css already sizes this 138x138 (112x112 when the card carries a QR)
  * and it is square in both states, so 50% is a circle and not an ellipse.
  * If either of those widths ever stops matching its height, this becomes an
  * egg — aspect-ratio below is the belt to that braces. */
@@ -40,8 +40,8 @@
  * stands to scan the code. */
 .g-artistinfo-face {
   flex: 0 0 auto;
-  width: 160px;
-  height: 160px;
+  width: 213px;    /* 33% larger, 9 Oct 2026 (Joshua): was 160px */
+  height: 213px;
   border-radius: 50%;
   overflow: hidden;
   background: rgba(255, 255, 255, 0.12);
@@ -59,7 +59,7 @@
 
 .g-artistinfo-face .g-artistinfo-initials {
   font-family: 'Bebas Neue', 'Inter', sans-serif;
-  font-size: 72px;
+  font-size: 96px;   /* grows with the photo: was 72px */
   line-height: 1;
   color: #fff;
 }

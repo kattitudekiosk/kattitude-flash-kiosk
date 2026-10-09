@@ -332,6 +332,15 @@ designs open in the detail view as a no-zoom lightbox — tap the picture or
 Back to close. The footer hint no longer mentions zoom. `tools/verify.js`
 section 1c checks it; `VERIFY_ZOOM=1` is its negative control and must fail.
 
+**[ADDED 9 Oct 2026 — Joshua: "move the back button to the bottom of the
+screen"]** Every Back on the kiosk (page headers, the single-design lightbox,
+the sheet viewer) is a large pink square button at the **bottom-right** of the
+canvas: the sheet viewer already uses the bottom-left (QR) and centre (dots).
+Gallery pages stop 144px short of the bottom so nothing sits behind it.
+`tools/verify-kiosk-layout.js` checks it is really *painted* — a screenshot
+pixel — because both bugs found while building it were a correctly placed
+button covered by something with `pointer-events: none`.
+
 ### 2. One layout everywhere — fixed canvas, scaled
 
 The entire app renders inside a fixed **1080 x 1920** canvas, CSS-scaled to the

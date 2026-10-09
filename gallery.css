@@ -115,6 +115,44 @@ body.sheets-has-back #sheetBackBtn { display: inline-flex; }
 .g-back svg { width: 22px; height: 22px; }
 .g-back.pressed { transform: translateY(-50%) scale(0.94); background: #c2156f; }
 
+/* BACK AT THE BOTTOM (9 Oct 2026 — Joshua: "move the back button to the
+ * bottom of the screen"). Every Back on the kiosk — page headers, the single-
+ * design lightbox and the sheet viewer — sits at the bottom-right of the
+ * canvas, where a hand reaches on the wall. Bottom-right because the sheet
+ * viewer already uses the bottom-left (its QR) and the bottom-centre (its
+ * dots); one position everywhere beats a different spot per page.
+ * position: fixed pins to #kioskCanvas, which is transformed (styles.css), so
+ * this is the canvas bottom on the wall and on a phone alike. Larger than
+ * before: 96px tall on a 1080 canvas. Square corners, pink, per the rules. */
+.g-back,
+.g-back.g-back-detail,
+#sheetBackBtn.g-back {
+  position: fixed;
+  left: auto;
+  top: auto;
+  right: 28px;
+  bottom: 24px;
+  transform: none;
+  z-index: 60;
+  min-width: 210px;
+  min-height: 96px;
+  padding: 0 36px 0 26px;
+  justify-content: center;
+  gap: 10px;
+  font-size: 28px;
+}
+.g-back svg { width: 32px; height: 32px; }
+/* Colour only when pressed — a transform here would make the button the
+ * containing block of the bar below and shrink it for a frame. */
+.g-back.pressed, .g-back.g-back-detail.pressed { transform: none; background: #c2156f; }
+
+/* On gallery pages the page stops 144px short of the bottom, leaving a clean
+ * strip of the gallery's own white ground for the button — so a tile or card
+ * is never behind it and the last row is never hidden. (Not a ::before on the
+ * button: inside the button's stacking context that painted OVER its pink
+ * fill and left white text on white.) The sheet viewer has its own footer. */
+body.mode-gallery #gallery:has(.g-back) { padding-bottom: 144px; box-sizing: border-box; }
+
 /* ── Scroll surfaces ──────────────────────────────────────────────────────
  * styles.css sets `touch-action: none` globally and script.js calls
  * preventDefault() on every touchmove to stop the browser claiming gestures.
@@ -260,8 +298,9 @@ body.sheets-has-back #sheetBackBtn { display: inline-flex; }
 
 .g-card-portrait {
   flex: 0 0 auto;
-  width: 104px;
-  height: 104px;
+  /* 33% larger, 9 Oct 2026 (Joshua): was 104px. */
+  width: 138px;
+  height: 138px;
   border-radius: 0;
   overflow: hidden;
   /* Portraits are drawn on a dark ground; a translucent black well keeps them
@@ -277,7 +316,7 @@ body.sheets-has-back #sheetBackBtn { display: inline-flex; }
 
 .g-card-initials {
   font-family: 'Bebas Neue', 'Inter', sans-serif;
-  font-size: 52px;
+  font-size: 69px;   /* letter circles grow with the photos: was 52px */
   color: #fff;
 }
 
@@ -543,6 +582,10 @@ body.sheets-has-back #sheetBackBtn { display: inline-flex; }
   background: linear-gradient(to bottom, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0));
   pointer-events: none;
 }
+/* Its Back now sits at the bottom of the canvas, over .g-detail-meta's white
+ * fade — same z-index, later in the DOM, so it painted over the button.
+ * The bar's layer goes above it (9 Oct 2026). */
+.g-detail-bar { z-index: 6; }
 
 .g-detail-bar > * { pointer-events: auto; }
 
@@ -788,7 +831,7 @@ body.sheets-has-back #sheetBackBtn { display: inline-flex; }
 
 /* The portrait yields first. Between a decorative headshot and a code that
    takes a customer to the artist's actual finished work, the code wins. */
-.g-card-artist.has-qr .g-card-portrait { width: 84px; height: 84px; }
+.g-card-artist.has-qr .g-card-portrait { width: 112px; height: 112px; }   /* 33% larger: was 84px */
 
 /* Dense variant — three or more columns, or short rows. The portrait and the
    style list are the first things to go: at this size they are decoration,
