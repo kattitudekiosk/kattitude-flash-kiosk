@@ -354,6 +354,11 @@ window.KIOSK_ROUTER = (function () {
     // slot beside it empty — a card that stretches to fill its row reads as a
     // different, more important kind of thing, which it is not.
     artists.forEach(a => grid.appendChild(artistCard(a, layout)));
+    // Now, once laid out, and again once the bundled fonts have loaded
+    // (Bebas Neue is narrower than its fallback).
+    fitCardLines(grid);
+    requestAnimationFrame(() => fitCardLines(grid));
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => fitCardLines(grid));
 
     // Exposed for tests and debugging: the numbers the layout was solved with.
     homeLayout = Object.assign({}, layout, {
@@ -371,6 +376,28 @@ window.KIOSK_ROUTER = (function () {
     if (snap.singleCount) parts.push(snap.singleCount + (snap.singleCount === 1 ? ' design' : ' designs'));
     if (snap.sheetCount) parts.push(snap.sheetCount + (snap.sheetCount === 1 ? ' sheet' : ' sheets'));
     return parts.join(' · ') || 'Browse everything';
+  }
+
+  /* Each card's name and handle on ONE line, never under the QR box. With the
+   * photos 33% larger (9 Oct 2026) a card's text column is ~158px on a 1080
+   * canvas, and "@delicatelyscripted" at 18px needs ~200: it ran under the QR.
+   * A handle has no spaces, so wrapping would break it mid-word; instead the
+   * line that does not fit steps its own font size down until it does (to a
+   * floor), and every line that already fits keeps its size. Measured in
+   * canvas pixels, so it is the same on the wall and on a phone. */
+  function fitCardLines(root) {
+    const lines = root.querySelectorAll('.g-card-artist .g-card-name, .g-card-artist .g-card-handle');
+    lines.forEach(line => {
+      line.style.fontSize = '';
+      const box = line.parentElement;
+      if (!box || !box.clientWidth) return;
+      let size = parseFloat(getComputedStyle(line).fontSize) || 18;
+      const floor = line.classList.contains('g-card-name') ? 24 : 12;
+      while (line.scrollWidth > box.clientWidth && size > floor) {
+        size -= 1;
+        line.style.fontSize = size + 'px';
+      }
+    });
   }
 
   function artistCard(a, layout) {

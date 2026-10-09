@@ -119,6 +119,22 @@ async function run(W, H) {
   check(`artist-card photos are ${want}px on the 1080 canvas (×1.33)`,
     cards.length > 0 && cards.every(c => Math.abs(c.portrait / scale - want) < 1.5), cards.map(c => Math.round(c.portrait / scale)).join(','));
   check('artist cards: no overflow, photo and QR never overlap', cards.every(c => !c.overflow && !c.overlap));
+  await wait(600);   // fonts settle; the fit re-runs
+  const text = await p.evaluate(() => [...document.querySelectorAll('.g-card-artist')].flatMap(c => {
+    const q = c.querySelector('.g-card-qr'); const qr = q && q.getBoundingClientRect();
+    return [...c.querySelectorAll('.g-card-name, .g-card-handle')].map(l => {
+      const r = l.getBoundingClientRect();
+      // The line's own content width, not the box: text that runs on past the box is what slid under the QR.
+      const k = r.width / (l.offsetWidth || 1);   // canvas scale: screen px per layout px
+      return { t: l.textContent, underQr: !!(qr && r.left + l.scrollWidth * k > qr.left + 1),
+               clipped: l.scrollWidth > l.parentElement.clientWidth + 1, size: parseFloat(getComputedStyle(l).fontSize) };
+    });
+  }));
+  const bad = text.filter(x => x.underQr || x.clipped);
+  check('no artist name or handle runs under the QR box or is cut off', bad.length === 0,
+    bad.map(x => `${x.t} (${x.size}px${x.underQr ? ', under QR' : ''}${x.clipped ? ', cut off' : ''})`).join('; '));
+  check('handles stay readable (never shrunk below 12px on the canvas)', text.every(x => x.size / scale >= 11.5),
+    text.map(x => x.t + ' ' + Math.round(x.size / scale) + 'px').join(', '));
 
   await p.evaluate(() => { window.KIOSK_ROUTER.goHome(); });
   await wait(400);

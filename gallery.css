@@ -334,6 +334,7 @@ body.mode-gallery #gallery:has(.g-back) { padding-bottom: 144px; box-sizing: bor
 }
 
 .g-card-handle {
+  white-space: nowrap;   /* one line; gallery.js fitCardLines() shrinks a long one */
   font-size: 18px;
   color: rgba(255, 255, 255, 0.92);
   font-weight: 600;
