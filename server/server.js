@@ -60,10 +60,14 @@ function runSync(conn, why) {
       const r = await require('./supabase-sync').syncOnce(conn);
       if (r.ok) lastFingerprint = r.fingerprint;
       const fs2 = require('./folder-sync').syncOnce(conn);   // import what arrived, now
-      const changed = !!(r.ok && (r.downloaded.length || r.removed.length || (r.retyped || []).length));
+      const artistChanges = (r.artistsAdded || []).length + (r.artistsUpdated || []).length +
+                            (r.artistsHidden || []).length + (r.photos || []).length;
+      const changed = !!(r.ok && (r.downloaded.length || r.removed.length || (r.retyped || []).length || artistChanges));
       console.log(`[studio-server] ${db.nowIso()} sync (${why}): ` +
         (r.ok ? `${r.downloaded.length} new, ${r.removed.length} removed` +
-          ((r.retyped || []).length ? `, ${r.retyped.length} switched single/sheet` : '') : 'offline, will retry at the next trigger'));
+          ((r.retyped || []).length ? `, ${r.retyped.length} switched single/sheet` : '') +
+          (artistChanges ? `, artists: ${[].concat(r.artistsAdded.map(n => '+' + n), r.artistsUpdated, r.artistsHidden.map(n => n + ' off the wall'), r.photos).join('; ')}` : '')
+          : 'offline, will retry at the next trigger'));
       return { ran: true, ok: r.ok, changed, imported: (fs2.imported || []).length };
     } finally { syncing = null; }
   })();

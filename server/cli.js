@@ -172,11 +172,13 @@ function status() {
     await importSupabase();
   } else if (cmd === 'sync-supabase') {
     /* Run by launchd once a day (com.kattitude.studio-sync). Pulls the
-     * hosted dashboard's published sheets into KIOSK MEDIA; see
+     * hosted dashboard's published sheets, artist cards and headshots into
+     * KIOSK MEDIA and this Mac's database; see
      * server/supabase-sync.js. Exits 0 even when offline — it just retries. */
     const c = conn();
     const r = await require('./supabase-sync').syncOnce(c);
-    if (r.ok && !r.downloaded.length && !r.removed.length && !r.kept.length) {
+    if (r.ok && !r.downloaded.length && !r.removed.length && !r.kept.length &&
+        !r.artistsAdded.length && !r.artistsUpdated.length && !r.artistsHidden.length && !r.photos.length) {
       console.log(`[supabase-sync] ${db.nowIso()} up to date`);
     }
   } else if (cmd === 'backup') {

@@ -403,10 +403,15 @@ const PNG = Buffer.from('89504e470d0a1a0a0000000d4948445200000001000000010806000
       return Buffer.concat([fs.readFileSync(f), Buffer.from(label)]);
     };
     let catalog = [], files = {}, down = false, requests = 0;
+    let remoteArtists = null;   // null = this stand-in has no artists list (404), as before
     const mock = http.createServer((q, r) => {
       requests++;
       if (down) { r.socket.destroy(); return; }
       if (q.url.startsWith('/rest/v1/kiosk_catalog')) { r.writeHead(200, { 'Content-Type': 'application/json' }); return r.end(JSON.stringify(catalog)); }
+      if (q.url.startsWith('/rest/v1/artists')) {
+        if (remoteArtists === null) { r.writeHead(404); return r.end(); }
+        r.writeHead(200, { 'Content-Type': 'application/json' }); return r.end(JSON.stringify(remoteArtists));
+      }
       const f = files[q.url];
       if (f) { r.writeHead(200, { 'Content-Type': 'image/jpeg' }); return r.end(f); }
       r.writeHead(404); r.end();
@@ -529,8 +534,89 @@ const PNG = Buffer.from('89504e470d0a1a0a0000000d4948445200000001000000010806000
     catalog = [];
     await sync.syncOnce(conn, opts);
 
+    /* ── artists and headshots (9 Oct 2026: "When does the Kiosk refresh profile pics?") ── */
+    {
+      const others = db.all(conn, 'artists').filter(a => a.id !== jen.id);
+      const pub = a => ({ id: a.id, name: a.name, handle: a.handle || null, bio: a.bio || null,
+        instagram_url: a.instagram_url || null, seniority: a.seniority || null, display_order: a.display_order,
+        portrait_url: null, portrait_thumb_url: null });
+      const NEW_ID = '11111111-2222-4333-8444-555555555555';
+      files[`/storage/v1/object/public/avatars/${jen.id}/avatar-a1.webp`] = Buffer.from('jen-photo-big');
+      files[`/storage/v1/object/public/avatars/${jen.id}/avatar-a1-sm.webp`] = Buffer.from('jen-photo-small');
+      remoteArtists = [...others.map(pub),
+        Object.assign(pub(jen), { handle: '@jen.new', display_order: 2,
+          portrait_url: `${SB}/storage/v1/object/public/avatars/${jen.id}/avatar-a1.webp`,
+          portrait_thumb_url: `${SB}/storage/v1/object/public/avatars/${jen.id}/avatar-a1-sm.webp` }),
+        { id: NEW_ID, name: 'Newbie', handle: '@newbie', bio: null, instagram_url: 'https://instagram.com/newbie',
+          seniority: 'Junior Artist', display_order: 9, portrait_url: null, portrait_thumb_url: null }];
+      const a1 = await sync.syncOnce(conn, opts);
+      const J2 = db.getByKey(conn, 'artists', [jen.id]);
+      const nb = db.getByKey(conn, 'artists', [NEW_ID]);
+      check('a new artist added in the dashboard appears on the Mac with the SAME id',
+        nb && nb.name === 'Newbie' && nb.handle === '@newbie' && nb.kiosk_visible && a1.artistsAdded.includes('Newbie'), JSON.stringify(a1.artistsAdded));
+      check('...with their KIOSK MEDIA folders made', fs.existsSync(path.join(media, 'Newbie', 'Designs')) && fs.existsSync(path.join(media, 'Newbie', 'Headshots')));
+      check('a changed handle / order reaches the Mac\'s card', J2.handle === '@jen.new' && J2.display_order === 2, JSON.stringify({ h: J2.handle, o: J2.display_order }));
+      check('a new profile photo is downloaded into <Artist>/Headshots, byte for byte',
+        fs.readFileSync(J('Headshots', 'avatar-a1.webp'), 'utf8') === 'jen-photo-big' &&
+        fs.readFileSync(J('Headshots', 'avatar-a1-sm.webp'), 'utf8') === 'jen-photo-small');
+      check('...and the card points at it, as a path (never a host)',
+        J2.portrait_url === `/storage/v1/object/public/avatars/${jen.id}/avatar-a1.webp` &&
+        J2.portrait_thumb_url === `/storage/v1/object/public/avatars/${jen.id}/avatar-a1-sm.webp`, J2.portrait_url);
+      const pr = await req('GET', `/storage/v1/object/public/avatars/${jen.id}/avatar-a1.webp`);
+      check('...and the wall can load it from this server', pr.status === 200 && pr.text === 'jen-photo-big', pr.status);
+
+      const a2 = await sync.syncOnce(conn, opts);
+      check('nothing changed → no artist changes, no re-download', !a2.artistsAdded.length && !a2.artistsUpdated.length && !a2.photos.length && !a2.artistsHidden.length,
+        JSON.stringify([a2.artistsAdded, a2.artistsUpdated, a2.photos, a2.artistsHidden]));
+
+      // Photo changed again
+      files[`/storage/v1/object/public/avatars/${jen.id}/avatar-b2.webp`] = Buffer.from('jen-photo-2');
+      remoteArtists.find(a => a.id === jen.id).portrait_url = `${SB}/storage/v1/object/public/avatars/${jen.id}/avatar-b2.webp`;
+      remoteArtists.find(a => a.id === jen.id).portrait_thumb_url = null;
+      await sync.syncOnce(conn, opts);
+      check('a replaced photo replaces the card\'s photo', db.getByKey(conn, 'artists', [jen.id]).portrait_url.endsWith('/avatar-b2.webp') &&
+        fs.readFileSync(J('Headshots', 'avatar-b2.webp'), 'utf8') === 'jen-photo-2');
+
+      // Taken off the wall in the dashboard: no longer in the public list.
+      remoteArtists = remoteArtists.filter(a => a.id !== NEW_ID);
+      const a3 = await sync.syncOnce(conn, opts);
+      check('an artist taken off the wall (or made inactive) is hidden on the Mac — not deleted',
+        a3.artistsHidden.includes('Newbie') && db.getByKey(conn, 'artists', [NEW_ID]) && !db.getByKey(conn, 'artists', [NEW_ID]).kiosk_visible);
+      remoteArtists.push({ id: NEW_ID, name: 'Newbie', handle: '@newbie', bio: null, instagram_url: 'https://instagram.com/newbie',
+        seniority: 'Junior Artist', display_order: 9, portrait_url: null, portrait_thumb_url: null });
+      await sync.syncOnce(conn, opts);
+      check('...and comes back when they are put back', db.getByKey(conn, 'artists', [NEW_ID]).kiosk_visible === true);
+
+      // Renamed in the dashboard → the folder moves with them.
+      remoteArtists.find(a => a.id === NEW_ID).name = 'Newbie Ink';
+      await sync.syncOnce(conn, opts);
+      check('a renamed artist\'s KIOSK MEDIA folder is renamed with them',
+        db.getByKey(conn, 'artists', [NEW_ID]).name === 'Newbie Ink' && fs.existsSync(path.join(media, 'Newbie Ink', 'Headshots')) &&
+        !fs.existsSync(path.join(media, 'Newbie')));
+
+      // An outage that returns an empty list must not wipe the wall.
+      const keep = remoteArtists; remoteArtists = [];
+      const a4 = await sync.syncOnce(conn, opts);
+      check('an EMPTY artist list hides nobody', a4.artistsHidden.length === 0 && db.getByKey(conn, 'artists', [jen.id]).kiosk_visible);
+      remoteArtists = keep;
+
+      // The cheap check sees a photo change on its own.
+      process.env.KT_SUPABASE_URL = SB; process.env.KT_SUPABASE_KEY = 'test'; process.env.KT_CHECK_GAP_MS = '0';
+      await req('POST', '/api/sync-now');                       // settle on the current state
+      const quiet = await req('POST', '/api/sync-now');
+      files[`/storage/v1/object/public/avatars/${jen.id}/avatar-c3.webp`] = Buffer.from('jen-photo-3');
+      remoteArtists.find(a => a.id === jen.id).portrait_url = `${SB}/storage/v1/object/public/avatars/${jen.id}/avatar-c3.webp`;
+      const loud = await req('POST', '/api/sync-now');
+      check('a screensaver start notices a photo change alone and syncs it',
+        quiet.json.reason === 'nothing new' && loud.json.ran && loud.json.changed &&
+        db.getByKey(conn, 'artists', [jen.id]).portrait_url.endsWith('/avatar-c3.webp'), JSON.stringify([quiet.json, loud.json]));
+      delete process.env.KT_SUPABASE_URL; delete process.env.KT_SUPABASE_KEY; delete process.env.KT_CHECK_GAP_MS;
+      remoteArtists = null;
+    }
+
     /* ── triggers: the screensaver start → POST /api/sync-now ── */
     process.env.KT_SUPABASE_URL = SB; process.env.KT_SUPABASE_KEY = 'test';
+    process.env.KT_CHECK_GAP_MS = '0';   // the 30s guard has its own check below
     files['/storage/v1/object/public/flash/x/c.jpg'] = img(2160, 2795, 'c');
     catalog = [{ id: 'cccccccc-3333', artist_id: jen.id, title: 'From phone', type: 'sheet',
                  image_url: SB + '/storage/v1/object/public/flash/x/c.jpg' }];
@@ -545,8 +631,9 @@ const PNG = Buffer.from('89504e470d0a1a0a0000000d4948445200000001000000010806000
     process.env.KT_CHECK_GAP_MS = '0';
     const r0 = requests;
     const t2 = await req('POST', '/api/sync-now');
-    check('a screensaver start with nothing new makes ONE small request and downloads nothing',
-      t2.status === 200 && t2.json.ran === false && t2.json.reason === 'nothing new' && requests - r0 === 1,
+    // Two small requests since 9 Oct 2026: the designs list and the artist cards.
+    check('a screensaver start with nothing new makes TWO small requests (designs, artists) and downloads nothing',
+      t2.status === 200 && t2.json.ran === false && t2.json.reason === 'nothing new' && requests - r0 === 2,
       t2.text + ' requests ' + (requests - r0));
 
     // Naomi's case: something is published straight after a sync. The very

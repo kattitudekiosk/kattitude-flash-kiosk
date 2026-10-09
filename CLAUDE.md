@@ -149,6 +149,15 @@ gets one injected script tag; served by Vercel, nothing changes.
 - **[STALE — the wall moved to the Mac mini on 2 Oct 2026.]** The wall is NOT on it yet. It still loads production from Vercel. Moving
   it is a production change and waits for Joshua.
 
+- **[ADDED 9 Oct 2026] The sync carries artist cards and headshots, not just
+  designs.** Every trigger (screensaver cheap check, daily 09:15, server start)
+  reads the public artist list first: new artists are added on the Mac with
+  the same id and their folders made; name, handle, bio, Instagram,
+  seniority and order follow (a rename moves the folder); a new photo is
+  downloaded into `<Artist>/Headshots` and the card points at it as a path;
+  an artist missing from the list (inactive or off the wall) is set
+  `kiosk_visible = false` on the Mac, never deleted, and an empty list hides
+  nobody. Before this, Kat's first profile photo never reached the wall.
 **[CORRECTED 2 Oct 2026] — the wall runs Chrome, not Safari.** The Hardware
 table above says Safari. As found on 2 Oct 2026, launchd agent
 `com.kattitude.kiosk.chrome` runs `~/kiosk-setup/chrome-kiosk.sh`, which

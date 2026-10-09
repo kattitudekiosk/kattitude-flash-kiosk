@@ -73,6 +73,13 @@ function fileName(d) {
 /* What the catalog looks like from here: every published design's id, image
  * and type. Changes when anything is published, unpublished, deleted,
  * re-uploaded or switched between single and sheet — and only then. */
+/* Designs AND the artist cards: a new photo, a renamed artist or someone
+ * taken off the wall changes it, so the next screensaver start syncs. */
+function combinedFingerprint(designs, artists) {
+  return crypto.createHash('sha1').update(fingerprint(designs) + '\n' + (artists
+    ? artists.map(a => JSON.stringify(a)).sort().join('\n') : 'artists: unavailable')).digest('hex');
+}
+
 function fingerprint(list) {
   return crypto.createHash('sha1')
     .update(list.map(d => d.id + '|' + d.image_url + '|' + (d.type || '')).sort().join('\n')).digest('hex');
@@ -86,7 +93,13 @@ async function remoteFingerprint(opts) {
   const base = (opts.url || process.env.KT_SUPABASE_URL || DEFAULTS.url).replace(/\/+$/, '');
   const key = opts.key || process.env.KT_SUPABASE_KEY || DEFAULTS.key;
   try {
-    return fingerprint(await getJson(opts.fetch || fetch, `${base}/rest/v1/kiosk_catalog?select=id,image_url,type`, key));
+    const f = opts.fetch || fetch;
+    const designs = await getJson(f, `${base}/rest/v1/kiosk_catalog?select=id,image_url,type`, key);
+    // Designs decide whether Supabase is reachable; an artists list that
+    // fails on its own counts as "unknown", the same way syncOnce records it.
+    let artists = null;
+    try { artists = await getJson(f, `${base}/rest/v1/${ARTISTS_Q}`, key); } catch (e) { artists = null; }
+    return combinedFingerprint(designs, artists);
   } catch (e) { return null; }
 }
 
@@ -98,6 +111,108 @@ async function getJson(fetchFn, url, key) {
   return j;
 }
 
+/* ── Artists and headshots (Joshua, 9 Oct 2026: "When does the Kiosk refresh
+ * profile pics?") ──────────────────────────────────────────────────────────
+ * The wall's artist cards come from THIS Mac's database, and the sync used to
+ * pull designs only — so Kat's new photo, Ally coming off the wall, and any
+ * artist added in the dashboard never arrived. Now every sync reads the
+ * public artist list first:
+ *   - a new artist is added here with the SAME id, and their folders made;
+ *   - display fields follow (a new name renames their KIOSK MEDIA folder);
+ *   - a new or changed photo is downloaded into <Artist>/Headshots and the
+ *     card points at it (stored as a path, like every photo here);
+ *   - an artist no longer in the list (inactive, or taken off the wall) is
+ *     set kiosk_visible = false here. Nothing is deleted; they come back if
+ *     they reappear. An EMPTY list hides nobody — that is an outage, not a
+ *     studio with no artists.
+ * The public key reads only what the kiosk may show (no email, role or login)
+ * and only active, on-the-wall artists — exactly the people the wall shows. */
+const ARTIST_COLS = ['name', 'handle', 'bio', 'instagram_url', 'seniority', 'display_order'];
+const ARTISTS_Q = `artists?select=id,${ARTIST_COLS.join(',')},portrait_url,portrait_thumb_url&order=display_order`;
+
+function photoFile(u) {
+  if (!u) return null;
+  const f = decodeURIComponent(String(u).split('?')[0].split('/').pop() || '');
+  return /^[A-Za-z0-9._-]+$/.test(f) && f !== '.' && f !== '..' ? f : null;   // a bare file name, nothing else
+}
+function same(a, b) {
+  if ((a === null || a === undefined || a === '') && (b === null || b === undefined || b === '')) return true;
+  return String(a) === String(b);
+}
+
+async function syncPhoto(conn, r, out, fetchFn) {
+  const local = db.getByKey(conn, 'artists', [r.id]);
+  const want = photoFile(r.portrait_url), wantSm = photoFile(r.portrait_thumb_url);
+  if (want === photoFile(local.portrait_url) && wantSm === photoFile(local.portrait_thumb_url)) return;
+  if (!want) {
+    db.updateRow(conn, 'artists', [r.id], { portrait_url: null, portrait_thumb_url: null });
+    out.photos.push(`${local.name}: photo removed`);
+    log(`${local.name}: photo removed`);
+    return;
+  }
+  const folder = storage.folderName(local.name);
+  const dir = path.join(storage.mediaDir(), folder, 'Headshots');
+  fs.mkdirSync(dir, { recursive: true });
+  for (const [url, file] of [[r.portrait_url, want], [r.portrait_thumb_url, wantSm]]) {
+    if (!file) continue;
+    try {
+      const res = await fetchFn(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const buf = Buffer.from(await res.arrayBuffer());
+      const tmp = path.join(dir, `.sync-${process.pid}-${Date.now()}`);
+      fs.writeFileSync(tmp, buf);
+      fs.renameSync(tmp, path.join(dir, file));
+    } catch (e) {
+      log(`could not download ${local.name}'s photo (${e.message}) — card unchanged, will retry next run`);
+      return;
+    }
+  }
+  const p = f => (f ? `/storage/v1/object/public/avatars/${r.id}/${f}` : null);
+  db.updateRow(conn, 'artists', [r.id], { portrait_url: p(want), portrait_thumb_url: p(wantSm) });
+  out.photos.push(`${local.name}: new photo`);
+  log(`${local.name}: new photo → ${folder}/Headshots/${want}`);
+}
+
+async function syncArtists(conn, base, key, fetchFn, out) {
+  let remote;
+  try { remote = await getJson(fetchFn, `${base}/rest/v1/${ARTISTS_Q}`, key); }
+  catch (e) { log(`artists: ${e.message} — cards unchanged, will retry next run`); return; }
+  out._artistsRemote = remote;
+  const seen = new Set();
+  for (const r of remote) {
+    if (!r || !r.id || !r.name) continue;
+    seen.add(r.id);
+    const local = db.getByKey(conn, 'artists', [r.id]);
+    if (!local) {
+      const row = { id: r.id, role: 'artist', active: true, kiosk_visible: true };
+      ARTIST_COLS.forEach(c => { if (r[c] !== undefined && r[c] !== null) row[c] = r[c]; });
+      db.insertRow(conn, 'artists', row);
+      storage.ensureArtistFolders([r.name]);
+      out.artistsAdded.push(r.name);
+      log(`new artist ${r.name} — folders made in KIOSK MEDIA`);
+    } else {
+      const patch = {};
+      ARTIST_COLS.forEach(c => { if (r[c] !== undefined && !same(local[c], r[c])) patch[c] = r[c]; });
+      if (!local.kiosk_visible) patch.kiosk_visible = true;   // back on the wall
+      if (patch.name) storage.renameArtistFolder(local.name, patch.name);
+      if (Object.keys(patch).length) {
+        db.updateRow(conn, 'artists', [r.id], patch);
+        out.artistsUpdated.push(`${r.name} (${Object.keys(patch).join(', ')})`);
+        log(`${r.name}: ${Object.keys(patch).join(', ')} updated`);
+      }
+    }
+    await syncPhoto(conn, r, out, fetchFn);
+  }
+  if (!remote.length) { log('artists: the public list came back empty — hiding nobody'); return; }
+  for (const a of db.all(conn, 'artists')) {
+    if (!seen.has(a.id) && a.kiosk_visible) {
+      db.updateRow(conn, 'artists', [a.id], { kiosk_visible: false });
+      out.artistsHidden.push(a.name);
+      log(`${a.name} is no longer on the wall (inactive or hidden in the dashboard)`);
+    }
+  }
+}
+
 /* One sync pass. Returns a summary; never throws on network trouble. */
 async function syncOnce(conn, opts) {
   opts = opts || {};
@@ -105,8 +220,13 @@ async function syncOnce(conn, opts) {
   const key = opts.key || process.env.KT_SUPABASE_KEY || DEFAULTS.key;
   const fetchFn = opts.fetch || fetch;
   const media = storage.mediaDir();
-  const out = { ok: false, downloaded: [], removed: [], kept: [], skipped: [], retyped: [] };
+  const out = { ok: false, downloaded: [], removed: [], kept: [], skipped: [], retyped: [],
+                artistsAdded: [], artistsUpdated: [], artistsHidden: [], photos: [] };
   ensureTables(conn);
+
+  // Artists first: a design can only land in the folder of an artist this
+  // Mac knows, and a renamed artist's folder must move before files arrive.
+  await syncArtists(conn, base, key, fetchFn, out);
 
   let remote;
   try {
@@ -118,7 +238,7 @@ async function syncOnce(conn, opts) {
     return out;
   }
   out.ok = true;
-  out.fingerprint = fingerprint(remote);
+  out.fingerprint = combinedFingerprint(remote, out._artistsRemote || null);
 
   /* Keep-alive: the query above reached Postgres. Log the first one a day. */
   const today = db.nowIso().slice(0, 10);
@@ -211,4 +331,4 @@ function removeOurs(conn, media, s, out, why) {
   conn.prepare('DELETE FROM synced_files WHERE remote_id = ?').run(s.remote_id);
 }
 
-module.exports = { syncOnce, fileName, remoteFingerprint, fingerprint, ensureTables };
+module.exports = { syncOnce, fileName, remoteFingerprint, fingerprint, combinedFingerprint, ensureTables };
