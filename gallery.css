@@ -798,15 +798,17 @@ body.mode-gallery #gallery:has(.g-back) { padding-bottom: 144px; box-sizing: bor
  * is the real path. The QR is for the wall. */
 .g-card-qr {
   flex: 0 0 auto;
-  width: 180px;
-  height: 180px;
-  /* 19px, not a round 10. The QR spec requires a quiet zone of 4 blank
-     modules on every side or decoders are entitled to fail, and the white
-     padding IS the quiet zone here — the SVG viewBox is the bare 29x29
-     matrix with no margin of its own. At 180px total, 19px of padding leaves
-     a 141px code, so one module is 4.9px and the padding is exactly 4
-     modules. Change the width and this has to change with it. */
-  padding: 19px;
+  /* 168px, was 180 (Joshua, 9 Oct 2026: "make the QR codes a bit smaller to
+     make those profile pics fit on the same line"). The QR spec requires a
+     quiet zone of 4 blank modules on every side, and the white padding IS the
+     quiet zone — the SVG viewBox is the bare matrix. Card codes are 33 or 37
+     modules (an Instagram URL at error correction H). 17px of padding leaves
+     a 134px code: 4.1px/module and 4.1 modules of quiet zone for a 33-module
+     code, 3.6px and 4.7 for a 37. Change the width and this has to change
+     with it — tools/verify-qr.py decodes it at this size and fails under 4. */
+  width: 168px;
+  height: 168px;
+  padding: 17px;
   background: #fff;
   /* Container rounding only. Rounding the individual MODULES was the other
      option and it is the more designed look, but it eats into each dark
@@ -833,6 +835,10 @@ body.mode-gallery #gallery:has(.g-back) { padding-bottom: 144px; box-sizing: bor
 /* The portrait yields first. Between a decorative headshot and a code that
    takes a customer to the artist's actual finished work, the code wins. */
 .g-card-artist.has-qr .g-card-portrait { width: 112px; height: 112px; }   /* 33% larger: was 84px */
+/* A QR card is tight: photo + text + code across ~518px. 4px less padding at
+ * each side and 4px less in each gap give the name and handle back the 186px
+ * they had before the photos grew, so handles fit at full size again. */
+.g-card-artist.has-qr { gap: 12px; padding: 14px 14px; }
 
 /* Dense variant — three or more columns, or short rows. The portrait and the
    style list are the first things to go: at this size they are decoration,

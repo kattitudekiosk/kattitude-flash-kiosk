@@ -32,7 +32,7 @@ import numpy as np
 PPI = 68.8
 SURFACES = [
     ("detail panel", 260, 28),
-    ("artist card", 180, 19),
+    ("artist card", 168, 17),   # 168px since 9 Oct 2026 (was 180/19)
     ("sheet corner", 138, 15),
 ]
 EXPECTED_GALLERY_URL = "https://kattitude-flash-kiosk.vercel.app"   # Kat's Vercel

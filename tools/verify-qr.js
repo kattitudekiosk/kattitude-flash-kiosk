@@ -162,7 +162,7 @@ async function bareViewerQr(html) {
     if (!a || !a.instagram) return null;
     if (!svg) return { artist: a.name + ' card', error: 'no card QR rendered' };
     return { artist: a.name + ' card', expected: a.instagram, svg: svg.outerHTML,
-             size: parseInt(svg.getAttribute('viewBox').split(' ')[2], 10), cssPx: 180, padPx: 19 };
+             size: parseInt(svg.getAttribute('viewBox').split(' ')[2], 10), cssPx: 168, padPx: 17 };   // the card QR box, gallery.css
   }).filter(Boolean);
 
   window.KIOSK_ROUTER.goHome();
