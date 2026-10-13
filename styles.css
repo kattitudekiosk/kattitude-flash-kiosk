@@ -16,16 +16,24 @@
  * would fire on a demo laptop and a phone alike while missing the actual
  * distinction, which is exactly the mistake the deleted QR media query made
  * further down this file.
+ *
+ * [13 Oct 2026 — Joshua: "I don't want to see an arrow or a hand when the
+ * kiosk is open."] The wall Mac DOES report a fine pointer — Touch Up drives
+ * the system mouse, and a trackpad is paired — so the query above showed the
+ * cursor on the wall itself. The wall is now told apart by WHERE the page is
+ * served from: the studio server's injected studio-server.js adds
+ * `kiosk-wall` to <html> on localhost only. There the cursor is always none;
+ * the public phone page on Vercel (and the tunnel) keep the rules below.
  */
 * { cursor: none !important; }
 
 @media (hover: hover) and (pointer: fine) {
-  * { cursor: auto !important; }
+  html:not(.kiosk-wall) * { cursor: auto !important; }
   /* `auto` on a <button> is an arrow, and the chevrons and dots are divs that
      would otherwise offer no affordance at all. */
-  a, button, .nav-btn, .dot, .qr-badge, [role="button"] { cursor: pointer !important; }
-  .stage { cursor: grab !important; }
-  .stage.dragging { cursor: grabbing !important; }
+  html:not(.kiosk-wall) :is(a, button, .nav-btn, .dot, .qr-badge, [role="button"]) { cursor: pointer !important; }
+  html:not(.kiosk-wall) .stage { cursor: grab !important; }
+  html:not(.kiosk-wall) .stage.dragging { cursor: grabbing !important; }
 }
 
 /* ─── Variables ─────────────────────────────────────────────────────────── */

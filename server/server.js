@@ -173,6 +173,9 @@ function injected(rel, html) {
 const KIOSK_OVERRIDE = `/* Served by the Kattitude studio server (server/server.js), not a file in the repo.
    Points the kiosk at the catalog on this Mac mini instead of Supabase. */
 (function () {
+  /* The wall: no pointer, ever (styles.css, top). Localhost only, so the
+     same page opened through a tunnel on somebody's laptop keeps its cursor. */
+  if (/^(localhost|127\\.0\\.0\\.1|\\[::1\\])$/.test(location.hostname)) document.documentElement.classList.add('kiosk-wall');
   var c = window.KIOSK_CONFIG;
   if (!c) return;
   c.catalogSource = 'live';
