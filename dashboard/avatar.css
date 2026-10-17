@@ -115,3 +115,14 @@
   box-shadow: 0 0 0 999px rgba(255, 255, 255, 0.72) inset;
   border-radius: 50%;
 }
+
+/* The photo, as saved — fetched back from storage, so what the artist sees
+ * here is what the wall will download. A circle, like every avatar. */
+.saved-photo { margin-top: 16px; text-align: center; }
+.saved-img {
+  width: 200px; height: 200px;
+  max-width: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  background: #f7f7f7;
+}

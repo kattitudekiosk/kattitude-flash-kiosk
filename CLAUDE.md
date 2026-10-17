@@ -78,6 +78,7 @@ Live URLs live in `LINKS.md`. Keep it current.
 | Kiosk artist headshots (circles, Follow panel) | `avatars.css`, `avatars.js` |
 | **Dashboard** Supabase URL, key, image spec | `dashboard/config.js` |
 | Dashboard headshot upload + crop confirm | `dashboard/avatar.js`, `dashboard/my-avatar.js` |
+| Reading / encoding phone photos (HEIC, iCloud, size limits) | `dashboard/image-read.js` |
 | Dashboard guided tutorial (per role) | `dashboard/tour.js`, `dashboard/tour.css` |
 | Dashboard category tagging (collapsed chips + picker) | `dashboard/tag-ui.js`, `dashboard/tag-ui.css` |
 | Dashboard corner radius — the only place it is decided | `dashboard/square.css` |
@@ -198,6 +199,29 @@ after this so you can unlock it."*
   Miranda, Jen, Naomi, Ally, Alena, Marissa), not to Kat and not to Joshua.
 - Still true: an agent sends email only when asked to, in so many words, for
   named people. Inviting someone is a message on the studio's behalf.
+
+## PHONE PHOTO UPLOADS — **[ADDED 17 Oct 2026]**
+
+Miranda (iPhone, Chrome) picked a camera-roll photo as her profile picture
+and nothing happened; Supabase saw no request. Cause: a 4 MB cap on the
+PICKED file (camera-roll photos are bigger; the 1024×1024 upload never is),
+reported in a toast drawn UNDER the photo sheet. Also found: iOS cannot
+encode WebP from a canvas, so every iPhone avatar was a PNG named `.webp`.
+
+- **Read photos with `ImageRead.load` (`dashboard/image-read.js`)**: `<img>` +
+  `decode()`, then `createImageBitmap`, with a timeout; HEIC opens where
+  WebKit can and is refused in words elsewhere; a 0-byte file is an iCloud
+  placeholder. `accept="image/*"`.
+- **Size limits apply to what is uploaded, after resizing** (`avatars` 5 MB,
+  `flash` 50 MB and JPEG/PNG/WebP only — a HEIC original is kept as a JPEG).
+  `ImageRead.encode` checks the blob it really got and names the file by it.
+- **Every outcome is shown where the artist is looking and stays there**:
+  the sheet's / upload card's status line (busy + spinner, saved, or what
+  went wrong and what to do). A toast alone is never the report. The photo
+  sheet closes only on Cancel / Done / Escape — never a backdrop tap.
+- `tools/verify-photo-uploads.js`: Chrome + WebKit at 390×844, a real HEIC,
+  a >4 MB JPEG, screenshots of every state; `VERIFY_PHOTO_OLD=1` serves
+  origin/main and must fail.
 
 ## EVIDENCE RULE — every task, no exceptions
 

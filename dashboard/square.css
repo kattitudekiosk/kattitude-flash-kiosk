@@ -48,6 +48,7 @@
 .avatar,
 .avatar-btn:focus-visible,      /* the focus ring has to follow the circle */
 .crop-ring,                     /* the mask that shows what will be kept */
+.saved-img,                     /* the photo just saved, shown back to the artist */
 
 /* NAMED EXCEPTION 2 — the "?" helper. A help affordance that is not a circle
    reads as a form control. */

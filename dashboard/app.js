@@ -263,16 +263,16 @@
     if (n) tab.appendChild(el('span', 'count', String(n)));
   }
 
-  /* == Image handling == */
-  function readImage(file) {
-    return new Promise((resolve, reject) => {
-      const url = URL.createObjectURL(file);
-      const img = new Image();
-      img.onload = () => resolve({ img, url });
-      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Not a readable image')); };
-      img.src = url;
-    });
-  }
+  /* == Image handling ==
+   * Reading is ImageRead.load (image-read.js): HEIC where the browser can
+   * decode it, an iCloud placeholder or an unreadable file refused with a
+   * message that says what to do, never a silent nothing. */
+  function readImage(file) { return window.ImageRead.load(file); }
+
+  // The flash bucket's own limits (db/kat-project/02-security.sql): 50 MB,
+  // JPEG / PNG / WebP only. Checked on what is actually uploaded.
+  const FLASH_MAX_BYTES = 50 * 1024 * 1024 - 256 * 1024;
+  const FLASH_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
   /**
    * Which spec does this file match? Returns 'design', 'sheet', or null.
@@ -335,7 +335,7 @@
 
   /** The copy the kiosk shows: the whole image scaled to fit inside maxW×maxH,
    *  aspect kept, no padding, never larger than the original. */
-  function fitInside(img, maxW, maxH) {
+  async function fitInside(img, maxW, maxH) {
     const s = Math.min(1, maxW / img.naturalWidth, maxH / img.naturalHeight);
     const c = document.createElement('canvas');
     c.width = Math.round(img.naturalWidth * s);
@@ -343,7 +343,26 @@
     const ctx = c.getContext('2d');
     ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(img, 0, 0, c.width, c.height);
-    return new Promise(res => c.toBlob(b => res({ blob: b, w: c.width, h: c.height }), 'image/webp', 0.92));
+    // WebP where the browser makes one; on iOS (no WebP encoder) a PNG, which
+    // keeps any transparency exactly as before — and only if that is over the
+    // bucket's limit, a JPEG on white.
+    const out = await encodeFlash(c, 0.92);
+    return Object.assign(out, { w: c.width, h: c.height });
+  }
+
+  /* WebP → PNG (transparency kept) → JPEG on white, the first that fits. */
+  async function encodeFlash(canvas, quality) {
+    try {
+      return await window.ImageRead.encode(canvas,
+        { types: ['image/webp', 'image/png'], quality, maxBytes: FLASH_MAX_BYTES });
+    } catch (e) {
+      const w = document.createElement('canvas');
+      w.width = canvas.width; w.height = canvas.height;
+      const ctx = w.getContext('2d');
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, w.width, w.height);
+      ctx.drawImage(canvas, 0, 0);
+      return window.ImageRead.encode(w, { types: ['image/jpeg'], quality, maxBytes: FLASH_MAX_BYTES });
+    }
   }
 
   /** Render a derivative with canvas. `cover` centre-crops, `contain` fits. */
@@ -367,7 +386,7 @@
       ctx.drawImage(img, 0, 0, sw, sh, (spec.w - dw) / 2, (spec.h - dh) / 2, dw, dh);
     }
 
-    return new Promise(res => c.toBlob(res, 'image/webp', 0.86));
+    return encodeFlash(c, 0.86);
   }
 
   /* == Category chips, grouped by kind ====================================
@@ -734,12 +753,22 @@
     pick.innerHTML = '<strong>Choose images</strong><span>or drag them here</span>';
     const input = el('input');
     input.type = 'file';
-    input.accept = 'image/png,image/jpeg,image/webp';
+    // image/* so the camera roll offers everything; HEIC is opened where the
+    // browser can, and refused on its own card where it cannot.
+    input.accept = 'image/*';
     input.multiple = true;
     input.hidden = true;
-    input.onchange = () => stage([...input.files]);
+    input.onchange = () => { const fs = [...input.files]; input.value = ''; stage(fs); };
     pick.appendChild(input);
     head.appendChild(pick);
+
+    // Where every upload says what happened, and keeps saying it.
+    const status = el('div', 'upl-status');
+    status.id = 'uploadStatus';
+    status.setAttribute('role', 'status');
+    status.setAttribute('aria-live', 'polite');
+    status.hidden = true;
+    head.appendChild(status);
 
     ;['dragover', 'dragenter'].forEach(ev =>
       pick.addEventListener(ev, e => { e.preventDefault(); pick.classList.add('is-over'); }));
@@ -762,11 +791,52 @@
     renderQueue();
   }
 
+  /* The upload card's status line. kind: 'busy' | 'ok' | 'error'.
+   * `items` is an optional list of lines under the message. */
+  function uploadStatus(kind, msg, items) {
+    const s = $('#uploadStatus');
+    if (!s) return;
+    if (!kind) { s.hidden = true; s.dataset.state = ''; return; }
+    s.hidden = false;
+    s.className = 'upl-status upl-' + kind;
+    s.dataset.state = kind;
+    s.innerHTML = '';
+    if (kind === 'busy') s.appendChild(el('span', 'spinner'));
+    else s.appendChild(el('span', 'upl-mark', kind === 'ok' ? '✓' : '!'));
+    const text = el('div', 'upl-text');
+    text.appendChild(el('div', null, msg));
+    if (items && items.length) {
+      const ul = el('ul', 'upl-list');
+      items.forEach(t => ul.appendChild(el('li', null, t)));
+      text.appendChild(ul);
+    }
+    s.appendChild(text);
+    if (s.scrollIntoView) { try { s.scrollIntoView({ block: 'nearest' }); } catch (e) {} }
+  }
+
+  let uploading = false;
+
   async function stage(files) {
-    for (const file of files) {
+    if (uploading) return;
+    if (!files.length) { uploadStatus('error', window.ImageRead.MSG.none); return; }
+    const bad = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      uploadStatus('busy', files.length > 1
+        ? `Opening ${i + 1} of ${files.length}…` : 'Opening your image…');
       let info;
       try { info = await readImage(file); }
-      catch (e) { toast(`${file.name}: ${e.message}`, 'error'); continue; }
+      catch (e) {
+        // A card of its own, saying why — not a toast that is gone in 12s.
+        bad.push(`${file.name || 'A photo'}: ${e.message}`);
+        state.queue.push({
+          id: Math.random().toString(36).slice(2),
+          file, url: null, img: null, w: 0, h: 0, type: null, shape: null,
+          error: e.message, title: '', artistId: null, categories: [],
+          publish: false, status: 'ready',
+        });
+        continue;
+      }
 
       const w = info.img.naturalWidth, h = info.img.naturalHeight;
       const p = plan(w, h);
@@ -786,6 +856,14 @@
       });
     }
     renderQueue();
+    const ready = state.queue.filter(i => !i.error).length;
+    if (bad.length) {
+      uploadStatus('error', bad.length === files.length
+        ? (bad.length === 1 ? 'That file can’t be uploaded.' : 'None of those files can be uploaded.')
+        : `${bad.length} of ${files.length} can’t be uploaded. The others are ready below.`, bad);
+    } else {
+      uploadStatus('ok', `${ready} ready to upload. Check them below, then tap Publish all.`);
+    }
   }
 
   function renderQueue() {
@@ -827,10 +905,14 @@
     const actions = el('div', 'row');
     const draftBtn = el('button', 'btn btn-quiet', 'Save all as drafts');
     draftBtn.onclick = () => uploadAll(false);
-    const pubBtn = el('button', 'btn btn-primary', 'Publish all');
+    const pubBtn = el('button', 'btn btn-primary', uploading ? 'Uploading…' : 'Publish all');
     pubBtn.onclick = () => uploadAll(true);
     const clearBtn = el('button', 'btn btn-quiet', 'Clear');
-    clearBtn.onclick = () => { state.queue.forEach(q => URL.revokeObjectURL(q.url)); state.queue = []; renderQueue(); };
+    clearBtn.onclick = () => {
+      state.queue.forEach(q => q.url && URL.revokeObjectURL(q.url));
+      state.queue = []; renderQueue(); uploadStatus(null);
+    };
+    [draftBtn, pubBtn, clearBtn].forEach(b => { b.disabled = uploading; });
     actions.append(draftBtn, pubBtn, clearBtn);
     bulk.appendChild(actions);
     list.appendChild(bulk);
@@ -859,9 +941,11 @@
     const card = el('div', 'card item' + (item.error ? ' is-bad' : ''));
     card.dataset.file = item.file.name;   // which file this card is (the name field starts empty)
 
-    const thumb = el('img', 'item-thumb');
-    thumb.src = item.url;
-    card.appendChild(thumb);
+    if (item.url) {
+      const thumb = el('img', 'item-thumb');
+      thumb.src = item.url;
+      card.appendChild(thumb);
+    }
 
     const body = el('div', 'item-body');
 
@@ -904,13 +988,17 @@
       renderQueue();
     }));
 
-    if (item.status !== 'ready') {
+    if (item.status === 'failed') {
+      body.appendChild(el('div', 'error item-failed',
+        'Not uploaded: ' + (item.failMsg || 'something went wrong') + ' Tap Publish all to try again.'));
+    } else if (item.status !== 'ready') {
       body.appendChild(el('div', 'muted small', item.status));
     }
 
     const rm = el('button', 'btn btn-quiet', 'Remove');
+    rm.disabled = uploading;
     rm.onclick = () => {
-      URL.revokeObjectURL(item.url);
+      if (item.url) URL.revokeObjectURL(item.url);
       state.queue = state.queue.filter(q => q.id !== item.id);
       renderQueue();
     };
@@ -925,35 +1013,77 @@
    * it just matches no category filter on the kiosk until somebody tags it.
    * Refusing the whole batch over it is what was stopping artists uploading. */
   async function uploadAll(publish) {
+    if (uploading) return;
     const usable = state.queue.filter(i => !i.error);
-    if (!usable.length) { toast('Nothing uploadable staged.', 'error'); return; }
+    if (!usable.length) {
+      uploadStatus('error', 'Nothing here can be uploaded. Choose a JPEG or PNG image first.');
+      return;
+    }
+
+    uploading = true;
+    const oldToast = $('#toast'); if (oldToast) oldToast.hidden = true;   // a stale "published" must not sit over a new attempt
+    renderQueue();
+    uploadStatus('busy', usable.length > 1 ? `Uploading 1 of ${usable.length}…` : 'Uploading…');
 
     // A token issued just now, so no file in this batch can reach Storage as
     // anon (3 Oct 2026: every upload was refused by RLS as role anon).
     if (!(await window.DashClient.fresh())) {
+      uploading = false;
+      renderQueue();
+      uploadStatus('error', SIGNED_OUT_MSG);
       toast(SIGNED_OUT_MSG, 'error');
       return;
     }
 
     let ok = 0;
-    for (const item of usable) {
+    const failed = [];
+    for (let i = 0; i < usable.length; i++) {
+      const item = usable[i];
+      uploadStatus('busy', usable.length > 1 ? `Uploading ${i + 1} of ${usable.length}…` : 'Uploading…');
       try {
         item.status = 'uploading…'; renderQueue();
         await uploadOne(item, publish);
         item.status = 'done'; ok++;
       } catch (e) {
+        console.error(item.file.name, e);
         item.status = 'failed';
-        fail(item.file.name, e);
+        item.failMsg = uploadError(e);
+        failed.push(`${item.title || item.file.name}: ${item.failMsg}`);
       }
       renderQueue();
     }
+    uploading = false;
 
-    if (ok) {
-      toast(`${ok} uploaded${publish ? ' and published' : ' as drafts'}.`);
-      state.queue = state.queue.filter(i => i.status !== 'done');
-      renderQueue();
-      await loadDesigns();
+    const n = d => `${d} design${d === 1 ? '' : 's'}`;
+    const done = publish
+      ? `${n(ok)} published. ${ok === 1 ? 'It' : 'They'}’ll show on the wall within the hour.`
+      : `${n(ok)} saved as drafts. Drafts are not on the wall — publish them in My Designs.`;
+    if (failed.length) {
+      uploadStatus('error', (ok ? done + ' ' : '') +
+        `${n(failed.length)} did not upload — ${failed.length === 1 ? 'it is' : 'they are'} still below. ` +
+        'Check your signal and tap ' + (publish ? 'Publish all' : 'Save all as drafts') + ' again.', failed);
+    } else {
+      uploadStatus('ok', done);
     }
+    if (ok) toast(done);
+
+    state.queue = state.queue.filter(i => i.status !== 'done');
+    renderQueue();
+    if (ok) await loadDesigns();
+  }
+
+  /* What an upload failure means, in words an artist can act on. */
+  function uploadError(e) {
+    const m = (e && e.message) || String(e || '');
+    if (/row-level security|violates|unauthori[sz]ed|403|jwt/i.test(m)) {
+      return 'the studio refused it — your sign-in may have expired. Sign out, sign in again, and retry.';
+    }
+    if (/payload too large|413|exceeded the maximum/i.test(m)) return 'the file is too big. Choose a smaller one.';
+    if (/mime|invalid_mime|not supported/i.test(m)) return 'that file type is not accepted. Choose a JPEG or PNG.';
+    if (/fetch|network|load failed|timed? ?out|taking too long/i.test(m)) {
+      return 'it didn’t reach the server. Check your Wi-Fi or signal.';
+    }
+    return /[.!?]$/.test(m) ? m : (m || 'something went wrong') + '.';
   }
 
   async function uploadOne(item, publish) {
@@ -962,12 +1092,20 @@
 
     const stamp = Date.now().toString(36);
     const base = `${artistId}/${stamp}-${item.id}`;
-    const ext = (item.file.type === 'image/png') ? 'png'
-              : (item.file.type === 'image/webp') ? 'webp' : 'jpg';
 
     // Original first — if this fails there is nothing to clean up.
+    // Kept byte-for-byte when the bucket will take it. A HEIC (the bucket
+    // refuses the type) or a file over 50 MB is kept as the largest JPEG
+    // this phone can make instead — the nearest thing to the original there
+    // is, and still never cropped.
+    let orig = { blob: item.file, type: item.file.type, ext: null };
+    if (FLASH_TYPES.indexOf(item.file.type) === -1 || item.file.size > FLASH_MAX_BYTES) {
+      orig = await window.ImageRead.encode(window.ImageRead.fullCanvas(item.img, '#ffffff'),
+        { types: ['image/jpeg'], quality: 0.95, maxBytes: FLASH_MAX_BYTES });
+    }
+    const ext = orig.ext || ((orig.type === 'image/png') ? 'png' : (orig.type === 'image/webp') ? 'webp' : 'jpg');
     const originalPath = `${base}/original.${ext}`;
-    await put(originalPath, item.file, item.file.type);
+    await put(originalPath, orig.blob, orig.type);
 
     const urls = { image_url: publicUrl(originalPath) };
 
@@ -978,18 +1116,17 @@
     const spec = boxFor(item.shape || shapeOf(item.w, item.h));
     if (item.w !== spec.w || item.h !== spec.h) {
       const fit = await fitInside(item.img, spec.w, spec.h);
-      if (!fit.blob) throw new Error('This browser could not resize the image. Try Safari or Chrome.');
-      const kioskPath = `${base}/kiosk.webp`;
-      await put(kioskPath, fit.blob, 'image/webp');
+      const kioskPath = `${base}/kiosk.${fit.ext}`;
+      await put(kioskPath, fit.blob, fit.type);
       urls.image_url = publicUrl(kioskPath);
       item.w = fit.w; item.h = fit.h;
     }
 
     for (const spec of cfg.derivatives) {
-      const blob = await derive(item.img, spec);
-      if (!blob) continue;
-      const p = `${base}/${spec.name}.webp`;
-      await put(p, blob, 'image/webp');
+      let out;
+      try { out = await derive(item.img, spec); } catch (e) { continue; }   // a thumbnail is optional
+      const p = `${base}/${spec.name}.${out.ext}`;
+      await put(p, out.blob, out.type);
       if (spec.name === 'thumb') urls.thumb_url = publicUrl(p);
     }
 
@@ -1019,9 +1156,14 @@
     }
   }
 
+  // A stalled upload must end in a message, not a spinner that never stops.
+  const PUT_TIMEOUT_MS = 180000;
   async function put(path, body, contentType) {
-    const { error } = await sb.storage.from(cfg.storageBucket)
-      .upload(path, body, { contentType, upsert: false });
+    let t;
+    const { error } = await Promise.race([
+      sb.storage.from(cfg.storageBucket).upload(path, body, { contentType, upsert: false }),
+      new Promise((_, rej) => { t = setTimeout(() => rej(new Error('The upload is taking too long')), PUT_TIMEOUT_MS); }),
+    ]).finally(() => clearTimeout(t));
     if (error) throw error;
   }
 

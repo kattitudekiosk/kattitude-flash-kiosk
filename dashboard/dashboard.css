@@ -567,3 +567,63 @@ p.muted { line-height: 1.5; margin: 0 0 12px; }
 .type-toggle .type-opt.is-on { background: #C2156F; color: #fff; }
 .set-all { margin: 10px 0 4px; }
 .size-note { margin-left: 6px; }
+
+/* ── Upload status — one line that says what is happening ────────────────
+ *
+ * 17 Oct 2026, Joshua: "there was no indication of that actually happening
+ * or like that it actually worked." Uploads report HERE, in the card the
+ * artist is looking at, and the message stays until something replaces it.
+ * A toast alone is not enough: it disappears, and under the photo sheet it
+ * was never visible at all.
+ *
+ *   busy   ink on paper, pink spinner      (17.6:1)
+ *   ok     ink on pale pink, pink mark     (16.0:1)
+ *   error  danger red on pale red          (#b3261e on #fdecea, 5.9:1)
+ *
+ * The spinner is a SQUARE turning — square.css would square a ring anyway,
+ * and a spinner is not on its list of circles. */
+.upl-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 12px 0 0;
+  padding: 12px 14px;
+  font-size: 15px;
+  line-height: 1.45;
+  font-weight: 600;
+  background: var(--surface);
+  color: var(--text);
+  border-left: 4px solid var(--pink);
+  /* scrollIntoView must stop BELOW the sticky top bar and tabs, or the
+     message lands underneath them — measured: 116px on a 390px phone. */
+  scroll-margin-top: 132px;
+}
+.upl-status[hidden] { display: none; }
+.upl-ok { background: #fdeaf4; border-left-color: var(--pink); }
+.upl-error { background: #fdecea; color: var(--danger); border-left-color: var(--danger); }
+.upl-text { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.upl-mark {
+  flex: 0 0 auto;
+  width: 22px; height: 22px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 15px; font-weight: 800;
+  color: #fff;
+  background: var(--pink-deep);
+}
+.upl-error .upl-mark { background: var(--danger); }
+.upl-list { margin: 6px 0 0; padding-left: 18px; font-weight: 400; }
+.upl-list li { margin: 2px 0; }
+
+.spinner {
+  flex: 0 0 auto;
+  width: 18px; height: 18px;
+  margin-top: 2px;
+  border: 3px solid #f4c6df;
+  border-top-color: var(--pink);
+  animation: upl-spin 0.8s linear infinite;
+}
+@keyframes upl-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2.4s; } }
+
+.dropzone.is-disabled { opacity: 0.5; pointer-events: none; }
+.item .error.item-failed { font-weight: 600; margin-top: 6px; }
