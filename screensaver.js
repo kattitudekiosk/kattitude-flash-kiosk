@@ -30,6 +30,11 @@ window.Screensaver = (function () {
   const MAX_CLIP_MS   = cfg.maxClipMs || 45000;
   const STILLS_PER_CLIP = Math.max(1, cfg.stillsPerClip || 4);
   const FADE_MS       = cfg.fadeMs || 600;
+  /* Joshua, 17 Oct 2026: "after 3 cycles of flash sheets it goes back to the
+   * home screen so people can know they can interact with it". After this
+   * many FULL passes through the playlist the reel hands back to script.js,
+   * which shows the splash. 0 = loop forever, as before. */
+  const PASSES        = cfg.passes == null ? 3 : Math.max(0, cfg.passes | 0);
   const CACHE_NAME    = 'kattitude-attract-v1';
 
   let layerA = null, layerB = null, stageEl = null;
@@ -39,6 +44,18 @@ window.Screensaver = (function () {
   let timer = null;
   let active = false;
   let onExit = null;
+  let onPassesDone = null;
+  /* Playlist positions advanced since this run started. A pass is
+   * playlist.length of them, so 3 passes always end back on the position the
+   * run resumed from, whatever that was. Reset by a reshuffle and by every
+   * start() — a run only ends by a tap or by finishing its passes. */
+  let advanced = 0;
+  /* The fingerprint of the playlist ON SCREEN. step() compares against this,
+   * not against loopState.fp from just before: anything else that builds the
+   * playlist between steps (playlistLength(), _playlist()) moves loopState to
+   * the new catalog first, and the reel would never see the reshuffle — the
+   * old pass count would carry on into the new loop. */
+  let playingFp = null;
 
   /* Clips that failed to load. A dead clip is skipped for the rest of the
    * session rather than retried every cycle — a 404 in a loop would hammer
@@ -291,13 +308,21 @@ window.Screensaver = (function () {
 
     // The catalog refreshes underneath us; if its set of designs changed,
     // currentLoop() has drawn a new shuffle and reset the position to 0.
-    const before = loopState && loopState.fp;
     const fresh = buildPlaylist();
-    if (!loopState || loopState.fp !== before) { playlist = fresh; pos = 0; }
+    if (!loopState || loopState.fp !== playingFp) {
+      playlist = fresh; pos = 0; advanced = 0; playingFp = loopState && loopState.fp;
+    }
     if (!playlist.length) return;
+
+    // The last item of the last pass has had its full time on screen.
+    if (PASSES && advanced >= PASSES * playlist.length) {
+      if (onPassesDone) { const f = onPassesDone; onPassesDone = null; f(); }
+      return;
+    }
 
     const item = playlist[pos % playlist.length];
     pos++;
+    advanced++;
     loopState.pos = pos % playlist.length;
     save(loopState);
 
@@ -349,14 +374,19 @@ window.Screensaver = (function () {
     /**
      * Returns false if there is nothing to play, which is the signal for
      * script.js to run its original sheet cycle untouched.
+     * passesDoneFn runs after cfg.passes full passes; it is expected to
+     * stop() the reel and show the splash.
      */
-    start(host, exitFn) {
+    start(host, exitFn, passesDoneFn) {
       if (active) return true;
       pingSync();
       playlist = buildPlaylist();
       if (!playlist.length) return false;
+      playingFp = loopState && loopState.fp;
 
       onExit = exitFn || null;
+      onPassesDone = passesDoneFn || null;
+      advanced = 0;
       active = true;
       // Resume where the loop was (0 if the catalog changed since).
       pos = (loopState && loopState.pos) || 0;
@@ -373,6 +403,7 @@ window.Screensaver = (function () {
     stop() {
       if (!active) return;
       active = false;
+      onPassesDone = null;
       clearTimeout(timer);
       document.body.classList.remove('attract');
       if (stageEl) {
@@ -397,6 +428,8 @@ window.Screensaver = (function () {
     _loop() { return loopState ? Object.assign({}, loopState) : null; },
     _step() { step(); },
     _pos() { return pos; },
+    _advanced() { return advanced; },
+    passes: PASSES,
     _syncPings() { return syncPings; },
   };
 })();

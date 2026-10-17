@@ -144,6 +144,13 @@ window.KIOSK_CONFIG = {
     maxClipMs: 45000,   // a stalled or over-long clip can't own the screen
     fadeMs: 600,        // crossfade; the outgoing frame is never torn down first
 
+    /* Joshua, 17 Oct 2026: after 3 full passes through the playlist the wall
+     * goes back to the "tap anywhere to enter" splash, so people can see they
+     * can use it, and rests there 3 minutes before the screensaver resumes.
+     * passes: 0 loops forever. */
+    passes: 3,
+    splashRestMs: 180000,
+
     /* Manifest of clips. Normally fetched from Supabase and cached locally;
      * this list is the offline/no-backend fallback and is empty on purpose.
      * Adding a clip here is also the quickest way to test one. */

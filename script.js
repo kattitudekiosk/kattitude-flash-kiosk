@@ -67,6 +67,16 @@
   const IDLE_TIMEOUT_MS         = 120000; // 2 minutes
   const SCREENSAVER_INTERVAL_MS = 8000;   // ms per sheet while cycling (8s)
 
+  /* Joshua, 17 Oct 2026: "after 3 cycles of flash sheets it goes back to the
+   * home screen so people can know they can interact with it. let it rest
+   * there for three minutes before it goes back to the screensaver". After
+   * `passes` full passes the screensaver shows the splash ("tap anywhere to
+   * enter"); an untouched splash starts the screensaver again after
+   * SPLASH_REST_MS, resuming where the loop was. KIOSK_CONFIG.screensaver. */
+  const SS_CFG         = (window.KIOSK_CONFIG && window.KIOSK_CONFIG.screensaver) || {};
+  const SS_PASSES      = SS_CFG.passes == null ? 3 : Math.max(0, SS_CFG.passes | 0);
+  const SPLASH_REST_MS = SS_CFG.splashRestMs || 180000;   // 3 minutes
+
   let isDragging         = false;
   let dragStart          = null;  // { x, y, tx, ty }
   let swipeStart         = null;  // { x, y }
@@ -88,6 +98,7 @@
   let idleTimer         = null;
   let screensaverTimer  = null;
   let screensaverActive = false;
+  let splashRestTimer   = null;
 
   /* ── Design canvas scaling ────────────────────────────────────────────────
    * THE ONLY PLACE IN THE APP THAT READS THE REAL VIEWPORT.
@@ -220,6 +231,7 @@
       return;
     }
     galleryEntered = true;
+    clearTimeout(splashRestTimer);
     if (e && e.cancelable) e.preventDefault();
 
     // Dismiss the splash and arm the idle timer FIRST and unconditionally.
@@ -250,6 +262,16 @@
   splash.addEventListener('touchstart', enterGallery, { passive: false });
   splash.addEventListener('pointerdown', e => { if (e.pointerType !== 'touch') enterGallery(e); });
 
+  /* The splash, untouched, rests SPLASH_REST_MS and then the screensaver
+   * starts. Armed whenever the splash is showing: at boot, after a tap wakes
+   * the screensaver, and after the screensaver finishes its passes — so the
+   * wall never sits on one still screen for good. */
+  function armSplashRest() {
+    clearTimeout(splashRestTimer);
+    splashRestTimer = setTimeout(() => startScreensaver(true), SPLASH_REST_MS);
+  }
+  armSplashRest();
+
   /* ── Screensaver (burn-in prevention) ─────────────────────────────────────
    * Idle countdown only runs while the gallery is being actively browsed
    * (after the splash has been dismissed). When it elapses, sheets auto-
@@ -261,12 +283,16 @@
     idleTimer = setTimeout(startScreensaver, IDLE_TIMEOUT_MS);
   }
 
-  function startScreensaver() {
-    if (screensaverActive || !galleryEntered) return;
-    if (!sheets.length) return; // nothing to cycle through
+  function startScreensaver(fromSplash) {
+    if (screensaverActive) return;
+    if (fromSplash ? galleryEntered : !galleryEntered) return;
+    if (!sheets.length) { if (fromSplash) armSplashRest(); return; } // nothing yet; try again later
+    clearTimeout(splashRestTimer);
     screensaverActive = true;
     document.body.classList.add('screensaver');
+    if (fromSplash) splash.classList.add('hidden');   // fades out over the reel
     if (isZoomed()) resetZoom();
+    const passesDone = () => exitScreensaver('passes');
 
     /* The mixed video+flash reel takes over ONLY if it has clips to play.
      * start() returns false when there are none, or when the catalog has no
@@ -274,7 +300,7 @@
      * always has. This is the whole degradation story: no clips, no change
      * to what is on the wall today. */
     try {
-      if (window.Screensaver && window.Screensaver.start(document.getElementById('kioskCanvas'))) {
+      if (window.Screensaver && window.Screensaver.start(document.getElementById('kioskCanvas'), null, passesDone)) {
         return;
       }
     } catch (err) {
@@ -282,15 +308,20 @@
         err && err.message ? err.message : err);
     }
 
+    // The original sheet cycle counts its passes the same way.
+    let ticks = 0;
     screensaverTimer = setInterval(() => {
+      if (SS_PASSES && ++ticks >= SS_PASSES * sheets.length) { passesDone(); return; }
       navigate((current + 1) % sheets.length, 'left');
     }, SCREENSAVER_INTERVAL_MS);
   }
 
-  function exitScreensaver() {
+  /* reason: a tap (the default) or 'passes' — the reel finished its passes
+   * with nobody touching, so there is no tap to guard against. */
+  function exitScreensaver(reason) {
     if (!screensaverActive) return;
     screensaverActive = false;
-    wokeAt = Date.now();
+    wokeAt = reason === 'passes' ? 0 : Date.now();
 
     /* SPLASH FIRST, AND INSTANTLY (Joshua, 3 Oct 2026: "the screen briefly
      * goes back to the kiosk screen instead of straight to the start page").
@@ -319,6 +350,7 @@
     } catch (err) {
       console.log('[screensaver] reset-to-sheet-1 failed (non-fatal):', err && err.message ? err.message : err);
     }
+    armSplashRest();
   }
 
   // The gallery UI (added later) needs real scrolling — a grid of designs and
@@ -347,7 +379,7 @@
       exitScreensaver();
       return;
     }
-    if (galleryEntered) resetIdleTimer();
+    if (galleryEntered) resetIdleTimer(); else armSplashRest();
     // Every touch is a valid user gesture — keep retrying fullscreen on
     // each one until it sticks, in case an earlier attempt (page load,
     // the very first splash tap) was rejected by this particular browser.
@@ -376,7 +408,7 @@
       exitScreensaver();
       return;
     }
-    if (galleryEntered) resetIdleTimer();
+    if (galleryEntered) resetIdleTimer(); else armSplashRest();
   }, { capture: true });
 
   /* ── Utility: dual touch+click binding for buttons ──────────────────────── */

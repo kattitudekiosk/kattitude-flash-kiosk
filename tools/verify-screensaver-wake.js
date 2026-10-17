@@ -39,9 +39,12 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
   w.HTMLElement.prototype.getBoundingClientRect = () =>
     ({ top: 0, left: 0, right: 1080, bottom: 1920, width: 1080, height: 1920, x: 0, y: 0 });
 
-  // The idle timeout is two minutes; compress anything that long to 30ms.
+  // The idle timeout is two minutes; compress THAT to 30ms. Only that: the
+  // splash's 3-minute rest (17 Oct 2026) would otherwise start the reel from
+  // the splash 30ms after boot. Its timing is checked on a fake clock in
+  // tools/verify-attract-rest.js.
   const realSetTimeout = w.setTimeout.bind(w);
-  w.setTimeout = (fn, ms, ...a) => realSetTimeout(fn, ms >= 60000 ? 30 : ms, ...a);
+  w.setTimeout = (fn, ms, ...a) => realSetTimeout(fn, ms === 120000 ? 30 : ms, ...a);
 
   const scriptJs = process.env.KT_SCRIPT || path.join(ROOT, 'script.js');
   // One eval, as the page has one global scope: data.js's top-level const

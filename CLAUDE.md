@@ -906,6 +906,19 @@ that alternate. Configured in `config.js` under `screensaver`.
   `localStorage` (`kt-attract-v1`): the loop resumes where it stopped across
   idles, reloads and server restarts, and reshuffles from 0 when the set of
   designs changes. `tools/verify.js` section 1e, with negative controls.
+- **[ADDED 17 Oct 2026 — Joshua: "after 3 cycles … it goes back to the home
+  screen so people can know they can interact with it. let it rest there for
+  three minutes"]** After `screensaver.passes` (3) FULL passes through the
+  playlist the reel hands back to the "TAP ANYWHERE TO ENTER" splash; an
+  untouched splash starts the screensaver again after `splashRestMs`
+  (180000), resuming where the loop was. Repeats forever. The pass count
+  resets on a reshuffle and on any interaction. The splash rest is armed
+  whenever the splash shows (boot included), never inside the gallery (the
+  2-minute idle timer does that). The reel compares the catalog against the
+  fingerprint of the playlist ON SCREEN (`playingFp`), so a reshuffle seen
+  first by `playlistLength()` still resets the count.
+  `tools/verify-attract-rest.js` (fake clock; `VERIFY_ATTRACT_PASSES=0` must
+  fail).
 - (history) Zero clips = today's sheet slideshow, on the original code path —
   now only when there is nothing at all to show.
   A clip that fails to load is marked dead for the session and skipped, never
