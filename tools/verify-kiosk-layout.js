@@ -200,11 +200,11 @@ async function run(W, H) {
       const c = document.querySelector('.g-detail-meta .credit'), bk = [...document.querySelectorAll('.g-back')].find(e => e.getBoundingClientRect().height > 0);
       const cr = c && c.getBoundingClientRect(), br = bk && bk.getBoundingClientRect();
       return { title: (document.querySelector('.g-detail-title') || {}).textContent || null,
-        name: c ? (c.querySelector('.credit-name') || {}).textContent : null, face: !!(c && c.querySelector('.credit-face')),
+        name: c ? (c.querySelector('.g-card-name') || {}).textContent : null, face: !!(c && c.querySelector('.g-card-portrait')),
         clearOfBack: !!(cr && br && (cr.right <= br.left || cr.bottom <= br.top)) };
     });
     // 17 Oct 2026: the lightbox credits the artist the same way as the sheet viewer.
-    check('lightbox: an unnamed design shows no title line and credits the artist (face + name), clear of Back',
+    check('lightbox: an unnamed design shows no title line and carries the artist card (photo + name), clear of Back',
       meta.title === null && !!meta.name && meta.face && meta.clearOfBack, JSON.stringify(meta));
   }
   await p.evaluate(() => { window.KIOSK_ROUTER.goHome(); });
@@ -237,13 +237,17 @@ async function run(W, H) {
         return {
           label: document.getElementById('sheetLabel').textContent,
           want: artist ? artist.name : null, wantIg: artist ? artist.instagram : null,
-          name: c ? c.querySelector('.credit-name').textContent : null,
-          handle: c ? (c.querySelector('.credit-handle') || {}).textContent || '' : '',
-          face: !!(c && c.querySelector('.credit-face')),
+          name: c ? (c.querySelector('.g-card-name') || {}).textContent : null,
+          handle: c ? (c.querySelector('.g-card-handle') || {}).textContent || '' : '',
+          count: c ? (c.querySelector('.g-card-count') || {}).textContent || '' : '',
+          face: !!(c && c.querySelector('.g-card-artist .g-card-portrait')),
+          cardQr: c && c.querySelector('.g-card-qr') ? c.querySelector('.g-card-qr').getAttribute('data-qr-url') : null,
+          cardQrSize: c && c.querySelector('.g-card-qr') ? c.querySelector('.g-card-qr').offsetWidth : 0,
+          cornerQrShown: vis(document.getElementById('qrBadge')),
           qr: document.getElementById('qrBadge').getAttribute('data-qr-url'),
           inTray: !!(cb && document.getElementById('footer').contains(c)),
           overlaps: cb ? others.filter(o => hit(cb, box(o))).map(o => o.id) : [],
-          nameSize: c ? parseFloat(getComputedStyle(c.querySelector('.credit-name')).fontSize) : 0,
+          nameSize: c && c.querySelector('.g-card-name') ? parseFloat(getComputedStyle(c.querySelector('.g-card-name')).fontSize) : 0,
         };
       }));
       const more = await p.evaluate(() => { const n = document.getElementById('btnNext'); if (n.classList.contains('hidden')) return false;
@@ -252,15 +256,17 @@ async function run(W, H) {
       await wait(1400);
     }
     const credited = credits.filter(c => c.want);
-    check(`sheet viewer: every sheet with an artist names them (${credited.length} of ${credits.length} sheets checked)`,
-      credited.length > 0 && credited.every(c => c.name === c.want && c.face && c.inTray), JSON.stringify(credits.filter(c => c.want && c.name !== c.want).slice(0, 3)));
+    check(`sheet viewer: every sheet with an artist shows THEIR artist card — photo, name, count (${credited.length} of ${credits.length} sheets checked)`,
+      credited.length > 0 && credited.every(c => c.name === c.want && c.face && c.inTray && /sheet|design/.test(c.count)), JSON.stringify(credits.filter(c => c.want && c.name !== c.want).slice(0, 3)));
     check('sheet viewer: the credit changes with the slide (more than one artist seen, each matching its sheet)',
       new Set(credited.map(c => c.name)).size > 1, [...new Set(credited.map(c => c.name))].join(', '));
-    check('sheet viewer: the corner QR points at THAT artist’s Instagram, slide by slide',
-      credited.every(c => !c.wantIg || c.qr === c.wantIg), JSON.stringify(credited.filter(c => c.wantIg && c.qr !== c.wantIg).slice(0, 2)));
+    check('sheet viewer: the card’s QR is THAT artist’s Instagram, slide by slide, at the card’s 168px',
+      credited.every(c => !c.wantIg || (c.cardQr === c.wantIg && Math.abs(c.cardQrSize - 168) < 1)),
+      JSON.stringify(credited.filter(c => c.wantIg && (c.cardQr !== c.wantIg || Math.abs(c.cardQrSize - 168) >= 1)).slice(0, 2)));
+    check('sheet viewer: one QR at a time — the corner code is hidden while the card shows', credited.every(c => !c.cornerQrShown));
     check('sheet viewer: the credit overlaps nothing — not the sheet, the QR, its caption, the dots or Back',
       credits.every(c => !c.overlaps.length), JSON.stringify(credits.filter(c => c.overlaps.length).slice(0, 2)));
-    check('sheet viewer: the name is big enough to read on a phone (44px on the canvas)', credited.every(c => Math.abs(c.nameSize - 44) < 1),   // computed size is canvas px; the canvas is scaled as a whole
+    check('sheet viewer: the card’s name is a readable size (≥ 24px on the canvas, the card’s own floor)', credited.every(c => c.nameSize >= 24),
       credited.map(c => Math.round(c.nameSize)).join(','));
     await backCheck('Sheet viewer, after paging');
     await p.screenshot({ path: path.join(SHOTS, `sheet-viewer-${W}.png`) });

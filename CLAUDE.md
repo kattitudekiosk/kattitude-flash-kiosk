@@ -835,22 +835,24 @@ before decoding starts.
 - Physical sizing on a 32" panel (~69 ppi): detail 2.04 mm/module, artist card
   1.42 mm, sheet corner 1.08 mm.
 
-## WHO MADE THIS SHEET — **[ADDED 17 Oct 2026]**
+## WHO MADE THIS SHEET — **[ADDED 17 Oct 2026, refined the same day]**
 
 Joshua: *"sometimes the artists don't add their name to the flash sheets so
 the customer wouldn't know or remember who the flash designs were created
-by in view all mode."* The sheet viewer (from View All and from an artist
-page) and the single-design lightbox always credit the artist: small photo
-(initials if none), name, @handle, in the tray above the dots / in the
-lightbox's bottom meta, never over the artwork. It follows the slide
-(`SheetViewer.onChange` in `script.js` → `paintSheetCredit` in `gallery.js`).
-The corner QR follows it too: the sheet's artist's Instagram, captioned
-"Follow @handle" — "Follow" only when there IS an Instagram. On the wall
-(`html.kiosk-wall`) the credit is plain text, because a tap must never leave
-the kiosk; on a phone it is a link to the artist's Instagram.
-`tools/verify-kiosk-layout.js` checks every sheet against the catalog's own
-artist, the QR per slide, and that the credit overlaps nothing; origin/main
-fails it.
+by in view all mode"*, then *"I think maybe adding the artist card to the
+screen when full view would be best"*. The sheet viewer (from View All and
+from an artist page) and the single-design lightbox carry the SAME artist
+card as Browse by Artist — `artistCard()` with `layout.static` (a `div`, no
+navigation), in its QR layout: photo, name, @handle, count, Instagram QR at
+168px. It sits in the tray's left side / the lightbox's bottom meta, at most
+790px wide, so Back (842–1052px) and the artwork stay clear, and it follows
+the slide (`SheetViewer.onChange` in `script.js` → `paintSheetCredit` in
+`gallery.js`). While it shows, the corner QR is hidden: one code at a time.
+On the wall (`html.kiosk-wall`) the card is static, because a tap must never
+leave the kiosk; on a phone it links to the artist's Instagram.
+`tools/verify-kiosk-layout.js` checks every sheet's card against the
+catalog's artist, its QR per slide, the hidden corner code and overlap;
+origin/main fails it.
 
 ## GRID LAYOUT RULE — **[REPLACED 2 Oct 2026]**
 

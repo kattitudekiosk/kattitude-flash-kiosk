@@ -424,7 +424,11 @@ window.KIOSK_ROUTER = (function () {
     const wantQr = !!a.instagram && !dense
       && cardW >= 460 && cardH >= 200;
 
-    const card = el('button', 'g-card g-card-artist'
+    // layout.static: the card shown inside the sheet viewer / lightbox — the
+    // same card, but a plain block: a tap there must not navigate away.
+    const isStatic = !!(layout && layout.static);
+    const card = el(isStatic ? 'div' : 'button', 'g-card g-card-artist'
+      + (isStatic ? ' g-card-inviewer' : '')
       + (count === 0 ? ' is-empty' : '')
       + (dense ? ' is-dense' : '')
       + (wantQr ? ' has-qr' : ''));
@@ -482,7 +486,9 @@ window.KIOSK_ROUTER = (function () {
       }
     }
 
-    if (count > 0) {
+    if (isStatic) {
+      // nothing to tap: the card informs; its QR (wall) or link (phone) acts
+    } else if (count > 0) {
       onTap(card, () => {
         // An artist with sheets and no singles has nothing a grid improves
         // on — open the linear viewer directly, scoped to her sheets.
@@ -670,32 +676,29 @@ window.KIOSK_ROUTER = (function () {
     if (!item || !item.artistId) return null;
     const a = snap.artists.find(x => x.id === item.artistId);
     if (a) return a;
-    return item.artistName ? { id: item.artistId, name: item.artistName, handle: item.artistHandle || '', portrait: '', instagram: '' } : null;
+    return item.artistName ? { id: item.artistId, name: item.artistName, handle: item.artistHandle || '', portrait: '', instagram: '', seniority: '' } : null;
   }
 
+  /* Joshua, 17 Oct 2026 (refined): "adding the artist card to the screen
+   * when full view would be best". The SAME card as Browse by Artist —
+   * artistCard() — in its QR layout, as a static block. On a phone, where
+   * nobody scans their own screen, the whole card links to the Instagram. */
+  const INVIEWER_LAYOUT = { cols: 1, cardW: 760, cardH: 200, static: true };
   function creditNode(artist, cls) {
+    const card = artistCard(artist, INVIEWER_LAYOUT);
     const onWall = document.documentElement.classList.contains('kiosk-wall');
-    const link = !onWall && artist.instagram;
-    const node = el(link ? 'a' : 'div', cls);
-    if (link) { node.href = artist.instagram; node.target = '_blank'; node.rel = 'noopener'; }
-    const face = el('span', 'credit-face');
-    // Initials first, photo on top: a failed photo uncovers a face, never a hole.
-    face.appendChild(el('span', 'credit-initials',
-      artist.name.split(/\s+/).slice(0, 2).map(s => s[0] || '').join('').toUpperCase()));
-    if (artist.portrait) {
-      const img = el('img');
-      img.src = artist.portrait; img.alt = '';
-      img.addEventListener('error', () => img.remove(), { once: true });
-      face.appendChild(img);
+    let node = card;
+    if (!onWall && artist.instagram) {
+      node = el('a', 'credit-link');
+      node.href = artist.instagram; node.target = '_blank'; node.rel = 'noopener';
+      node.appendChild(card);
     }
-    node.appendChild(face);
-    const words = el('span', 'credit-words');
-    words.appendChild(el('span', 'credit-by', 'Flash by'));
-    words.appendChild(el('span', 'credit-name', artist.name));
-    if (artist.handle) words.appendChild(el('span', 'credit-handle', artist.handle));
-    node.appendChild(words);
-    node.setAttribute('aria-label', 'Flash by ' + artist.name + (artist.handle ? ', ' + artist.handle : ''));
-    return node;
+    const wrap = el('div', cls);
+    wrap.appendChild(node);
+    wrap.setAttribute('aria-label', 'Flash by ' + artist.name + (artist.handle ? ', ' + artist.handle : ''));
+    // Long names and handles step down to fit, exactly as on the Artists page.
+    requestAnimationFrame(() => fitCardLines(wrap));
+    return wrap;
   }
 
   /* Called by the sheet viewer on every slide (script.js SheetViewer.onChange). */
