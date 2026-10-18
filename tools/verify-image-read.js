@@ -58,7 +58,7 @@ function check(name, cond, detail) {
       try { await R.load(file(heicB64, 'IMG_0001.HEIC', 'image/heic')); out.heic = 'opened'; } catch (e) { out.heic = e.message; }
       // 3: no WebP encoder, as on iOS.
       const c = document.createElement('canvas'); c.width = c.height = 64;
-      const g = c.getContext('2d'); g.fillStyle = '#E91E8C'; g.fillRect(0, 0, 64, 64);
+      const g = c.getContext('2d'); g.fillStyle = '#FC258D'; g.fillRect(0, 0, 64, 64);
       const realToBlob = HTMLCanvasElement.prototype.toBlob;
       HTMLCanvasElement.prototype.toBlob = function (cb, type, q) { return realToBlob.call(this, cb, type === 'image/webp' ? 'image/png' : type, q); };
       const enc = await R.encode(c, {});

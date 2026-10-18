@@ -42,6 +42,6 @@
   padding: 1px 7px;
   border-radius: 999px;
   background: var(--pink);
-  color: #fff;
+  color: var(--text);           /* 11px on the logo pink: black */
   font-size: 11px;
 }

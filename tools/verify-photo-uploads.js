@@ -137,7 +137,7 @@ async function makeFiles(browser) {
     g.addColorStop(0, '#f2c9a0'); g.addColorStop(0.5, '#6b8fb3'); g.addColorStop(1, '#2b2b3a');
     x.fillStyle = g; x.fillRect(0, 0, 4032, 3024);
     x.fillStyle = '#e8b48a'; x.beginPath(); x.ellipse(2016, 1400, 700, 900, 0, 0, Math.PI * 2); x.fill();
-    x.fillStyle = '#E91E8C'; x.fillRect(300, 2300, 1200, 500);
+    x.fillStyle = '#FC258D'; x.fillRect(300, 2300, 1200, 500);
     const d = x.getImageData(0, 0, 4032, 3024), a = d.data;
     let s = 7;
     for (let i = 0; i < a.length; i += 4) {

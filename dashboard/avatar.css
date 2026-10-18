@@ -17,8 +17,8 @@
   flex: 0 0 auto;
   border-radius: 50%;
   overflow: hidden;
-  background: #C2156F;            /* deep pink — 5.78:1 under white text */
-  color: #fff;
+  background: #FC258D;            /* the logo pink */
+  color: #17171a;                 /* initials in black: 4.93:1 (white would be 3.63:1 at 15px) */
   font-family: 'Bebas Neue', Inter, sans-serif;
   letter-spacing: 0.04em;
   line-height: 1;
@@ -65,7 +65,7 @@
   cursor: pointer;
   line-height: 0;
 }
-.avatar-btn:focus-visible { outline: 3px solid #E91E8C; outline-offset: 3px; border-radius: 50%; }
+.avatar-btn:focus-visible { outline: 3px solid #FC258D; outline-offset: 3px; border-radius: 50%; }
 
 /* ── Photo picker sheet ─────────────────────────────────────────────── */
 

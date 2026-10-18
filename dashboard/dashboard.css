@@ -55,9 +55,9 @@
   --line: #e6e6e9;
   --text: #17171a;
   --muted: #6b6b74;
-  --pink: #E91E8C;
-  --pink-deep: #C2156F;
-  --yellow: #FDE446;
+  --pink: #FC258D;
+  --pink-deep: #FC258D;
+  --yellow: #FFE448;
   --ok: #0f7b4f;
   --warn: #8a6d00;
   --danger: #b3261e;
@@ -136,7 +136,7 @@ body {
   font-size: 10px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--pink);
+  color: var(--text);           /* 10px: too small to be pink text (3.63:1); the logo carries the pink */
   margin-top: 3px;
 }
 
@@ -163,9 +163,9 @@ body {
 /* The role pill is one of the accents. Pink type on white, pink hairline —
  * not a filled badge, which at this size would be a small pink slab. */
 #whoRole {
-  color: var(--pink);
+  color: var(--text);           /* 11px: black on a tint of the logo pink */
   border-color: var(--pink);
-  background: var(--bg);
+  background: #FFE9F4;
 }
 
 /* ── Top bar overflow menu ──────────────────────────────────────────────── */
@@ -296,7 +296,7 @@ body {
   min-height: 48px;
 }
 
-.tab.is-active { color: var(--pink); border-bottom-color: var(--pink); }
+.tab.is-active { color: var(--text); border-bottom-color: var(--pink); }   /* 14px: black text, the pink is the underline */
 
 #app { padding: 12px; max-width: 900px; margin: 0 auto; }
 
@@ -348,7 +348,8 @@ p.muted { line-height: 1.5; margin: 0 0 12px; }
   min-height: 48px;
 }
 
-.btn-primary { background: var(--pink); color: #fff; }
+/* Black on the logo pink (4.93:1): white would be 3.63:1 at 14px. */
+.btn-primary { background: var(--pink); color: var(--text); }
 .btn-primary:active { background: var(--pink-deep); }
 .btn-quiet { background: var(--bg); color: var(--text); border-color: var(--line); }
 .btn-danger { background: var(--bg); color: var(--danger); border-color: #f0c9c6; }
@@ -384,7 +385,7 @@ p.muted { line-height: 1.5; margin: 0 0 12px; }
   min-height: 40px;
 }
 
-.chip.is-on { background: var(--pink); border-color: var(--pink); color: #fff; }
+.chip.is-on { background: var(--pink); border-color: var(--pink); color: var(--text); }
 
 /* ── Sign in ────────────────────────────────────────────────────────────── */
 /* THE REFERENCE SCREEN. Everything above is this, repeated. */
@@ -392,7 +393,7 @@ p.muted { line-height: 1.5; margin: 0 0 12px; }
 /* The same logo opens the sign-in card — the reference screen of the palette
  * rule: white card, black type, one pink accent. */
 .signin-logo { display: block; width: 220px; max-width: 70%; height: auto; margin: 0 0 14px; }
-.msg { min-height: 20px; font-size: 13px; color: var(--pink); }
+.msg { min-height: 20px; font-size: 13px; color: var(--text); }
 
 /* ── Upload ─────────────────────────────────────────────────────────────── */
 .dropzone {
@@ -560,11 +561,11 @@ p.muted { line-height: 1.5; margin: 0 0 12px; }
 .chip .muted { text-transform: none; }
 
 /* "Single design" / "Flash sheet" — what a square upload is shown as.
- * Inverted active state (deep pink fill, white type, 5.78:1), never a ring;
+ * Inverted active state (logo-pink fill, black type, 4.93:1), never a ring;
  * corners are square.css's business. */
 .type-toggle { display: inline-flex; gap: 0; margin: 6px 0; }
 .type-toggle .type-opt { padding: 6px 12px; font-size: 13px; }
-.type-toggle .type-opt.is-on { background: #C2156F; color: #fff; }
+.type-toggle .type-opt.is-on { background: var(--pink); color: var(--text); }
 .set-all { margin: 10px 0 4px; }
 .size-note { margin-left: 6px; }
 
@@ -599,7 +600,7 @@ p.muted { line-height: 1.5; margin: 0 0 12px; }
   scroll-margin-top: 132px;
 }
 .upl-status[hidden] { display: none; }
-.upl-ok { background: #fdeaf4; border-left-color: var(--pink); }
+.upl-ok { background: #FFE9F4; border-left-color: var(--pink); }
 .upl-error { background: #fdecea; color: var(--danger); border-left-color: var(--danger); }
 .upl-text { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .upl-mark {
@@ -607,10 +608,10 @@ p.muted { line-height: 1.5; margin: 0 0 12px; }
   width: 22px; height: 22px;
   display: inline-flex; align-items: center; justify-content: center;
   font-size: 15px; font-weight: 800;
-  color: #fff;
+  color: var(--text);           /* black on the logo pink */
   background: var(--pink-deep);
 }
-.upl-error .upl-mark { background: var(--danger); }
+.upl-error .upl-mark { background: var(--danger); color: #fff; }
 .upl-list { margin: 6px 0 0; padding-left: 18px; font-weight: 400; }
 .upl-list li { margin: 2px 0; }
 
@@ -618,7 +619,7 @@ p.muted { line-height: 1.5; margin: 0 0 12px; }
   flex: 0 0 auto;
   width: 18px; height: 18px;
   margin-top: 2px;
-  border: 3px solid #f4c6df;
+  border: 3px solid #FEBEDD;
   border-top-color: var(--pink);
   animation: upl-spin 0.8s linear infinite;
 }

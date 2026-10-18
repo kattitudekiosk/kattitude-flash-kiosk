@@ -42,7 +42,7 @@ body.sheets-has-back #sheetBackBtn { display: inline-flex; }
 .g-seedbanner {
   flex: 0 0 auto;
   background: var(--pink);
-  color: #fff;
+  color: var(--text);           /* small text on the logo pink is black (4.80:1) */
   font-size: 14px;
   font-weight: 600;
   letter-spacing: 0.14em;
@@ -116,7 +116,8 @@ body.sheets-has-back #sheetBackBtn { display: inline-flex; }
 }
 
 .g-back svg { width: 22px; height: 22px; }
-.g-back.pressed { transform: translateY(-50%) scale(0.94); background: #c2156f; }
+/* Pressed: the same logo pink, darkened by a filter — there is no second pink. */
+.g-back.pressed { transform: translateY(-50%) scale(0.94); background: var(--pink); filter: brightness(0.86); }
 
 /* BACK AT THE BOTTOM (9 Oct 2026 — Joshua: "move the back button to the
  * bottom of the screen"). Every Back on the kiosk — page headers, the single-
@@ -147,7 +148,7 @@ body.sheets-has-back #sheetBackBtn { display: inline-flex; }
 .g-back svg { width: 32px; height: 32px; }
 /* Colour only when pressed — a transform here would make the button the
  * containing block of the bar below and shrink it for a frame. */
-.g-back.pressed, .g-back.g-back-detail.pressed { transform: none; background: #c2156f; }
+.g-back.pressed, .g-back.g-back-detail.pressed { transform: none; background: var(--pink); filter: brightness(0.86); }
 
 /* On gallery pages the page stops 144px short of the bottom, leaving a clean
  * strip of the gallery's own white ground for the button — so a tile or card
@@ -195,7 +196,7 @@ body.mode-gallery #gallery:has(.g-back) { padding-bottom: 144px; box-sizing: bor
   text-align: center;
 }
 
-.g-home-help strong { font-weight: 600; color: var(--pink); }
+.g-home-help strong { font-weight: 700; color: var(--text); text-decoration: underline; text-decoration-color: var(--pink); text-decoration-thickness: 3px; text-underline-offset: 4px; }
 
 .g-card {
   display: block;
@@ -214,7 +215,7 @@ body.mode-gallery #gallery:has(.g-back) { padding-bottom: 144px; box-sizing: bor
 
 /* Studio-wide card reads as "browse everything", not as another artist. */
 .g-card-all {
-  background: linear-gradient(135deg, var(--pink), #c2156f);
+  background: var(--pink);   /* the logo pink, flat (was a pink-to-deep-pink gradient) */
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -229,8 +230,10 @@ body.mode-gallery #gallery:has(.g-back) { padding-bottom: 144px; box-sizing: bor
 }
 
 .g-card-all-sub {
-  font-size: 18px;
-  color: rgba(255, 255, 255, 0.85);
+  /* Large text (19px bold) so it stays white on the logo pink at 3.63:1. */
+  font-size: 19px;
+  font-weight: 700;
+  color: #ffffff;
   letter-spacing: 0.05em;
   margin-top: 4px;
 }
@@ -279,7 +282,7 @@ body.mode-gallery #gallery:has(.g-back) { padding-bottom: 144px; box-sizing: bor
 .g-card-span { grid-column: 1 / -1; }
 
 /* Pink fill rather than black — the wall of black cards read as heavy.
-   Brand pink at full strength (#E91E8C) only gives white text 4.18:1, so the
+   [17 Oct 2026] Every pink is the logo's #FC258D (white on it: 3.63:1). Was: #E91E8C only gave white text 4.18:1, so the
    fill is a shade deeper: the hue is unchanged but white now clears 5.8:1 and
    the logo yellow clears 4.5:1, both comfortable at arm's length. */
 .g-card-artist {
@@ -306,9 +309,10 @@ body.mode-gallery #gallery:has(.g-back) { padding-bottom: 144px; box-sizing: bor
   height: 138px;
   border-radius: 0;
   overflow: hidden;
-  /* Portraits are drawn on a dark ground; a translucent black well keeps them
-     from looking like bright holes punched in a pink card. */
-  background: rgba(0, 0, 0, 0.28);
+  /* White well (17 Oct 2026): the old translucent black well over the pink
+     card read as a SECOND, darker pink. A photo covers it; a letter circle
+     shows the logo pink initials on white (69px: large text, 3.63:1). */
+  background: #ffffff;
   border: none;
   display: flex;
   align-items: center;
@@ -320,7 +324,7 @@ body.mode-gallery #gallery:has(.g-back) { padding-bottom: 144px; box-sizing: bor
 .g-card-initials {
   font-family: 'Bebas Neue', 'Inter', sans-serif;
   font-size: 69px;   /* letter circles grow with the photos: was 52px */
-  color: #fff;
+  color: var(--pink);
 }
 
 .g-card-meta { min-width: 0; }
@@ -388,8 +392,10 @@ body.mode-gallery #gallery:has(.g-back) { padding-bottom: 144px; box-sizing: bor
   background: var(--surface);
   color: var(--text);
   font-family: 'Inter', sans-serif;
-  font-size: 18px;
-  font-weight: 600;
+  /* 19px bold: large text, so white on the logo pink (3.63:1) is readable
+     when a chip is active. Every chip, so turning one on never shifts it. */
+  font-size: 19px;
+  font-weight: 700;
   letter-spacing: 0.03em;
   white-space: nowrap;
   transition: transform 0.1s, background 0.12s, border-color 0.12s, color 0.12s;
@@ -407,7 +413,7 @@ body.mode-gallery #gallery:has(.g-back) { padding-bottom: 144px; box-sizing: bor
   color: #fff;
 }
 
-.g-chip-artist { background: rgba(233, 30, 140, 0.12); color: var(--pink); }
+.g-chip-artist { background: rgba(252, 37, 141, 0.12); color: var(--pink); }
 
 /* ── Grid ─────────────────────────────────────────────────────────────── */
 .g-grid {
@@ -958,11 +964,16 @@ body.mode-gallery .qr-badge.qr-inline { display: flex !important; }
   text-overflow: ellipsis;
 }
 
-.g-card-category .g-card-count { color: rgba(255, 255, 255, 0.85); margin-top: 2px; }
+.g-card-category .g-card-count { color: var(--text); margin-top: 2px; }   /* small text on the logo pink: black */
 .g-card-category.pressed { filter: brightness(1.12); }
 
 /* Counts on a pink card: the logo yellow clears 4.5:1 here. */
-.g-card-artist .g-card-count { color: var(--gold); }
+/* On the logo pink the card's small lines are black: the yellow count was
+   2.84:1 and the white handle 3.63:1 at 18px — both too thin. The name stays
+   white (24–38px Bebas: large text). 17 Oct 2026. */
+.g-card-artist .g-card-count,
+.g-card-artist .g-card-handle,
+.g-card-artist .g-card-styles { color: var(--text); }
 
 /* ── Proportional scaling ─────────────────────────────────────────────────
  * The kiosk is 1080x1920 and a phone is ~390x844 — both portrait, so the

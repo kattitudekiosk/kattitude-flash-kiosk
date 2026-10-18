@@ -618,10 +618,19 @@ highlight."*
 - **BLACK is TYPE.** It is not a background. There is no black slab anywhere:
   no masthead, no dark grey identity strip, no black tab bar. If a region of
   the screen reads as predominantly dark, it is wrong.
-- **PINK is the accent, small and deliberate.** The active tab and its
-  underline, primary buttons, the eyebrow label, the role pill. `#E91E8C`
-  for accents; `#C2156F` under white text, because white on `#E91E8C` is
-  4.18:1 and too thin for a fill.
+- **PINK is the accent, small and deliberate — and there is ONE pink, the
+  logo's `#FC258D`** (**[17 Oct 2026]** Joshua: *"everything needs to use the
+  logo's pink"*). The active tab's underline, primary buttons, the role pill,
+  cards, chips, Back, focus rings, the spinner. No second pink: no deep pink,
+  no gradient to a darker pink, no pressed-state pink (pressed is the same
+  pink under `filter: brightness()`). Light grounds use a TINT of it
+  (`#FFE9F4`, `#FEBEDD`, or `rgba(252,37,141,a)`).
+- **Text and the logo pink.** White on `#FC258D` is **3.63:1** and pink text
+  on white is the same. So white-on-pink or pink text only when LARGE —
+  ≥24px, or bold ≥18.66px; everything smaller is BLACK (`#1a1a1a` 4.80:1,
+  `#17171a` 4.93:1 on the pink), with the pink as the fill or underline.
+  `tools/verify-logo-pink.js` greps every shipped file for any other pink and
+  measures every rendered pink text pair on the kiosk and the dashboard.
 - **YELLOW is a highlight, sparingly.** Never a heading colour, never a fill
   behind a slab.
 
@@ -640,16 +649,16 @@ one dark surface in the whole product is the attract loop, which is video.
 
 | Token | Value | Use |
 |---|---|---|
-| Primary pink | `#E91E8C` | accents, banner |
-| Deep pink | `#C2156F` | card fills behind white text (5.78:1) |
-| Logo yellow | `#FDE446` | counts, category card (ink text only) |
+| Logo pink | `#FC258D` | every pink: accents, fills, cards, buttons (`--pink`, `--pink-card`, `--pink-deep` all equal it) |
+| Pink tints | `#FFE9F4`, `#FEBEDD`, `rgba(252,37,141,a)` | light grounds only |
+| Logo yellow | `#FFE448` | highlight; ink text only (13.6:1); never text on the pink (2.84:1) |
 | Ink | `#1a1a1a` | text |
 | Paper | `#ffffff` / `#f7f7f7` | page ground |
 
 **Contrast is a requirement.** This is read from a metre away by someone
-standing up. White on primary pink is 4.18:1 — too thin for a large fill.
-State the ratio when you commit a colour. **[CORRECTED]** ink on logo yellow is
-**13.94:1**, not the 13.6:1 the draft claimed.
+standing up. White on the logo pink is 3.63:1 — large text only.
+State the ratio when you commit a colour. Ink `#1a1a1a` on the logo yellow
+`#FFE448` is **13.6:1** (it was 13.94:1 on the old `#FDE446`).
 
 **No borders.** Fill, spacing and shadow separate things — not outlines.
 

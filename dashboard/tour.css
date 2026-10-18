@@ -63,7 +63,7 @@
   position: fixed;
   z-index: 19;            /* ties #tabs, loses to #topbar, beats the page */
   pointer-events: none;
-  outline: 3px solid #E91E8C;
+  outline: 3px solid #FC258D;
   outline-offset: 3px;
   box-shadow: 0 0 0 9999px rgba(20, 20, 20, 0.35);
 
@@ -192,7 +192,7 @@
   font-family: 'Bebas Neue', Inter, sans-serif;
   font-size: 15px;
   letter-spacing: 0.08em;
-  color: #C2156F;
+  color: var(--text, #17171a);  /* 15px: black; the progress dots carry the pink */
   white-space: nowrap;
 }
 
@@ -204,8 +204,8 @@
   border-radius: 50%;      /* progress dots — dots are round or they are dashes */
   background: #d9d9d9;
 }
-.tour-dot.is-done { background: #E91E8C; }
-.tour-dot.is-now  { background: #C2156F; transform: scale(1.5); }
+.tour-dot.is-done { background: #FC258D; }
+.tour-dot.is-now  { background: #FC258D; transform: scale(1.5); }
 
 .tour-title {
   font-family: 'Bebas Neue', Inter, sans-serif;
@@ -246,7 +246,7 @@
  * cannot otherwise tell where focus went. */
 .tour-actions .btn:focus { outline: none; }
 .tour-actions .btn:focus-visible {
-  outline: 3px solid #E91E8C;
+  outline: 3px solid #FC258D;
   outline-offset: 2px;
 }
 
@@ -289,7 +289,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--pink, #E91E8C);
+  background: var(--pink, #FC258D);
   /* A ring in the tab-strip's own background, so the dot reads as sitting
      ON the tab rather than being part of the label. */
   box-shadow: 0 0 0 2px var(--bg, #fff);
@@ -314,7 +314,7 @@
   border-radius: 50%;
   border: none;
   padding: 0;
-  background: #E91E8C;
+  background: #FC258D;
   color: #fff;
   font-family: 'Bebas Neue', Inter, sans-serif;
   font-size: 30px;

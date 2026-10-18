@@ -36,10 +36,10 @@
  *   | bg-white/5     | #f6f6f7  --surface      | the picker card, the    |
  *   |                |                         | icon button at rest     |
  *   | bg-white/10    | #ececef  --raised       | hover                   |
- *   | bg-white/black | #C2156F  --pink-deep    | applied, and open       |
+ *   | bg-white/black | #FC258D  --pink-deep    | applied, and open       |
  *
  * CONTRAST, stated as CLAUDE.md requires:
- *   white on #C2156F .................... 5.78:1   applied chip, open icon
+ *   black on #FC258D (logo pink) ........ 4.93:1   applied chip, open icon (17 Oct 2026; was white on #C2156F)
  *   #17171a on #f6f6f7 .................. 16.56:1  picker body text
  *   #6b6b74 on #ffffff .................. 5.28:1   the "not tagged yet" prompt
  *   #6b6b74 on #f6f6f7 .................. 4.88:1   micro-labels in the picker
@@ -91,7 +91,7 @@
 
 .chip-applied {
   background: var(--pink-deep);
-  color: #fff;                  /* 5.78:1 */
+  color: var(--text);           /* black on the logo pink, 4.93:1 (white would be 3.63:1 at 12px) */
 }
 
 .chip-more {
@@ -166,7 +166,7 @@
 /* Open inverts and scales up, which is the tray's own active state. */
 .tagtoggle.is-on {
   background: var(--pink-deep);
-  color: #fff;                  /* 5.78:1 */
+  color: var(--text);           /* 4.93:1 */
   transform: scale(1.1);
 }
 
@@ -240,7 +240,7 @@
 .tagpanel-foot .btn { flex: 1 1 auto; }
 
 /* ── One contrast fix, reaching back into dashboard.css ─────────────────
- * .chip.is-on ships as white on --pink #E91E8C, which measures 4.18:1 —
+ * [17 Oct 2026: every pink is now the logo's #FC258D; text on it is black.] History: .chip.is-on shipped as white on --pink #E91E8C, which measures 4.18:1 —
  * under AA for 13px text, and CLAUDE.md says so itself: "White on primary
  * pink is 4.18:1 — too thin for a large fill." --pink-deep is the token that
  * exists for exactly this job: "Deep pink #C2156F — card fills behind white
@@ -251,6 +251,7 @@
 .chip.is-on {
   background: var(--pink-deep);
   border-color: var(--pink-deep);
+  color: var(--text);
 }
 
 /* Somebody who has asked their phone not to animate things gets the card,

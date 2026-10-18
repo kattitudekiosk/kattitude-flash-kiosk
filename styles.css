@@ -40,28 +40,30 @@
 :root {
   --bg:        #ffffff;
   --surface:   #f7f7f7;
-  --pink:      #E91E8C;
+  --pink:      #FC258D;
 
-  /* Same hue, one step deeper. Used where pink is a large FILL carrying text:
-     #E91E8C gives white only 4.18:1, which is thin for a wall panel read from
-     a metre away. This clears 5.78:1 for white and 4.51:1 for the logo yellow. */
-  --pink-card: #C2156F;
+  /* ONE PINK, THE LOGO'S (Joshua, 17 Oct 2026: "everything needs to use the
+     logo's pink"). --pink-card used to be a deeper #C2156F for white text;
+     it is the logo pink now, and the text on it follows CLAUDE.md's rule:
+     white only when large (≥24px, or bold ≥18.66px — 3.63:1), otherwise
+     black (#1a1a1a, 4.80:1). tools/verify-logo-pink.js enforces both. */
+  --pink-card: #FC258D;
 
-  /* The logo's yellow. Sampled from the old logo; the 2026 logo's own yellow
-     is #FFE448 — near-identical, kept as-is for the UI. */
-  --yellow:    #FDE446;
-  --gold:      #FDE446;
+  /* The 2026 logo's own yellow, exactly (was #FDE446, sampled from the old
+     logo). Never text on the pink: 2.84:1. */
+  --yellow:    #FFE448;
+  --gold:      #FFE448;
 
   /* Same hue held, value dropped until it reads as type. Not currently used —
-     kept here because #FDE446 scores 1.28:1 on white, so any label that has
+     kept here because the logo yellow scores ~1.3:1 on white, so any label that has
      to be legible on a light surface needs either this or a dark pill behind
      it. */
   --gold-ink:  #8A790D;
 
   --text:      #1a1a1a;
   --text-dim:  rgba(26,26,26,0.4);
-  --pink-dim:  rgba(233,30,140,0.35);
-  --yellow-dim: rgba(253,228,70,0.45);
+  --pink-dim:  rgba(252,37,141,0.35);
+  --yellow-dim: rgba(255,228,72,0.45);
 }
 
 /* ─── Reset & base ──────────────────────────────────────────────────────── */
@@ -155,8 +157,8 @@ html, body {
 }
 
 @keyframes logo-breathe {
-  0%, 100% { filter: drop-shadow(0 0 14px rgba(233,30,140,0.12)); }
-  50%       { filter: drop-shadow(0 0 26px rgba(233,30,140,0.30)); }
+  0%, 100% { filter: drop-shadow(0 0 14px rgba(252,37,141,0.12)); }
+  50%       { filter: drop-shadow(0 0 26px rgba(252,37,141,0.30)); }
 }
 
 .splash-divider {
