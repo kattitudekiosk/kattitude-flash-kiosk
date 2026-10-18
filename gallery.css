@@ -1017,3 +1017,108 @@ body.mode-gallery .qr-badge.qr-inline { display: flex !important; }
   color: #000;
   margin: 28px 0 12px;
 }
+
+/* ── Who made this sheet ────────────────────────────────────────────────────
+ * Joshua, 17 Oct 2026: artists don't always put their name on a sheet, so in
+ * View All a customer could not tell whose flash they were looking at. The
+ * sheet viewer's tray and the single-design lightbox say so: photo, name,
+ * @handle. Sized for the PHONE as much as the wall: the canvas is scaled to
+ * 0.36 on a 390px phone, so 44px here is ~16px there.
+ *
+ * Ink on the tray surface for the name (~17:1); the handle in DEEP pink
+ * (#C2156F, 5.78:1 on white) because at phone size it is small text and
+ * #E91E8C (4.18:1) would be too thin. Square everything — except the face,
+ * which is the recorded headshot exception (CLAUDE.md, avatars are circles).
+ *
+ * In the tray it sits ABOVE the dots, centred, and is kept clear of the QR
+ * (left, 16–154px + caption) and Back (right, 842–1052px) by its max-width. */
+.sheet-credit {
+  display: flex;
+  justify-content: center;
+  max-width: 560px;
+  width: 100%;
+  min-width: 0;
+}
+.sheet-credit[hidden] { display: none; }
+body.screensaver .sheet-credit,
+body.attract .sheet-credit { display: none !important; }
+
+.credit {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  max-width: 100%;
+  color: var(--text);
+  text-decoration: none;
+}
+a.credit { pointer-events: auto; cursor: pointer; }
+
+.credit-face {
+  position: relative;
+  flex: 0 0 auto;
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;       /* the headshot exception — a face is a circle */
+  overflow: hidden;
+  background: #C2156F;
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Bebas Neue', 'Inter', sans-serif;
+  font-size: 34px;
+  letter-spacing: 0.04em;
+}
+.credit-face img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.credit-words {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.05;
+  text-align: left;
+}
+.credit-by {
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #C2156F;
+}
+.credit-name {
+  font-family: 'Bebas Neue', 'Inter', sans-serif;
+  font-size: 44px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.credit-handle {
+  font-family: 'Inter', sans-serif;
+  font-size: 26px;
+  font-weight: 700;
+  color: #C2156F;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* In the tray the credit makes it taller; Back still sits inside it. */
+body.sheets-has-back.sheet-has-credit #footer { min-height: 176px; }
+
+/* Lightbox: the credit sits in the bottom meta, left of Back (842px on). */
+.credit-detail {
+  margin: 6px 0 8px;
+  max-width: calc(100% - 270px);
+}

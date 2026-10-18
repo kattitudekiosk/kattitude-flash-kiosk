@@ -569,7 +569,15 @@
     btnPrev.classList.toggle('hidden', current === 0);
     btnNext.classList.toggle('hidden', current === sheets.length - 1);
     updateDots();
+    // Whoever drives the viewer (gallery.js) hears about every sheet shown,
+    // so the artist credit and QR follow the slide. A fault there must not
+    // stop the viewer.
+    if (onSheetChange) {
+      try { onSheetChange(sheets[current], current); }
+      catch (err) { console.log('[sheets] onChange failed (non-fatal):', err && err.message ? err.message : err); }
+    }
   }
+  let onSheetChange = null;
 
   /* ── Zoom / Pan ────────────────────────────────────────────────────────── */
 
@@ -874,6 +882,8 @@
     },
     get count() { return sheets.length; },
     get current() { return current; },
+    /* fn(item, index) after every sheet change. Items may carry artistId. */
+    onChange(fn) { onSheetChange = typeof fn === 'function' ? fn : null; },
   };
 
   /* ── Start ──────────────────────────────────────────────────────────────── */

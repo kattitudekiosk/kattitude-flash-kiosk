@@ -35,6 +35,7 @@ function check(name, cond, detail) {
   else { failed++; console.log('  FAIL ' + name + (detail ? ' — ' + detail : '')); }
 }
 const wait = ms => new Promise(r => setTimeout(r, ms));
+const SHOTS = process.env.SHOTS || fs.mkdtempSync(path.join(os.tmpdir(), 'kt-layout-shots-'));
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg', '.JPEG': 'image/jpeg', '.webp': 'image/webp', '.woff2': 'font/woff2', '.svg': 'image/svg+xml', '.mp4': 'video/mp4' };
 
@@ -195,9 +196,16 @@ async function run(W, H) {
   await wait(800);
   if (await p.evaluate(() => { const t = document.querySelector('.g-tile-design'); if (t) t.dispatchEvent(new Event('click', { bubbles: true })); return !!t; })) {
     await backCheck('Single-design lightbox');
-    const meta = await p.evaluate(() => ({ title: (document.querySelector('.g-detail-title') || {}).textContent || null,
-      sub: (document.querySelector('.g-detail-sub') || {}).textContent || null }));
-    check('lightbox: an unnamed design shows the artist and no title line', meta.title === null && !!meta.sub, JSON.stringify(meta));
+    const meta = await p.evaluate(() => {
+      const c = document.querySelector('.g-detail-meta .credit'), bk = [...document.querySelectorAll('.g-back')].find(e => e.getBoundingClientRect().height > 0);
+      const cr = c && c.getBoundingClientRect(), br = bk && bk.getBoundingClientRect();
+      return { title: (document.querySelector('.g-detail-title') || {}).textContent || null,
+        name: c ? (c.querySelector('.credit-name') || {}).textContent : null, face: !!(c && c.querySelector('.credit-face')),
+        clearOfBack: !!(cr && br && (cr.right <= br.left || cr.bottom <= br.top)) };
+    });
+    // 17 Oct 2026: the lightbox credits the artist the same way as the sheet viewer.
+    check('lightbox: an unnamed design shows no title line and credits the artist (face + name), clear of Back',
+      meta.title === null && !!meta.name && meta.face && meta.clearOfBack, JSON.stringify(meta));
   }
   await p.evaluate(() => { window.KIOSK_ROUTER.goHome(); });
   await wait(400);
@@ -210,6 +218,52 @@ async function run(W, H) {
       const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
       return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); });
     check('the SHEET n / N counter is dark type (readable on the light header), not yellow', lum < 0.05, 'luminance ' + lum.toFixed(3));
+
+    /* 17 Oct 2026, Joshua: artists don't always sign a sheet, so the viewer
+     * says whose it is — and keeps saying it, correctly, slide after slide.
+     * Every sheet is checked against the catalog's own artist for it. */
+    const credits = [];
+    for (let i = 0; i < 20; i++) {
+      credits.push(await p.evaluate(() => {
+        const vis = e => e && !e.hidden && e.getBoundingClientRect().height > 0;
+        const slot = document.getElementById('sheetCredit'), c = slot && slot.querySelector('.credit');
+        const box = e => { const r = e.getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom }; };
+        const hit = (a, b) => a.l < b.r && a.r > b.l && a.t < b.b && a.b > b.t;
+        const src = document.getElementById('sheetImg').getAttribute('src') || '';
+        const item = window.Catalog.sheets().find(s => s.image && (src === s.image || src.endsWith(s.image) || s.image.endsWith(src)));
+        const artist = item && item.artistId && window.Catalog.artists.find(a => a.id === item.artistId);
+        const cb = vis(slot) && c ? box(c) : null;
+        const others = ['#qrBadge', '#qrCaption', '#sheetBackBtn', '#dots', '#stage'].map(q => document.querySelector(q)).filter(vis);
+        return {
+          label: document.getElementById('sheetLabel').textContent,
+          want: artist ? artist.name : null, wantIg: artist ? artist.instagram : null,
+          name: c ? c.querySelector('.credit-name').textContent : null,
+          handle: c ? (c.querySelector('.credit-handle') || {}).textContent || '' : '',
+          face: !!(c && c.querySelector('.credit-face')),
+          qr: document.getElementById('qrBadge').getAttribute('data-qr-url'),
+          inTray: !!(cb && document.getElementById('footer').contains(c)),
+          overlaps: cb ? others.filter(o => hit(cb, box(o))).map(o => o.id) : [],
+          nameSize: c ? parseFloat(getComputedStyle(c.querySelector('.credit-name')).fontSize) : 0,
+        };
+      }));
+      const more = await p.evaluate(() => { const n = document.getElementById('btnNext'); if (n.classList.contains('hidden')) return false;
+        n.dispatchEvent(new MouseEvent('click', { bubbles: true })); return true; });
+      if (!more) break;
+      await wait(1400);
+    }
+    const credited = credits.filter(c => c.want);
+    check(`sheet viewer: every sheet with an artist names them (${credited.length} of ${credits.length} sheets checked)`,
+      credited.length > 0 && credited.every(c => c.name === c.want && c.face && c.inTray), JSON.stringify(credits.filter(c => c.want && c.name !== c.want).slice(0, 3)));
+    check('sheet viewer: the credit changes with the slide (more than one artist seen, each matching its sheet)',
+      new Set(credited.map(c => c.name)).size > 1, [...new Set(credited.map(c => c.name))].join(', '));
+    check('sheet viewer: the corner QR points at THAT artist’s Instagram, slide by slide',
+      credited.every(c => !c.wantIg || c.qr === c.wantIg), JSON.stringify(credited.filter(c => c.wantIg && c.qr !== c.wantIg).slice(0, 2)));
+    check('sheet viewer: the credit overlaps nothing — not the sheet, the QR, its caption, the dots or Back',
+      credits.every(c => !c.overlaps.length), JSON.stringify(credits.filter(c => c.overlaps.length).slice(0, 2)));
+    check('sheet viewer: the name is big enough to read on a phone (44px on the canvas)', credited.every(c => Math.abs(c.nameSize - 44) < 1),   // computed size is canvas px; the canvas is scaled as a whole
+      credited.map(c => Math.round(c.nameSize)).join(','));
+    await backCheck('Sheet viewer, after paging');
+    await p.screenshot({ path: path.join(SHOTS, `sheet-viewer-${W}.png`) });
   }
   await browser.close();
 }
@@ -217,6 +271,7 @@ async function run(W, H) {
 (async () => {
   await run(1080, 1920);
   await run(390, 844);
-  console.log(`\n${passed} passed, ${failed} failed`);
+  console.log(`\nscreenshots: ${SHOTS}`);
+  console.log(`${passed} passed, ${failed} failed`);
   process.exit(failed ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });

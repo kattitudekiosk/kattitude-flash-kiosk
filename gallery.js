@@ -635,8 +635,11 @@ window.KIOSK_ROUTER = (function () {
     if (!badge) return;
 
     const artist = artistId ? snap.artists.find(a => a.id === artistId) : null;
-    const url = (artist && artist.instagram) || DEFAULT_QR_URL;
-    const label = artist ? 'Follow ' + (artist.handle || artist.name) : DEFAULT_QR_LABEL;
+    // "Follow" only when the code really goes to the artist: an artist with
+    // no Instagram on file gets the gallery code and its own caption.
+    const ig = artist && artist.instagram;
+    const url = ig || DEFAULT_QR_URL;
+    const label = ig ? 'Follow ' + (artist.handle || artist.name) : DEFAULT_QR_LABEL;
 
     if (badge.getAttribute('data-qr-url') === url) return;  // already correct
 
@@ -652,6 +655,62 @@ window.KIOSK_ROUTER = (function () {
       if (badge.parentNode) badge.parentNode.insertBefore(cap, badge.nextSibling);
     }
     cap.textContent = label;
+  }
+
+  /* ── Who made this sheet ──────────────────────────────────────────────────
+   * Joshua, 17 Oct 2026: "sometimes the artists don't add their name to the
+   * flash sheets so the customer wouldn't know or remember who the flash
+   * designs were created by". The sheet viewer and the single-design
+   * lightbox say whose work is on screen: small photo (or initials), name,
+   * @handle. On the wall it is text — a tap there must never leave the
+   * kiosk, and the corner QR is the way to the artist's Instagram. On a
+   * phone the name is a link to the same profile.
+   */
+  function artistOf(item) {
+    if (!item || !item.artistId) return null;
+    const a = snap.artists.find(x => x.id === item.artistId);
+    if (a) return a;
+    return item.artistName ? { id: item.artistId, name: item.artistName, handle: item.artistHandle || '', portrait: '', instagram: '' } : null;
+  }
+
+  function creditNode(artist, cls) {
+    const onWall = document.documentElement.classList.contains('kiosk-wall');
+    const link = !onWall && artist.instagram;
+    const node = el(link ? 'a' : 'div', cls);
+    if (link) { node.href = artist.instagram; node.target = '_blank'; node.rel = 'noopener'; }
+    const face = el('span', 'credit-face');
+    // Initials first, photo on top: a failed photo uncovers a face, never a hole.
+    face.appendChild(el('span', 'credit-initials',
+      artist.name.split(/\s+/).slice(0, 2).map(s => s[0] || '').join('').toUpperCase()));
+    if (artist.portrait) {
+      const img = el('img');
+      img.src = artist.portrait; img.alt = '';
+      img.addEventListener('error', () => img.remove(), { once: true });
+      face.appendChild(img);
+    }
+    node.appendChild(face);
+    const words = el('span', 'credit-words');
+    words.appendChild(el('span', 'credit-by', 'Flash by'));
+    words.appendChild(el('span', 'credit-name', artist.name));
+    if (artist.handle) words.appendChild(el('span', 'credit-handle', artist.handle));
+    node.appendChild(words);
+    node.setAttribute('aria-label', 'Flash by ' + artist.name + (artist.handle ? ', ' + artist.handle : ''));
+    return node;
+  }
+
+  /* Called by the sheet viewer on every slide (script.js SheetViewer.onChange). */
+  function paintSheetCredit(item) {
+    const slot = document.getElementById('sheetCredit');
+    const artist = artistOf(item);
+    if (slot) {
+      clear(slot);
+      if (artist) slot.appendChild(creditNode(artist, 'credit'));
+      slot.hidden = !artist;
+      document.body.classList.toggle('sheet-has-credit', !!artist);
+    }
+    // The corner QR follows the sheet: this artist's Instagram while their
+    // sheet is up, the page's own scope otherwise.
+    syncSheetQr((artist && artist.id) || view.artistId);
   }
 
   /* ── Artist follow panel ──────────────────────────────────────────────────
@@ -1217,10 +1276,10 @@ window.KIOSK_ROUTER = (function () {
 
     clear(detailEls.meta);
     if (item.title) detailEls.meta.appendChild(el('div', 'g-detail-title', item.title));
-    const sub = [];
-    if (item.artistName) sub.push(item.artistName);
-    if (item.categories.length) sub.push(item.categories.join(' • '));
-    if (sub.length) detailEls.meta.appendChild(el('div', 'g-detail-sub', sub.join('  —  ')));
+    // The same credit as the sheet viewer: photo, name, @handle.
+    const artist = artistOf(item);
+    if (artist) detailEls.meta.appendChild(creditNode(artist, 'credit credit-detail'));
+    if (item.categories.length) detailEls.meta.appendChild(el('div', 'g-detail-sub', item.categories.join(' • ')));
 
     const only = view.items.length <= 1;
     detailEls.prev.classList.toggle('hidden', only);
@@ -1358,9 +1417,13 @@ window.KIOSK_ROUTER = (function () {
 
     if (window.SheetViewer && typeof window.SheetViewer.setSheets === 'function') {
       const set = (list && list.length) ? list : window.Catalog.sheets();
+      if (typeof window.SheetViewer.onChange === 'function') window.SheetViewer.onChange(paintSheetCredit);
       window.SheetViewer.setSheets(set.map(sheetItem => ({
         title: sheetItem.title,
         file: sheetItem.image,
+        artistId: sheetItem.artistId || null,
+        artistName: sheetItem.artistName || null,
+        artistHandle: sheetItem.artistHandle || null,
       })));
     }
 

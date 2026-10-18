@@ -104,6 +104,11 @@
 
   <!-- FOOTER -->
   <footer id="footer">
+    <!-- Who made the sheet on screen (17 Oct 2026, Joshua: artists don't
+         always put their name on a sheet, so a customer in View All couldn't
+         tell whose it was). Filled by gallery.js on every slide; empty and
+         hidden for a sheet with no artist. -->
+    <div class="sheet-credit" id="sheetCredit" hidden></div>
     <div class="dots" id="dots"></div>
     <!-- Invariant 1: arrow buttons are the navigation. The touch driver turns
          HID into MOUSE events, so touchstart/touchmove may never fire and a

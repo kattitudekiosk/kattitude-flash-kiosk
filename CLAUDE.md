@@ -835,6 +835,23 @@ before decoding starts.
 - Physical sizing on a 32" panel (~69 ppi): detail 2.04 mm/module, artist card
   1.42 mm, sheet corner 1.08 mm.
 
+## WHO MADE THIS SHEET — **[ADDED 17 Oct 2026]**
+
+Joshua: *"sometimes the artists don't add their name to the flash sheets so
+the customer wouldn't know or remember who the flash designs were created
+by in view all mode."* The sheet viewer (from View All and from an artist
+page) and the single-design lightbox always credit the artist: small photo
+(initials if none), name, @handle, in the tray above the dots / in the
+lightbox's bottom meta, never over the artwork. It follows the slide
+(`SheetViewer.onChange` in `script.js` → `paintSheetCredit` in `gallery.js`).
+The corner QR follows it too: the sheet's artist's Instagram, captioned
+"Follow @handle" — "Follow" only when there IS an Instagram. On the wall
+(`html.kiosk-wall`) the credit is plain text, because a tap must never leave
+the kiosk; on a phone it is a link to the artist's Instagram.
+`tools/verify-kiosk-layout.js` checks every sheet against the catalog's own
+artist, the QR per slide, and that the credit overlaps nothing; origin/main
+fails it.
+
 ## GRID LAYOUT RULE — **[REPLACED 2 Oct 2026]**
 
 Joshua: *"the grid is not good"* — the staggered 2-column sheet blocks left
